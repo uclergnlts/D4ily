@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(timeout 3 tail:*)",
+      "Bash(npm run test:unit:*)",
+      "Bash(npm run test:integration:*)",
+      "Bash(curl:*)",
+      "Bash(npm run db:generate:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx tsc:*)",
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(npm run db:seed:*)",
+      "Bash(timeout /t 5 /nobreak)",
+      "Bash(powershell -Command:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run db:migrate:*)",
+      "Bash(cmd //c \"taskkill /PID 49864 /F\")",
+      "Bash(npm start)",
+      "Bash(cmd //c \"taskkill /PID 91592 /F\")",
+      "Bash(npx expo start)",
+      "Bash(npx expo start --web)",
+      "Bash(start:*)",
+      "Bash(cmd //c \"taskkill /PID 85668 /F\")",
+      "Bash(ls:*)",
+      "Bash(timeout 10 tail:*)",
+      "Bash(node --loader tsx -e:*)"
+    ]
+  }
+}

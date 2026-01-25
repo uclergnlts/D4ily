@@ -1,0 +1,404 @@
+import { Hono } from 'hono';
+import { db } from '../config/db.js';
+import {
+    notifications,
+    userDevices,
+    userNotificationPreferences,
+} from '../db/schema/index.js';
+import { authMiddleware, AuthUser } from '../middleware/auth.js';
+import { eq, and, desc } from 'drizzle-orm';
+import { logger } from '../config/logger.js';
+import { z } from 'zod';
+import { v4 as uuidv4 } from 'uuid';
+
+type Variables = {
+    user: AuthUser;
+};
+
+const notificationsRoute = new Hono<{ Variables: Variables }>();
+
+// Apply auth middleware to all routes
+notificationsRoute.use('*', authMiddleware);
+
+// Schemas
+const registerDeviceSchema = z.object({
+    fcmToken: z.string().min(1, 'FCM token is required'),
+    deviceType: z.enum(['ios', 'android']),
+    deviceName: z.string().optional(),
+});
+
+const updatePreferencesSchema = z.object({
+    notifFollowedSources: z.boolean().optional(),
+    notifDailyDigest: z.boolean().optional(),
+    notifWeeklyComparison: z.boolean().optional(),
+    notifBreakingNews: z.boolean().optional(),
+    notifComments: z.boolean().optional(),
+});
+
+// ===========================
+// DEVICE MANAGEMENT
+// ===========================
+
+/**
+ * POST /notifications/register-device
+ * Register a device for push notifications
+ */
+notificationsRoute.post('/register-device', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const body = await c.req.json();
+        const { fcmToken, deviceType, deviceName } = registerDeviceSchema.parse(body);
+
+        // Check if device already registered (by fcmToken)
+        const existing = await db
+            .select()
+            .from(userDevices)
+            .where(eq(userDevices.fcmToken, fcmToken))
+            .get();
+
+        if (existing) {
+            // Update existing device
+            await db
+                .update(userDevices)
+                .set({
+                    userId: user.uid,
+                    deviceType,
+                    deviceName: deviceName || null,
+                    isActive: true,
+                    lastActive: new Date(),
+                })
+                .where(eq(userDevices.id, existing.id));
+
+            logger.info({ userId: user.uid, deviceId: existing.id }, 'Device updated');
+
+            return c.json({
+                success: true,
+                message: 'Device updated',
+                data: { deviceId: existing.id },
+            });
+        }
+
+        // Register new device
+        const deviceId = uuidv4();
+        await db.insert(userDevices).values({
+            id: deviceId,
+            userId: user.uid,
+            fcmToken,
+            deviceType,
+            deviceName: deviceName || null,
+            isActive: true,
+            createdAt: new Date(),
+            lastActive: new Date(),
+        });
+
+        logger.info({ userId: user.uid, deviceId }, 'Device registered');
+
+        return c.json({
+            success: true,
+            message: 'Device registered',
+            data: { deviceId },
+        }, 201);
+    } catch (error) {
+        logger.error({ error }, 'Register device failed');
+        return c.json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to register device',
+        }, 400);
+    }
+});
+
+/**
+ * GET /notifications/devices
+ * Get user's registered devices
+ */
+notificationsRoute.get('/devices', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+
+        const devices = await db
+            .select()
+            .from(userDevices)
+            .where(eq(userDevices.userId, user.uid));
+
+        return c.json({
+            success: true,
+            data: devices,
+        });
+    } catch (error) {
+        return c.json({
+            success: false,
+            error: 'Failed to get devices',
+        }, 500);
+    }
+});
+
+/**
+ * DELETE /notifications/device/:deviceId
+ * Remove a device
+ */
+notificationsRoute.delete('/device/:deviceId', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const { deviceId } = c.req.param();
+
+        const deleted = await db
+            .delete(userDevices)
+            .where(and(
+                eq(userDevices.id, deviceId),
+                eq(userDevices.userId, user.uid)
+            ))
+            .returning()
+            .get();
+
+        if (!deleted) {
+            return c.json({
+                success: false,
+                error: 'Device not found',
+            }, 404);
+        }
+
+        logger.info({ userId: user.uid, deviceId }, 'Device removed');
+
+        return c.json({
+            success: true,
+            message: 'Device removed',
+        });
+    } catch (error) {
+        logger.error({ error }, 'Remove device failed');
+        return c.json({
+            success: false,
+            error: 'Failed to remove device',
+        }, 500);
+    }
+});
+
+// ===========================
+// NOTIFICATION PREFERENCES
+// ===========================
+
+/**
+ * GET /notifications/preferences
+ * Get user's notification preferences
+ */
+notificationsRoute.get('/preferences', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+
+        let preferences = await db
+            .select()
+            .from(userNotificationPreferences)
+            .where(eq(userNotificationPreferences.userId, user.uid))
+            .get();
+
+        // Create default preferences if not exists
+        if (!preferences) {
+            await db.insert(userNotificationPreferences).values({
+                userId: user.uid,
+                notifFollowedSources: true,
+                notifDailyDigest: true,
+                notifWeeklyComparison: true,
+                notifBreakingNews: true,
+                notifComments: true,
+                notifAlignmentChanges: true,
+                updatedAt: new Date(),
+            });
+
+            preferences = {
+                userId: user.uid,
+                notifFollowedSources: true,
+                notifDailyDigest: true,
+                notifWeeklyComparison: true,
+                notifBreakingNews: true,
+                notifComments: true,
+                notifAlignmentChanges: true,
+                updatedAt: new Date(),
+            };
+        }
+
+        return c.json({
+            success: true,
+            data: preferences,
+        });
+    } catch (error) {
+        logger.error({ error }, 'Get preferences failed');
+        return c.json({
+            success: false,
+            error: 'Failed to get preferences',
+        }, 500);
+    }
+});
+
+/**
+ * PUT /notifications/preferences
+ * Update notification preferences
+ */
+notificationsRoute.put('/preferences', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const body = await c.req.json();
+        const validatedData = updatePreferencesSchema.parse(body);
+
+        // Check if preferences exist
+        const existing = await db
+            .select()
+            .from(userNotificationPreferences)
+            .where(eq(userNotificationPreferences.userId, user.uid))
+            .get();
+
+        if (existing) {
+            // Update existing
+            await db
+                .update(userNotificationPreferences)
+                .set({
+                    ...validatedData,
+                    updatedAt: new Date(),
+                })
+                .where(eq(userNotificationPreferences.userId, user.uid));
+        } else {
+            // Create new
+            await db.insert(userNotificationPreferences).values({
+                userId: user.uid,
+                notifFollowedSources: validatedData.notifFollowedSources ?? true,
+                notifDailyDigest: validatedData.notifDailyDigest ?? true,
+                notifWeeklyComparison: validatedData.notifWeeklyComparison ?? true,
+                notifBreakingNews: validatedData.notifBreakingNews ?? true,
+                notifComments: validatedData.notifComments ?? true,
+                updatedAt: new Date(),
+            });
+        }
+
+        logger.info({ userId: user.uid }, 'Notification preferences updated');
+
+        return c.json({
+            success: true,
+            message: 'Preferences updated',
+        });
+    } catch (error) {
+        logger.error({ error }, 'Update preferences failed');
+        return c.json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update preferences',
+        }, 400);
+    }
+});
+
+// ===========================
+// NOTIFICATION HISTORY
+// ===========================
+
+/**
+ * GET /notifications/history
+ * Get user's notification history
+ */
+notificationsRoute.get('/history', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const page = parseInt(c.req.query('page') ?? '1');
+        const limit = parseInt(c.req.query('limit') ?? '20');
+        const offset = (page - 1) * limit;
+
+        const userNotifications = await db
+            .select()
+            .from(notifications)
+            .where(eq(notifications.userId, user.uid))
+            .orderBy(desc(notifications.sentAt))
+            .limit(limit)
+            .offset(offset);
+
+        // Count unread
+        const allNotifications = await db
+            .select()
+            .from(notifications)
+            .where(eq(notifications.userId, user.uid));
+
+        const unreadCount = allNotifications.filter(n => !n.isRead).length;
+
+        return c.json({
+            success: true,
+            data: {
+                notifications: userNotifications,
+                unreadCount,
+                pagination: {
+                    page,
+                    limit,
+                    hasMore: userNotifications.length === limit,
+                },
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Get notification history failed');
+        return c.json({
+            success: false,
+            error: 'Failed to get notification history',
+        }, 500);
+    }
+});
+
+/**
+ * PUT /notifications/:id/read
+ * Mark notification as read
+ */
+notificationsRoute.put('/:notificationId/read', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const { notificationId } = c.req.param();
+
+        const updated = await db
+            .update(notifications)
+            .set({ isRead: true })
+            .where(and(
+                eq(notifications.id, notificationId),
+                eq(notifications.userId, user.uid)
+            ))
+            .returning()
+            .get();
+
+        if (!updated) {
+            return c.json({
+                success: false,
+                error: 'Notification not found',
+            }, 404);
+        }
+
+        return c.json({
+            success: true,
+            message: 'Notification marked as read',
+        });
+    } catch (error) {
+        logger.error({ error }, 'Mark notification read failed');
+        return c.json({
+            success: false,
+            error: 'Failed to mark notification as read',
+        }, 500);
+    }
+});
+
+/**
+ * PUT /notifications/read-all
+ * Mark all notifications as read
+ */
+notificationsRoute.put('/read-all', async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+
+        await db
+            .update(notifications)
+            .set({ isRead: true })
+            .where(eq(notifications.userId, user.uid));
+
+        logger.info({ userId: user.uid }, 'All notifications marked as read');
+
+        return c.json({
+            success: true,
+            message: 'All notifications marked as read',
+        });
+    } catch (error) {
+        logger.error({ error }, 'Mark all read failed');
+        return c.json({
+            success: false,
+            error: 'Failed to mark all as read',
+        }, 500);
+    }
+});
+
+export default notificationsRoute;

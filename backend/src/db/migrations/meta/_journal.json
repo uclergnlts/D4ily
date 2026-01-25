@@ -1,0 +1,41 @@
+{
+  "version": "5",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1769028285282,
+      "tag": "0000_zippy_cobalt_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1769028379380,
+      "tag": "0001_short_obadiah_stane",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769056883798,
+      "tag": "0002_motionless_rawhide_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1769165789289,
+      "tag": "0003_mixed_krista_starr",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1769177437740,
+      "tag": "0004_perpetual_madelyne_pryor",
+      "breakpoints": true
+    }
+  ]
+}
