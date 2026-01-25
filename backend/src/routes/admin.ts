@@ -117,13 +117,41 @@ admin.post('/scrape/:sourceId', scrapeRateLimiter, async (c) => {
     }
 });
 
+import { runScraper } from '../cron/scraperCron.js';
+
+/**
+ * POST /admin/scrape-trigger
+ * Trigger the main scraper routine (same as cron job)
+ */
+admin.post('/scrape-trigger', scrapeRateLimiter, async (c) => {
+    try {
+        logger.info('Manual scraper trigger received');
+
+        // Run asynchronously without waiting
+        runScraper().catch(err => {
+            logger.error({ error: err }, 'Manual triggered scraper failed');
+        });
+
+        return c.json({
+            success: true,
+            message: 'Scraper process started in background',
+        });
+    } catch (error) {
+        logger.error({ error }, 'Failed to trigger scraper');
+        return c.json({
+            success: false,
+            error: 'Failed to start scraper',
+        }, 500);
+    }
+});
+
 /**
  * POST /admin/scrape-all
- * Manually trigger scraping for ALL active sources
+ * Manually trigger scraping for ALL active sources (waits for completion)
  */
 admin.post('/scrape-all', scrapeRateLimiter, async (c) => {
     try {
-        logger.info('Manual scraping triggered for all sources');
+        logger.info('Manual scraping triggered for all sources (waiting mode)');
 
         // Get all active sources
         const sources = await db

@@ -16,90 +16,65 @@ export const ArticleCard = React.memo(({ article }: ArticleCardProps) => {
     const sourceName = primarySource?.sourceName || 'Kaynak';
     const sourceLogo = primarySource?.sourceLogoUrl;
 
-    // Calculate color based on political alignment for the dot
-    const alignmentColor = (article.govAlignmentScore || 0) > 2 ? '#3b82f6' : (article.govAlignmentScore || 0) < -2 ? '#ef4444' : '#f59e0b';
-
     return (
         <Link href={`/article/${article.id}`} asChild>
-            <TouchableOpacity className="bg-white dark:bg-zinc-900 mb-4 mx-4 rounded-[24px] shadow-sm border border-zinc-100 dark:border-zinc-800 active:scale-[0.99] transition-transform overflow-hidden">
-
-                {/* Header: Source Info */}
-                <View className="flex-row items-center justify-between px-4 py-3">
-                    <View className="flex-row items-center gap-3">
+            <TouchableOpacity className="bg-white dark:bg-zinc-900 mx-4 mb-3 p-4 rounded-[20px] shadow-sm border border-zinc-50 dark:border-zinc-800 active:scale-[0.99] transition-transform">
+                <View className="flex-row items-center justify-between mb-2">
+                    <View className="flex-row items-center gap-2">
                         {sourceLogo ? (
                             <Image
                                 source={{ uri: sourceLogo }}
-                                style={{ width: 32, height: 32, borderRadius: 8 }} // Square with rounded corners per design
+                                style={{ width: 16, height: 16, borderRadius: 4 }}
                                 contentFit="contain"
-                                transition={200}
                             />
-                        ) : (
-                            <View className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 items-center justify-center">
-                                <Text className="text-xs font-bold text-zinc-500">{sourceName.charAt(0)}</Text>
-                            </View>
-                        )}
-                        <View>
-                            <Text className="text-[14px] font-bold text-zinc-900 dark:text-white leading-tight">
-                                {sourceName}
-                            </Text>
-                            <TimeAgo date={article.publishedAt} className="text-[11px] text-zinc-400 font-medium" />
-                        </View>
+                        ) : null}
+                        <Text className="text-[13px] font-bold text-zinc-900 dark:text-white">
+                            {sourceName}
+                        </Text>
+                        <Text className="text-[12px] text-zinc-400">
+                            • <TimeAgo date={article.publishedAt} />
+                        </Text>
                     </View>
-
-                    {/* Status Dot */}
-                    <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: alignmentColor }} />
+                    <View className="w-2 h-2 rounded-full bg-orange-500" />
                 </View>
 
-                {/* Article Image - New Addition */}
-                <View className="px-4 mb-3">
+                <View className="flex-row gap-4">
+                    <View className="flex-1">
+                        <Text className="text-[15px] font-bold text-zinc-900 dark:text-white leading-[22px] mb-2">
+                            {article.translatedTitle}
+                        </Text>
+                        <Text
+                            numberOfLines={3}
+                            className="text-[13px] text-zinc-500 dark:text-zinc-400 leading-[18px]"
+                        >
+                            {article.summary || "Haber detayı için tıklayınız..."}
+                        </Text>
+                    </View>
                     <Image
-                        source={{ uri: article.imageUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=2070&auto=format&fit=crop' }} // Fallback image
-                        style={{ width: '100%', height: 200, borderRadius: 16 }}
+                        source={{ uri: article.imageUrl || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?q=80&w=2070&auto=format&fit=crop' }}
+                        style={{ width: 100, height: 100, borderRadius: 12 }}
                         contentFit="cover"
                         transition={200}
                     />
                 </View>
 
-                {/* Content Body */}
-                <View className="px-5 pb-3">
-                    <Text className="text-[17px] font-black text-zinc-900 dark:text-white leading-[24px] mb-2 tracking-tight">
-                        {article.translatedTitle}
-                    </Text>
-
-                    <Text
-                        numberOfLines={3}
-                        className="text-[14px] text-zinc-500 dark:text-zinc-400 leading-[20px] font-medium"
-                    >
-                        {article.summary}
-                    </Text>
-                </View>
-
-                {/* Footer: Stats & Actions */}
-                <View className="flex-row items-center justify-between px-5 py-3 border-t border-zinc-50 dark:border-zinc-800/50">
-
-                    {/* Left: Views & Comments */}
-                    <View className="flex-row items-center gap-4">
-                        <View className="flex-row items-center gap-1.5">
-                            <Eye size={16} color="#a1a1aa" />
-                            <Text className="text-[13px] text-zinc-500 font-medium">{article.viewCount || 664}</Text>
-                        </View>
-                        <View className="flex-row items-center gap-1.5">
-                            <MessageCircle size={16} color="#a1a1aa" />
-                            <Text className="text-[13px] text-zinc-500 font-medium">{article.commentCount || 12}</Text>
-                        </View>
+                <View className="flex-row items-center gap-4 mt-3">
+                    <View className="flex-row items-center gap-1.5">
+                        <Eye size={14} color="#a1a1aa" />
+                        <Text className="text-[12px] text-zinc-400 font-medium">{article.viewCount || 664}</Text>
                     </View>
-
-                    {/* Right: Actions */}
-                    <View className="flex-row items-center gap-4">
-                        <TouchableOpacity>
-                            <Bookmark size={20} color="#a1a1aa" />
-                        </TouchableOpacity>
-                        <TouchableOpacity>
-                            <Share2 size={20} color="#a1a1aa" />
-                        </TouchableOpacity>
+                    <View className="flex-row items-center gap-1.5">
+                        <MessageCircle size={14} color="#a1a1aa" />
+                        <Text className="text-[12px] text-zinc-400 font-medium">{article.commentCount || 12}</Text>
                     </View>
+                    <View className="flex-1" />
+                    <TouchableOpacity>
+                        <Bookmark size={18} color="#a1a1aa" />
+                    </TouchableOpacity>
+                    <TouchableOpacity>
+                        <Share2 size={18} color="#a1a1aa" />
+                    </TouchableOpacity>
                 </View>
-
             </TouchableOpacity>
         </Link>
     );

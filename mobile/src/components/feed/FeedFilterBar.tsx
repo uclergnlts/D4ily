@@ -25,11 +25,11 @@ interface FeedFilterBarProps {
 
 export const FeedFilterBar = React.memo(({ selectedCategory, onSelectCategory, className }: FeedFilterBarProps) => {
     return (
-        <View className={`bg-white dark:bg-zinc-900 ${className}`}>
+        <View className={`bg-transparent border-b border-zinc-100 dark:border-zinc-800 ${className}`}>
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
+                contentContainerStyle={{ paddingHorizontal: 16 }}
                 className="flex-row"
             >
                 {CATEGORIES.map((cat) => {
@@ -38,27 +38,17 @@ export const FeedFilterBar = React.memo(({ selectedCategory, onSelectCategory, c
                         <TouchableOpacity
                             key={cat.id}
                             onPress={() => onSelectCategory(cat.id)}
-                            className={`mr-3 px-6 py-2 rounded-full border transition-all active:scale-95 ${isSelected
-                                ? 'bg-[#1A1A1A] border-[#1A1A1A] dark:bg-white dark:border-white'
-                                : 'bg-white border-zinc-100 dark:bg-zinc-800/50 dark:border-zinc-700'
-                                }`}
-                            style={{
-                                shadowColor: "#000",
-                                shadowOffset: {
-                                    width: 0,
-                                    height: 1,
-                                },
-                                shadowOpacity: 0.05,
-                                shadowRadius: 2,
-                                elevation: 2,
-                            }}
+                            className="mr-6 py-4 relative"
                         >
-                            <Text className={`text-[13px] font-bold tracking-wide ${isSelected
-                                ? 'text-white dark:text-zinc-900'
+                            <Text className={`text-[15px] font-semibold tracking-tight ${isSelected
+                                ? 'text-black dark:text-white'
                                 : 'text-zinc-500 dark:text-zinc-400'
                                 }`}>
                                 {cat.name}
                             </Text>
+                            {isSelected && (
+                                <View className="absolute bottom-0 left-0 right-0 h-[2px] bg-black dark:bg-white rounded-full" />
+                            )}
                         </TouchableOpacity>
                     );
                 })}

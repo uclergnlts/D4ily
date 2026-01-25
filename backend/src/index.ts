@@ -30,9 +30,12 @@ const app = new Hono();
 
 // CORS Middleware
 app.use('*', cors({
-    origin: env.NODE_ENV === 'production'
-        ? ['https://admin.d4ily.com'] // Add your production domains here
-        : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:3000', 'http://127.0.0.1:5173'],
+    origin: (origin) => {
+        if (env.NODE_ENV === 'production') {
+            return origin === 'https://admin.d4ily.com' ? origin : null;
+        }
+        return origin || '*';
+    },
     credentials: true,
 }));
 
@@ -112,5 +115,6 @@ console.log(`🔔 Alignment notification cron job active (every 5 minutes)`);
 
 serve({
     fetch: app.fetch,
-    port
+    port,
+    hostname: '0.0.0.0'
 });

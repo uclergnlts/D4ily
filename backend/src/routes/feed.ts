@@ -91,8 +91,8 @@ app.get('/:country', async (c) => {
 
             const balancedData = await getBalancedFeed(country, { limit, page });
 
-            // Cache for 5 minutes
-            await cacheSet(cacheKey, balancedData, 300);
+            // Cache for 1 minute for fresher data
+            await cacheSet(cacheKey, balancedData, 60);
 
             return c.json({
                 success: true,
@@ -169,8 +169,8 @@ app.get('/:country', async (c) => {
             },
         };
 
-        // Cache for 5 minutes
-        await cacheSet(cacheKey, response, 300);
+        // Cache for 1 minute for fresher data
+        await cacheSet(cacheKey, response, 60);
 
         return c.json({
             success: true,

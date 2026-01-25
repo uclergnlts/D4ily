@@ -13,6 +13,17 @@ export const digestService = {
         return response.data.data;
     },
 
+    getDigests: async (country: string) => {
+        // Backend: GET /digest/:country (returns list of recent digests)
+        const response = await client.get<ApiResponse<DailyDigest[]>>(`/digest/${country}`);
+
+        if (!response.data.success) {
+            throw new Error(response.data.error || 'Failed to fetch digests');
+        }
+
+        return response.data.data;
+    },
+
     getDigestById: async (country: string, digestId: string) => {
         const response = await client.get<ApiResponse<DailyDigest>>(`/digest/${country}/${digestId}`);
 

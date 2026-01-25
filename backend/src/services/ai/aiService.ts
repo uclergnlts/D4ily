@@ -58,6 +58,26 @@ export async function processArticleWithAI(
     content: string,
     language: string
 ): Promise<ProcessedArticle> {
+    // Fallback if content is too short
+    if (!content || content.length < 50) {
+        return {
+            translatedTitle: title,
+            summary: content || title,
+            isClickbait: false,
+            isAd: false,
+            category: 'Dünya',
+            topics: [],
+            sentiment: 'neutral',
+            politicalTone: 0,
+            politicalConfidence: 0,
+            governmentMentioned: false,
+            emotionalTone: null,
+            emotionalIntensity: 0,
+            loadedLanguageScore: 0,
+            sensationalismScore: 0,
+        };
+    }
+
     // Check cache first
     const cacheKey = generateCacheKey(title, content);
     const cached = aiCache.get(cacheKey);
@@ -173,7 +193,8 @@ Return ONLY valid JSON, no additional text.`;
         logger.error({
             error: errorMessage,
             stack: errorStack,
-            title: title.substring(0, 50)
+            title: title.substring(0, 50),
+            hint: 'Check OpenAI API Key, Quota, or Internet Connection'
         }, 'OpenAI processing failed');
 
         // Fallback: return basic data without AI processing

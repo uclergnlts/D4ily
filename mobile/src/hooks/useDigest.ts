@@ -9,6 +9,14 @@ export function useLatestDigest(country: string = 'tr') {
     });
 }
 
+export function useDigests(country: string = 'tr') {
+    return useQuery({
+        queryKey: ['digests', country],
+        queryFn: () => digestService.getDigests(country),
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
+}
+
 export function useDigestDetail(country: string, digestId: string) {
     return useQuery({
         queryKey: ['digest', digestId],

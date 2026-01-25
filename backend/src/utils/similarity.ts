@@ -42,6 +42,6 @@ export function calculateSimilarity(str1: string, str2: string): number {
 /**
  * Check if two articles are duplicates based on title similarity
  */
-export function isDuplicate(title1: string, title2: string, threshold = 0.8): boolean {
+export function isDuplicate(title1: string, title2: string, threshold = 0.7): boolean {
     return calculateSimilarity(title1, title2) >= threshold;
 }
