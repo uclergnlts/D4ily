@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Activity, Award, ChevronRight, History, ShieldCheck, TrendingUp, BookOpen } from 'lucide-react-native';
 
-const { width: _width } = Dimensions.get('window'); // Kept for future use
+// const { width } = Dimensions.get('window'); // Kept for future use
 
 export default function AnalysisScreen() {
     // const [selectedTab, setSelectedTab] = useState<'overview' | 'stats'>('overview'); // Commented out - not used yet

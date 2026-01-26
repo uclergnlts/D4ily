@@ -27,48 +27,90 @@ export async function analyzeArticleEmotions(
     language: string
 ): Promise<EmotionalAnalysis> {
     try {
-        const prompt = `Analyze the emotional tone and linguistic characteristics of this news article.
+        // Clean and prepare content - remove HTML tags and extra whitespace
+        const cleanContent = content
+            .replace(/<[^>]*>/g, '') // Remove HTML tags
+            .replace(/\s+/g, ' ')    // Normalize whitespace
+            .trim();
+        
+        // Use more content for better analysis (up to 3500 chars)
+        const analysisContent = cleanContent.substring(0, 3500);
+        
+        // Determine prompt language based on content language
+        const isTurkish = language === 'tr' || language === 'turkish';
+        
+        const systemPrompt = isTurkish 
+            ? `Sen bir medya analisti ve haber içerik uzmanısın. Verilen haber metninin SADECE HABERİN KENDİSİNDEKİ duygusal tonunu analiz et. 
+               
+               ÖNEMLİ KURALLAR:
+               - Haberin KONUSU hakkında değil, HABERİN YAZILIŞ ŞEKLİ hakkında analiz yap
+               - Gazetecinin kullandığı dil ve üsluba odaklan
+               - Haberin nasıl çerçevelendiğine (framing) bak
+               - Manipülatif veya yönlendirici dil kullanımını tespit et
+               - Sadece geçerli JSON döndür, başka metin ekleme`
+            : `You are a media analyst and news content expert. Analyze ONLY the emotional tone of HOW the news is written, not the topic itself.
+               
+               IMPORTANT RULES:
+               - Analyze the WRITING STYLE, not the news topic
+               - Focus on the language and tone used by the journalist
+               - Look at how the news is framed
+               - Detect manipulative or biased language usage
+               - Return only valid JSON, no additional text`;
 
-Title: ${title}
-Content: ${content.substring(0, 2000)}
-Language: ${language}
+        const prompt = isTurkish 
+            ? `Bu haber metninin YAZILIŞ ŞEKLİNİ ve DUYGUSAL TONUNU analiz et.
 
-Provide a JSON response with:
-1. emotional_tone: Object with emotion scores (0-1 each):
-   - anger: Level of angry/outraged tone
-   - fear: Level of fear/worry inducing content
-   - joy: Level of positive/happy content
-   - sadness: Level of sad/melancholic content
-   - surprise: Level of shocking/unexpected content
+BAŞLIK: ${title}
 
-2. emotional_intensity: Overall emotional intensity (0-1)
-   - 0: Completely neutral, factual reporting
-   - 0.3-0.5: Normal news with some emotional content
-   - 0.6-0.8: Strong emotional appeal
-   - 0.9-1: Highly emotionally charged
+İÇERİK: ${analysisContent}
 
-3. loaded_language_score: Use of biased/loaded language (0-1)
-   - 0: Completely neutral language
-   - 0.5: Some loaded terms
-   - 1: Heavy use of emotionally manipulative language
+SADECE HABERİN YAZILIŞ ŞEKLİNİ analiz et. Haberin konusu (örn: kaza, ölüm, kutlama) değil, gazetecinin bu haberi NASIL yazdığı önemli.
 
-4. sensationalism_score: Level of sensationalism (0-1)
-   - 0: Factual, balanced reporting
-   - 0.5: Some exaggeration or dramatic framing
-   - 1: Highly sensationalist, clickbait-style
+JSON formatında yanıt ver:
+{
+  "emotional_tone": {
+    "anger": 0-1 arası (gazetecinin öfkeli/kışkırtıcı dil kullanımı),
+    "fear": 0-1 arası (korku/endişe yaratan dil kullanımı),
+    "joy": 0-1 arası (olumlu/neşeli dil kullanımı),
+    "sadness": 0-1 arası (üzüntü vurgulayan dil kullanımı),
+    "surprise": 0-1 arası (şok edici/sansasyonel dil kullanımı)
+  },
+  "emotional_intensity": 0-1 arası (genel duygusal yoğunluk - 0: tamamen nötr, tarafsız haber dili, 0.5: normal haber dili, 1: çok yoğun duygusal dil),
+  "loaded_language_score": 0-1 arası (yüklü/yönlendirici kelime kullanımı - 0: nötr, 1: çok yüklü),
+  "sensationalism_score": 0-1 arası (sansasyonellik - 0: düz haber, 1: clickbait tarzı),
+  "dominant_emotion": "anger/fear/joy/sadness/surprise/neutral" (en baskın duygu),
+  "analysis_notes": "Haberin yazılış şekli hakkında 1-2 cümlelik Türkçe açıklama"
+}`
+            : `Analyze the WRITING STYLE and EMOTIONAL TONE of this news article.
 
-5. dominant_emotion: The most prominent emotion (anger/fear/joy/sadness/surprise/neutral)
+TITLE: ${title}
 
-6. analysis_notes: Brief Turkish explanation (1-2 sentences) of the emotional framing
+CONTENT: ${analysisContent}
 
-Return ONLY valid JSON, no additional text.`;
+Analyze ONLY HOW the news is written. The topic (e.g., accident, death, celebration) is not important - focus on HOW the journalist wrote this news.
+
+Respond in JSON format:
+{
+  "emotional_tone": {
+    "anger": 0-1 (journalist's use of angry/provocative language),
+    "fear": 0-1 (fear/anxiety inducing language),
+    "joy": 0-1 (positive/cheerful language),
+    "sadness": 0-1 (sadness-emphasizing language),
+    "surprise": 0-1 (shocking/sensational language)
+  },
+  "emotional_intensity": 0-1 (overall emotional intensity - 0: completely neutral, factual, 0.5: normal news language, 1: highly emotional language),
+  "loaded_language_score": 0-1 (loaded/biased word usage - 0: neutral, 1: heavily loaded),
+  "sensationalism_score": 0-1 (sensationalism - 0: straight news, 1: clickbait style),
+  "dominant_emotion": "anger/fear/joy/sadness/surprise/neutral" (most dominant emotion),
+  "analysis_notes": "1-2 sentence explanation about the writing style in ${isTurkish ? 'Turkish' : 'English'}"
+}`;
 
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
             messages: [
                 {
                     role: 'system',
-                    content: 'You are an expert media analyst specializing in emotional content analysis and detecting manipulative framing in news articles. Analyze objectively and return valid JSON only.',
+                    content: systemPrompt,
                 },
                 {
                     role: 'user',
@@ -76,7 +118,7 @@ Return ONLY valid JSON, no additional text.`;
                 },
             ],
             response_format: { type: 'json_object' },
-            temperature: 0.2,
+            temperature: 0.1, // Lower temperature for more consistent results
         });
 
         const result = JSON.parse(response.choices[0].message.content || '{}');
@@ -101,8 +143,13 @@ Return ONLY valid JSON, no additional text.`;
 
         logger.info({
             title: title.substring(0, 50),
+            language,
+            contentLength: cleanContent.length,
             dominantEmotion: analysis.dominantEmotion,
             intensity: analysis.emotionalIntensity,
+            sensationalism: analysis.sensationalismScore,
+            loadedLanguage: analysis.loadedLanguageScore,
+            notes: analysis.analysisNotes.substring(0, 100),
         }, 'Emotional analysis completed');
 
         return analysis;

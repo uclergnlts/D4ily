@@ -26,7 +26,7 @@ export const FeaturedCarousel = React.memo(({ articles }: FeaturedCarouselProps)
             if (url) {
                 try {
                     await WebBrowser.openBrowserAsync(url);
-                } catch (_e) {
+                } catch {
                     // Fallback or silent fail
                 }
             }

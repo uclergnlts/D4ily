@@ -1,5 +1,5 @@
  
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -61,7 +61,7 @@ const SettingsItem = ({
 
 export default function SettingsScreen() {
     const router = useRouter();
-    const [_notificationsEnabled, _setNotificationsEnabled] = useState(true); // Kept for future use
+    // const [notificationsEnabled, setNotificationsEnabled] = useState(true); // Kept for future use
     const { mode, setMode } = useThemeStore();
 
     // Simple toggle: If dark, go light. If light or system, go dark (enforce explicit mode)

@@ -6,6 +6,11 @@ export default defineConfig({
         globals: true,
         environment: 'node',
         setupFiles: ['./tests/setup.ts'],
+        server: {
+            deps: {
+                inline: ['pino', 'pino-pretty', 'sonic-boom', 'thread-stream'],
+            },
+        },
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, FlatList, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+// import { useRouter } from 'expo-router'; // Kept for future navigation
 import { Search, X, TrendingUp } from 'lucide-react-native';
 import { FlashList } from '@shopify/flash-list';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withSequence } from 'react-native-reanimated';
@@ -47,7 +47,7 @@ export default function ExploreScreen() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
-  const _router = useRouter(); // Kept for future navigation
+  // const router = useRouter(); // Kept for future navigation
   const categoriesQuery = useCategories();
 
   // Debounce logic

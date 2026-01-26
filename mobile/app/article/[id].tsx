@@ -58,7 +58,7 @@ export default function ArticleDetailScreen() {
         if (!article?.sources?.[0]?.sourceUrl) return;
         try {
             await WebBrowser.openBrowserAsync(article.sources[0].sourceUrl);
-        } catch (_e) {
+        } catch {
             Alert.alert('Hata', 'Kaynak açılamadı.');
         }
     };
