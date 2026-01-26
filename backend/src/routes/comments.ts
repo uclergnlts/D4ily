@@ -14,7 +14,7 @@ type Variables = {
 const commentsRoute = new Hono<{ Variables: Variables }>();
 
 // Validation schemas
-const countrySchema = z.enum(['tr', 'de', 'us']);
+const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']);
 
 const createCommentSchema = z.object({
     articleId: z.string().min(1, 'Article ID is required'),
@@ -35,8 +35,8 @@ commentsRoute.get('/:country/:articleId', async (c) => {
         const { country, articleId } = c.req.param();
         const validatedCountry = countrySchema.parse(country);
 
-        const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const page = parseInt(c.req.query('page') ?? '1', 10);
+        const limit = parseInt(c.req.query('limit') ?? '20', 10);
         const offset = (page - 1) * limit;
 
         // Get top-level comments (no parent)

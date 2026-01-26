@@ -571,8 +571,8 @@ admin.get('/stats', async (c) => {
  */
 admin.get('/users', async (c) => {
     try {
-        const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const page = parseInt(c.req.query('page') ?? '1', 10);
+        const limit = parseInt(c.req.query('limit') ?? '20', 10);
         const offset = (page - 1) * limit;
 
         const allUsers = await db
@@ -702,8 +702,8 @@ admin.patch('/users/:userId', async (c) => {
 admin.get('/articles', async (c) => {
     try {
         const country = c.req.query('country') as 'tr' | 'de' | 'us' || 'tr';
-        const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const page = parseInt(c.req.query('page') ?? '1', 10);
+        const limit = parseInt(c.req.query('limit') ?? '20', 10);
         const offset = (page - 1) * limit;
         const category = c.req.query('category');
         const sentiment = c.req.query('sentiment');
@@ -723,7 +723,10 @@ admin.get('/articles', async (c) => {
         // Build conditions
         const conditions = [];
         if (category) {
-            conditions.push(eq(articlesTable.categoryId, parseInt(category)));
+            const categoryId = parseInt(category, 10);
+            if (!isNaN(categoryId)) {
+                conditions.push(eq(articlesTable.categoryId, categoryId));
+            }
         }
         if (sentiment && ['positive', 'neutral', 'negative'].includes(sentiment)) {
             conditions.push(eq(articlesTable.sentiment, sentiment as 'positive' | 'neutral' | 'negative'));

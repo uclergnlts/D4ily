@@ -33,6 +33,17 @@ const COUNTRY_TABLES = {
     ru: ru_daily_digests,
 } as const;
 
+// Safe JSON parse helper
+function safeJsonParse<T>(value: string | T, fallback: T): T {
+    if (typeof value !== 'string') return value;
+    try {
+        return JSON.parse(value) as T;
+    } catch {
+        logger.warn({ value }, 'Failed to parse JSON, using fallback');
+        return fallback;
+    }
+}
+
 /**
  * GET /digest/:country/latest
  * Get the latest daily digest
@@ -52,9 +63,7 @@ digestRoute.get('/:country/latest', async (c) => {
         }
 
         // Parse topTopics from JSON string
-        const topTopics = typeof digest.topTopics === 'string'
-            ? JSON.parse(digest.topTopics)
-            : digest.topTopics;
+        const topTopics = safeJsonParse(digest.topTopics, []);
 
         return c.json({
             success: true,
@@ -98,7 +107,7 @@ digestRoute.get('/:country', async (c) => {
                 success: true,
                 data: digests.map(d => ({
                     ...d,
-                    topTopics: typeof d.topTopics === 'string' ? JSON.parse(d.topTopics) : d.topTopics,
+                    topTopics: safeJsonParse(d.topTopics, []),
                 })),
             });
         }
@@ -113,9 +122,7 @@ digestRoute.get('/:country', async (c) => {
             }, 404);
         }
 
-        const topTopics = typeof digest.topTopics === 'string'
-            ? JSON.parse(digest.topTopics)
-            : digest.topTopics;
+        const topTopics = safeJsonParse(digest.topTopics, []);
 
         return c.json({
             success: true,
@@ -168,9 +175,7 @@ digestRoute.get('/:country/:digestId', async (c) => {
             .orderBy(desc(comments.createdAt))
             .limit(20);
 
-        const topTopics = typeof digest.topTopics === 'string'
-            ? JSON.parse(digest.topTopics)
-            : digest.topTopics;
+        const topTopics = safeJsonParse(digest.topTopics, []);
 
         return c.json({
             success: true,

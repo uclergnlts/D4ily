@@ -212,7 +212,7 @@ app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
             }, 400);
         }
 
-        const country = countryValidation.data as 'tr' | 'de' | 'us';
+        const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         // Get article (don't cache to ensure fresh view count)
         const tables = COUNTRY_TABLES[country];
@@ -316,7 +316,7 @@ app.get('/:country/:articleId/perspectives', async (c) => {
             }, 400);
         }
 
-        const country = countryValidation.data as 'tr' | 'de' | 'us';
+        const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         // Check cache first
         const cacheKey = `perspectives:${country}:${articleId}`;
@@ -367,7 +367,7 @@ app.get('/:country/:articleId/analysis', async (c) => {
             }, 400);
         }
 
-        const country = countryValidation.data as 'tr' | 'de' | 'us';
+        const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         // Check cache first
         const cacheKey = `analysis:${country}:${articleId}`;

@@ -32,7 +32,9 @@
       "Bash(cmd //c \"taskkill /PID 85668 /F\")",
       "Bash(ls:*)",
       "Bash(timeout 10 tail:*)",
-      "Bash(node --loader tsx -e:*)"
+      "Bash(node --loader tsx -e:*)",
+      "Bash(timeout:*)",
+      "Bash(find:*)"
     ]
   }
 }

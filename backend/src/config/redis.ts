@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis';
 import { env } from './env.js';
+import { logger } from './logger.js';
 
 export const redis = new Redis({
     url: env.UPSTASH_REDIS_REST_URL,
@@ -20,7 +21,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
         const data = await withTimeout(redis.get(key), 3000);
         return data as T | null;
     } catch (error) {
-        console.warn('Redis cacheGet failed:', error);
+        logger.warn({ error }, 'Redis cacheGet failed');
         return null;
     }
 }
@@ -33,7 +34,7 @@ export async function cacheSet(key: string, value: any, ttlSeconds?: number) {
             await withTimeout(redis.set(key, value), 3000);
         }
     } catch (error) {
-        console.warn('Redis cacheSet failed:', error);
+        logger.warn({ error }, 'Redis cacheSet failed');
     }
 }
 
@@ -44,6 +45,6 @@ export async function cacheInvalidate(pattern: string) {
             await withTimeout(redis.del(...keys), 3000);
         }
     } catch (error) {
-        console.warn('Redis cacheInvalidate failed:', error);
+        logger.warn({ error }, 'Redis cacheInvalidate failed');
     }
 }

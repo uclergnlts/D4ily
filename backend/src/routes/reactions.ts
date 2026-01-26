@@ -7,6 +7,11 @@ import {
     tr_articles,
     de_articles,
     us_articles,
+    uk_articles,
+    fr_articles,
+    es_articles,
+    it_articles,
+    ru_articles,
 } from '../db/schema/index.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
@@ -26,23 +31,28 @@ const COUNTRY_TABLES = {
     tr: tr_articles,
     de: de_articles,
     us: us_articles,
+    uk: uk_articles,
+    fr: fr_articles,
+    es: es_articles,
+    it: it_articles,
+    ru: ru_articles,
 } as const;
 
 // Schemas
 const reactionSchema = z.object({
     articleId: z.string(),
-    countryCode: z.enum(['tr', 'de', 'us']),
+    countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']),
     action: z.enum(['like', 'dislike', 'remove']),
 });
 
 const bookmarkSchema = z.object({
     articleId: z.string(),
-    countryCode: z.enum(['tr', 'de', 'us']),
+    countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']),
 });
 
 const historySchema = z.object({
     articleId: z.string(),
-    countryCode: z.enum(['tr', 'de', 'us']),
+    countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']),
     timeSpent: z.number().optional(),
 });
 
@@ -51,7 +61,7 @@ const historySchema = z.object({
  */
 async function updateArticleReactionCounts(
     articleId: string,
-    countryCode: 'tr' | 'de' | 'us',
+    countryCode: 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru',
     likeChange: number,
     dislikeChange: number
 ) {
@@ -255,8 +265,8 @@ reactionRoute.post('/bookmark', authMiddleware, async (c) => {
 reactionRoute.get('/bookmarks', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
-        const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const page = parseInt(c.req.query('page') ?? '1', 10);
+        const limit = parseInt(c.req.query('limit') ?? '20', 10);
         const offset = (page - 1) * limit;
 
         const userBookmarks = await db.select()
@@ -269,7 +279,7 @@ reactionRoute.get('/bookmarks', authMiddleware, async (c) => {
         // Fetch article details for each bookmark
         const bookmarksWithArticles = await Promise.all(
             userBookmarks.map(async (bookmark) => {
-                const table = COUNTRY_TABLES[bookmark.countryCode as 'tr' | 'de' | 'us'];
+                const table = COUNTRY_TABLES[bookmark.countryCode as keyof typeof COUNTRY_TABLES];
                 if (!table) return { ...bookmark, article: null };
 
                 const article = await db
@@ -333,8 +343,8 @@ reactionRoute.post('/history', authMiddleware, async (c) => {
 reactionRoute.get('/history', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
-        const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const page = parseInt(c.req.query('page') ?? '1', 10);
+        const limit = parseInt(c.req.query('limit') ?? '20', 10);
         const offset = (page - 1) * limit;
 
         const history = await db.select()
@@ -347,7 +357,7 @@ reactionRoute.get('/history', authMiddleware, async (c) => {
         // Fetch article details
         const historyWithArticles = await Promise.all(
             history.map(async (item) => {
-                const table = COUNTRY_TABLES[item.countryCode as 'tr' | 'de' | 'us'];
+                const table = COUNTRY_TABLES[item.countryCode as keyof typeof COUNTRY_TABLES];
                 if (!table) return { ...item, article: null };
 
                 const article = await db

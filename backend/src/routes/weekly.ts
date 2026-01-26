@@ -7,6 +7,17 @@ import { getLatestWeeklyComparison, getWeeklyComparisonByWeek } from '../service
 
 const weeklyRoute = new Hono();
 
+// Safe JSON parse helper
+function safeJsonParse<T>(value: string | T, fallback: T): T {
+    if (typeof value !== 'string') return value;
+    try {
+        return JSON.parse(value) as T;
+    } catch {
+        logger.warn({ value }, 'Failed to parse JSON, using fallback');
+        return fallback;
+    }
+}
+
 /**
  * GET /weekly/latest
  * Get the latest weekly comparison
@@ -23,9 +34,7 @@ weeklyRoute.get('/latest', async (c) => {
         }
 
         // Parse countriesData from JSON string
-        const countriesData = typeof comparison.countriesData === 'string'
-            ? JSON.parse(comparison.countriesData)
-            : comparison.countriesData;
+        const countriesData = safeJsonParse(comparison.countriesData, {});
 
         return c.json({
             success: true,
@@ -62,9 +71,7 @@ weeklyRoute.get('/', async (c) => {
                 }, 404);
             }
 
-            const countriesData = typeof comparison.countriesData === 'string'
-                ? JSON.parse(comparison.countriesData)
-                : comparison.countriesData;
+            const countriesData = safeJsonParse(comparison.countriesData, {});
 
             return c.json({
                 success: true,
@@ -86,9 +93,7 @@ weeklyRoute.get('/', async (c) => {
             success: true,
             data: comparisons.map(comp => ({
                 ...comp,
-                countriesData: typeof comp.countriesData === 'string'
-                    ? JSON.parse(comp.countriesData)
-                    : comp.countriesData,
+                countriesData: safeJsonParse(comp.countriesData, {}),
             })),
         });
     } catch (error) {
@@ -133,9 +138,7 @@ weeklyRoute.get('/:comparisonId', async (c) => {
             .orderBy(desc(comments.createdAt))
             .limit(20);
 
-        const countriesData = typeof comparison.countriesData === 'string'
-            ? JSON.parse(comparison.countriesData)
-            : comparison.countriesData;
+        const countriesData = safeJsonParse(comparison.countriesData, {});
 
         return c.json({
             success: true,
