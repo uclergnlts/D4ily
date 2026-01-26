@@ -38,7 +38,14 @@ export function useToggleBookmark() {
             interactionService.toggleBookmark(country, articleId),
         onSuccess: (_, { country, articleId }) => {
             queryClient.invalidateQueries({ queryKey: ['reactionStatus', country, articleId] });
-            // Also update lists if needed
+            queryClient.invalidateQueries({ queryKey: ['savedArticles'] });
         },
+    });
+}
+
+export function useSavedArticles(country: string) {
+    return useQuery({
+        queryKey: ['savedArticles', country],
+        queryFn: () => interactionService.getSavedArticles(country),
     });
 }

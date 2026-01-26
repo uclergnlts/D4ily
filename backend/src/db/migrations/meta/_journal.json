@@ -36,6 +36,20 @@
       "when": 1769177437740,
       "tag": "0004_perpetual_madelyne_pryor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1769420472667,
+      "tag": "0005_gorgeous_thing",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1769424281939,
+      "tag": "0006_good_lady_ursula",
+      "breakpoints": true
     }
   ]
 }

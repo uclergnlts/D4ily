@@ -8,6 +8,16 @@ import {
     de_daily_digests,
     us_articles,
     us_daily_digests,
+    uk_articles,
+    uk_daily_digests,
+    fr_articles,
+    fr_daily_digests,
+    es_articles,
+    es_daily_digests,
+    it_articles,
+    it_daily_digests,
+    ru_articles,
+    ru_daily_digests,
 } from '../db/schema/index.js';
 import { gte, lte, eq, desc, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,9 +26,14 @@ const COUNTRY_TABLES = {
     tr: { articles: tr_articles, digests: tr_daily_digests },
     de: { articles: de_articles, digests: de_daily_digests },
     us: { articles: us_articles, digests: us_daily_digests },
+    uk: { articles: uk_articles, digests: uk_daily_digests },
+    fr: { articles: fr_articles, digests: fr_daily_digests },
+    es: { articles: es_articles, digests: es_daily_digests },
+    it: { articles: it_articles, digests: it_daily_digests },
+    ru: { articles: ru_articles, digests: ru_daily_digests },
 } as const;
 
-type CountryCode = 'tr' | 'de' | 'us';
+type CountryCode = keyof typeof COUNTRY_TABLES;
 type Period = 'morning' | 'evening';
 
 interface DigestResult {

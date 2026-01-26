@@ -153,10 +153,9 @@ export default function ArticleDetailScreen() {
                     </Text>
 
                     {/* Summary (Simulated content body) */}
-                    <Text className="text-[17px] leading-[26px] text-zinc-600 dark:text-zinc-300 font-normal mb-8 text-left">
+                    {/* Summary (Simulated content body) */}
+                    <Text className="text-[18px] leading-[28px] text-zinc-700 dark:text-zinc-300 font-normal mb-8 text-left tracking-wide">
                         {article.summary}
-                        {'\n\n'}
-                        Burada bu haberin özeti gelecek. Bu özet minimum 1 cümle maksimum 5 cümle olacak. Buradan sonrası bu şekilde ... olacak...
                     </Text>
 
                     {/* Primary Actions */}

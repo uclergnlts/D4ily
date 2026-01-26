@@ -7,7 +7,7 @@ interface Category {
 }
 
 const CATEGORIES: Category[] = [
-    { id: 'all', name: 'Tümü' },
+    { id: 'all', name: 'Senin Akışın' },
     { id: 'gundem', name: 'Gündem' },
     { id: 'siyaset', name: 'Siyaset' },
     { id: 'ekonomi', name: 'Ekonomi' },

@@ -1,8 +1,8 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, Image, FlatList } from 'react-native';
+import React, { useRef, useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Dimensions, FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
 import { ArrowRight, Check } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -35,23 +35,33 @@ export default function OnboardingScreen() {
     const router = useRouter();
     const flatListRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
+    const [showSplash, setShowSplash] = useState(true);
+
+    useEffect(() => {
+        // Simulate Splash Screen
+        const timer = setTimeout(() => {
+            setShowSplash(false);
+        }, 2500);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleNext = () => {
         if (currentIndex < SLIDES.length - 1) {
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
         } else {
-            handleFinish();
+            // "Hemen Başla" -> Go to Auth
+            router.push('/auth');
         }
     };
 
-    const handleFinish = () => {
-        // Here we would normally set a flag in storage that onboarding is done
+    const handleGuest = () => {
+        // "Guest Mode" -> Skip to Feed
         router.replace('/(tabs)');
     };
 
     const renderItem = ({ item }: { item: typeof SLIDES[0] }) => {
         return (
-            <View style={{ width, height }} className="items-center justify-center p-8">
+            <View style={{ width }} className="items-center justify-center p-8 pt-20">
                 <Animated.View
                     entering={FadeInUp.delay(200).duration(1000)}
                     className="w-48 h-48 bg-zinc-100 dark:bg-zinc-800 rounded-full items-center justify-center mb-12 shadow-xl"
@@ -77,6 +87,17 @@ export default function OnboardingScreen() {
         );
     };
 
+    if (showSplash) {
+        return (
+            <View className="flex-1 bg-white dark:bg-black items-center justify-center">
+                <Animated.View exiting={FadeOut.duration(500)} className="items-center">
+                    <Text className="text-6xl font-black text-[#006FFF] tracking-tighter mb-4">D4ILY</Text>
+                    <Text className="text-zinc-400 font-medium tracking-widest uppercase text-xs">Yapay Zeka Destekli Haber</Text>
+                </Animated.View>
+            </View>
+        );
+    }
+
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-black">
             <FlatList
@@ -94,9 +115,9 @@ export default function OnboardingScreen() {
             />
 
             {/* Pagination & Controls */}
-            <View className="absolute bottom-12 left-0 right-0 px-8 flex-row items-center justify-between">
+            <View className="px-8 pb-12 pt-4">
                 {/* Dots */}
-                <View className="flex-row gap-2">
+                <View className="flex-row gap-2 justify-center mb-10">
                     {SLIDES.map((_, index) => (
                         <View
                             key={index}
@@ -106,21 +127,21 @@ export default function OnboardingScreen() {
                     ))}
                 </View>
 
-                {/* Button */}
+                {/* Primary Button */}
                 <TouchableOpacity
                     onPress={handleNext}
-                    className="bg-zinc-900 dark:bg-white w-14 h-14 rounded-full items-center justify-center shadow-lg active:scale-95 transition-transform"
+                    className="bg-[#006FFF] w-full py-4 rounded-2xl items-center justify-center shadow-lg shadow-blue-500/30 mb-4 active:scale-[0.98]"
                 >
-                    {currentIndex === SLIDES.length - 1 ? (
-                        <Check size={24} color={Platform.OS === 'ios' ? '#000' : '#fff'} className="text-white dark:text-black" />
-                    ) : (
-                        <ArrowRight size={24} color={Platform.OS === 'ios' ? '#fff' : '#000'} className="text-white dark:text-black" />
-                    )}
+                    <Text className="text-white font-bold text-lg">
+                        {currentIndex === SLIDES.length - 1 ? 'Hemen Başla' : 'Devam Et'}
+                    </Text>
+                </TouchableOpacity>
+
+                {/* Guest Link - Only show on last slide or always? Let's show always for convenience */}
+                <TouchableOpacity onPress={handleGuest} className="py-2 items-center">
+                    <Text className="text-zinc-400 font-medium text-sm">Giriş yapmadan devam et</Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
     );
 }
-
-// Helper for icon color fix if lucide props behave oddly on native directly
-import { Platform } from 'react-native';

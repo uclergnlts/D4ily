@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type CountryCode = 'tr' | 'us' | 'de' | 'uk' | 'fr';
+export type CountryCode = 'tr' | 'us' | 'de' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
 interface AppState {
     selectedCountry: CountryCode;

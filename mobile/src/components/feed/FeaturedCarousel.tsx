@@ -46,9 +46,9 @@ export const FeaturedCarousel = React.memo(({ articles }: FeaturedCarouselProps)
                     contentFit="cover"
                     transition={200}
                 />
-                <View className="p-4">
+                <View className="p-4 flex-1 justify-between">
                     <Text
-                        className="text-[17px] font-bold text-zinc-900 dark:text-white leading-[24px] mb-3"
+                        className="text-[17px] font-bold text-zinc-900 dark:text-white leading-[24px] mb-2"
                         numberOfLines={3}
                     >
                         {item.translatedTitle}
@@ -65,7 +65,7 @@ export const FeaturedCarousel = React.memo(({ articles }: FeaturedCarouselProps)
                                 <Text className="text-[10px] font-bold text-black">{sourceName.charAt(0)}</Text>
                             </View>
                         )}
-                        <Text className="text-[13px] font-bold text-zinc-900 dark:text-zinc-300">
+                        <Text className="text-[13px] font-bold text-zinc-700 dark:text-zinc-300">
                             {sourceName}
                         </Text>
                     </View>

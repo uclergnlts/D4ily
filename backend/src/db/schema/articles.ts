@@ -12,6 +12,7 @@ export function createArticleTable(countryCode: string) {
         originalLanguage: text('original_language').notNull(),
         translatedTitle: text('translated_title').notNull(),
         summary: text('summary').notNull(),
+        imageUrl: text('image_url'),
         isClickbait: integer('is_clickbait', { mode: 'boolean' }).notNull(),
         isAd: integer('is_ad', { mode: 'boolean' }).notNull(),
         isFiltered: integer('is_filtered', { mode: 'boolean' }).notNull(),
@@ -116,3 +117,33 @@ export const us_article_sources = createArticleSourcesTable('us');
 export const us_article_topics = createArticleTopicsTable('us');
 export const us_article_polls = createArticlePollsTable('us');
 export const us_daily_digests = createDailyDigestsTable('us');
+
+export const uk_articles = createArticleTable('uk');
+export const uk_article_sources = createArticleSourcesTable('uk');
+export const uk_article_topics = createArticleTopicsTable('uk');
+export const uk_article_polls = createArticlePollsTable('uk');
+export const uk_daily_digests = createDailyDigestsTable('uk');
+
+export const fr_articles = createArticleTable('fr');
+export const fr_article_sources = createArticleSourcesTable('fr');
+export const fr_article_topics = createArticleTopicsTable('fr');
+export const fr_article_polls = createArticlePollsTable('fr');
+export const fr_daily_digests = createDailyDigestsTable('fr');
+
+export const es_articles = createArticleTable('es');
+export const es_article_sources = createArticleSourcesTable('es');
+export const es_article_topics = createArticleTopicsTable('es');
+export const es_article_polls = createArticlePollsTable('es');
+export const es_daily_digests = createDailyDigestsTable('es');
+
+export const it_articles = createArticleTable('it');
+export const it_article_sources = createArticleSourcesTable('it');
+export const it_article_topics = createArticleTopicsTable('it');
+export const it_article_polls = createArticlePollsTable('it');
+export const it_daily_digests = createDailyDigestsTable('it');
+
+export const ru_articles = createArticleTable('ru');
+export const ru_article_sources = createArticleSourcesTable('ru');
+export const ru_article_topics = createArticleTopicsTable('ru');
+export const ru_article_polls = createArticlePollsTable('ru');
+export const ru_daily_digests = createDailyDigestsTable('ru');

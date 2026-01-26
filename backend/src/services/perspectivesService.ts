@@ -8,6 +8,16 @@ import {
     de_article_sources,
     us_articles,
     us_article_sources,
+    uk_articles,
+    uk_article_sources,
+    fr_articles,
+    fr_article_sources,
+    es_articles,
+    es_article_sources,
+    it_articles,
+    it_article_sources,
+    ru_articles,
+    ru_article_sources,
     rss_sources,
     articlePerspectives,
 } from '../db/schema/index.js';
@@ -19,6 +29,11 @@ const COUNTRY_TABLES = {
     tr: { articles: tr_articles, sources: tr_article_sources },
     de: { articles: de_articles, sources: de_article_sources },
     us: { articles: us_articles, sources: us_article_sources },
+    uk: { articles: uk_articles, sources: uk_article_sources },
+    fr: { articles: fr_articles, sources: fr_article_sources },
+    es: { articles: es_articles, sources: es_article_sources },
+    it: { articles: it_articles, sources: it_article_sources },
+    ru: { articles: ru_articles, sources: ru_article_sources },
 } as const;
 
 type CountryCode = keyof typeof COUNTRY_TABLES;

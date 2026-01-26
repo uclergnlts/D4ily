@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ActivityIndicator, RefreshControl, Switch, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { FlaskConical, Menu, BellRing } from 'lucide-react-native';
 
 import { useFeed } from '../../src/hooks/useFeed';
@@ -19,14 +19,17 @@ import { FeedFilterBar } from '../../src/components/feed/FeedFilterBar';
 import { SideMenu } from '../../src/components/navigation/SideMenu';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { useAppStore } from '../../src/store/useAppStore';
+import { useFeedStore } from '../../src/store/useFeedStore';
 
 import { useColorScheme } from 'react-native';
 
 export default function FeedScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const [isBalanced, setIsBalanced] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState({ id: 'all', name: 'Tümü' });
+  // Global State
+  const { isBalanced } = useFeedStore();
+  const [selectedCategory, setSelectedCategory] = useState({ id: 'all', name: 'Senin Akışın' });
 
   const { toggleSideMenu, isSideMenuOpen, selectedCountry } = useAppStore();
 
@@ -65,24 +68,22 @@ export default function FeedScreen() {
   // Header Component for FlashList to scroll together
   const ListHeader = React.useCallback(() => (
     <View>
+      <FeaturedCarousel articles={featuredArticles} />
+
+      <View className="h-6" />
+
       <FeedFilterBar
         selectedCategory={selectedCategory.id}
         onSelectCategory={(id) => setSelectedCategory({ id, name: '' })}
-        className="mb-10 pb-2"
+        className="mb-4 pb-2"
       />
-      <FeaturedCarousel articles={featuredArticles} />
-      <View className="px-4 mb-2 mt-4">
-        <Text className="text-[17px] font-bold text-zinc-500 dark:text-zinc-400">
-          Haberler
-        </Text>
-      </View>
     </View>
   ), [selectedCategory.id, featuredArticles]);
 
   return (
     <View className="flex-1 bg-zinc-50 dark:bg-black">
       {/* Side Menu Overlay */}
-      <SideMenu />
+      {/* Side Menu moved to bottom */}
 
       <SafeAreaView className="flex-1" edges={['top']}>
         {/* Header */}
@@ -100,14 +101,14 @@ export default function FeedScreen() {
           <View className="absolute left-0 right-0 top-0 bottom-0 items-center justify-center flex-row pointer-events-none">
             <View className="flex-row items-center">
               <Text className="text-[24px] font-black text-zinc-900 dark:text-white tracking-tighter">
-                D<Text className="text-[#006FFF]">4</Text>ily
+                D<Text className="text-[#006FFF]">4</Text>ILY
               </Text>
             </View>
           </View>
 
           {/* Right: Notifications */}
           <View className="flex-row items-center gap-4">
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => router.push('/notifications')}>
               <BellRing size={24} color={isDark ? "#ffffff" : "#18181b"} />
             </TouchableOpacity>
           </View>
@@ -155,6 +156,9 @@ export default function FeedScreen() {
           </View>
         )}
       </SafeAreaView>
+
+      {/* Side Menu Overlay - Rendered last to stay on top */}
+      <SideMenu />
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Country validation
-export const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'jp', 'kr', 'ru']);
+export const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']);
 
 // Query params schemas
 export const paginationSchema = z.object({

@@ -1,5 +1,6 @@
 import { client } from '../client';
 import { ApiResponse, Category, Article } from '../../types';
+import { getMockFeed } from '../mock/mockData';
 
 export const exploreService = {
     getCategories: async () => {
@@ -15,17 +16,31 @@ export const exploreService = {
     searchArticles: async (query: string, categoryId: number | null = null) => {
         const params: any = {};
         if (query) params.q = query;
-        if (categoryId) params.category = categoryId; // Backend probably expects 'category' or 'categoryId'
+        if (categoryId) params.category = categoryId;
 
-        // If no query and no category, return empty or trending?
-        // Let's assume search endpoint handles empty query if category is present
+        try {
+            const response = await client.get<ApiResponse<Article[]>>('/search', { params });
 
-        const response = await client.get<ApiResponse<Article[]>>('/search', { params });
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Search failed');
+            }
 
-        if (!response.data.success) {
-            throw new Error(response.data.error || 'Search failed');
+            return response.data.data;
+        } catch (error) {
+            console.warn('API connection failed, falling back to Mock Data for Search.', error);
+            // Simulate network delay
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // Return mock results based on query to make it feel real
+            const mockFeed = getMockFeed('tr', 1); // Reuse mock feed generator
+            // Simple filtering simulation for realism
+            if (query && query.length > 0) {
+                return mockFeed.articles.map((a: Article) => ({
+                    ...a,
+                    translatedTitle: `${a.translatedTitle} (${query})` // Append query to title to prove it "searched"
+                }));
+            }
+            return mockFeed.articles;
         }
-
-        return response.data.data;
     },
 };

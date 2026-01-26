@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, Dimensions, Switch } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Animated, { useAnimatedStyle, withTiming, useSharedValue } from 'react-native-reanimated';
-import { X, User, Settings, HelpCircle, Mic, LogOut, ChevronRight, Scale } from 'lucide-react-native';
+import { X, User, Settings, HelpCircle, Mic, LogOut, ChevronRight, Scale, Bookmark, History, Crown } from 'lucide-react-native';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppStore } from '../../store/useAppStore';
 import { useFeedStore } from '../../store/useFeedStore';
@@ -53,7 +53,9 @@ export const SideMenu = () => {
     };
 
     const menuItems = [
-        { icon: User, label: 'Profilim', path: '/user-profile' },
+        { icon: Crown, label: 'Premium\'a Yükselt', path: '/premium', color: '#eab308' }, // Gold color
+        { icon: Bookmark, label: 'Kaydedilenler', path: '/saved' },
+        { icon: History, label: 'Okuma Geçmişi', path: '/history' },
         { icon: Mic, label: 'Podcastler', path: '/podcast' },
         { icon: Settings, label: 'Ayarlar', path: '/settings' },
         { icon: HelpCircle, label: 'Yardım & Destek', path: '/help' },
@@ -84,14 +86,52 @@ export const SideMenu = () => {
             >
                 <SafeAreaViewWrapper>
                     {/* Header */}
-                    <View className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex-row justify-between items-center">
-                        <Image
-                            source={require('../../../assets/images/d4ily_logo.png')}
-                            style={{ width: 100, height: 35 }}
-                            contentFit="contain"
-                        />
-                        <TouchableOpacity onPress={toggleSideMenu} className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded-full">
-                            <X size={20} color="#71717a" />
+                    {/* User Profile Header */}
+                    <View className="px-6 pt-2 pb-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900">
+                        {user ? (
+                            <View className="flex-row items-center gap-4">
+                                <View className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900 justify-center items-center border-2 border-white dark:border-zinc-800 shadow-sm">
+                                    <Text className="text-xl font-bold text-blue-600 dark:text-blue-400">
+                                        {user.name?.charAt(0) || 'U'}
+                                    </Text>
+                                </View>
+                                <View className="flex-1">
+                                    <Text className="text-lg font-bold text-zinc-900 dark:text-white leading-6">
+                                        {user.name || 'Kullanıcı'}
+                                    </Text>
+                                    <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+                                        {user.email}
+                                    </Text>
+                                    <View className="mt-2 flex-row items-center">
+                                        <View className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 rounded-md">
+                                            <Text className="text-[10px] font-bold text-yellow-700 dark:text-yellow-500">
+                                                PREMIUM
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <TouchableOpacity onPress={() => router.push('/auth')} className="flex-row items-center gap-4">
+                                <View className="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 justify-center items-center">
+                                    <User size={24} color="#a1a1aa" />
+                                </View>
+                                <View>
+                                    <Text className="text-lg font-bold text-zinc-900 dark:text-white">
+                                        Giriş Yap
+                                    </Text>
+                                    <Text className="text-xs text-zinc-500">
+                                        Özelleştirilmiş deneyim için
+                                    </Text>
+                                </View>
+                            </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                            onPress={toggleSideMenu}
+                            className="absolute top-0 right-4 p-2"
+                        >
+                            <X size={20} color="#a1a1aa" />
                         </TouchableOpacity>
                     </View>
 
@@ -130,20 +170,27 @@ export const SideMenu = () => {
                     </View>
 
                     {/* Navigation Items */}
-                    <View className="flex-1 p-4">
-                        {menuItems.map((item, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                onPress={() => handleNavigation(item.path)}
-                                className="flex-row items-center p-4 mb-2 rounded-xl active:bg-zinc-50 dark:active:bg-zinc-800"
-                            >
-                                <item.icon size={22} color="#52525b" className="mr-4" />
-                                <Text className="flex-1 text-base font-semibold text-zinc-700 dark:text-zinc-300">
-                                    {item.label}
-                                </Text>
-                                <ChevronRight size={16} color="#d4d4d8" />
-                            </TouchableOpacity>
-                        ))}
+                    {/* Content Scroll */}
+                    <View className="flex-1">
+                        {/* Navigation Items */}
+                        <View className="p-4">
+                            <Text className="px-4 mb-2 text-xs font-bold text-zinc-400 uppercase tracking-wider">Menü</Text>
+                            {menuItems.map((item, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    onPress={() => handleNavigation(item.path)}
+                                    className={`flex-row items-center p-4 mb-1 rounded-2xl active:bg-zinc-50 dark:active:bg-zinc-800 ${item.label.includes('Premium') ? 'bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30' : ''}`}
+                                >
+                                    <View className={`w-9 h-9 rounded-full items-center justify-center mr-4 ${item.label.includes('Premium') ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-zinc-50 dark:bg-zinc-800/50'}`}>
+                                        <item.icon size={20} color={item.color || "#52525b"} />
+                                    </View>
+                                    <Text className={`flex-1 text-[15px] font-semibold ${item.label.includes('Premium') ? 'text-yellow-700 dark:text-yellow-500' : 'text-zinc-700 dark:text-zinc-200'}`}>
+                                        {item.label}
+                                    </Text>
+                                    <ChevronRight size={16} color={item.label.includes('Premium') ? '#eab308' : '#e4e4e7'} />
+                                </TouchableOpacity>
+                            ))}
+                        </View>
                     </View>
 
                     {/* Footer remains same, just ensuring correct close for View */}

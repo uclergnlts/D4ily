@@ -4,6 +4,11 @@ import {
     tr_daily_digests,
     de_daily_digests,
     us_daily_digests,
+    uk_daily_digests,
+    fr_daily_digests,
+    es_daily_digests,
+    it_daily_digests,
+    ru_daily_digests,
     comments,
 } from '../db/schema/index.js';
 import { eq, and, desc, isNull } from 'drizzle-orm';
@@ -14,13 +19,18 @@ import { getLatestDigest, getDigestByDateAndPeriod } from '../services/digestSer
 const digestRoute = new Hono();
 
 // Validation schemas
-const countrySchema = z.enum(['tr', 'de', 'us']);
+const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']);
 const periodSchema = z.enum(['morning', 'evening']);
 
 const COUNTRY_TABLES = {
     tr: tr_daily_digests,
     de: de_daily_digests,
     us: us_daily_digests,
+    uk: uk_daily_digests,
+    fr: fr_daily_digests,
+    es: es_daily_digests,
+    it: it_daily_digests,
+    ru: ru_daily_digests,
 } as const;
 
 /**
@@ -30,7 +40,7 @@ const COUNTRY_TABLES = {
 digestRoute.get('/:country/latest', async (c) => {
     try {
         const { country } = c.req.param();
-        const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us';
+        const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         const digest = await getLatestDigest(validatedCountry);
 
@@ -70,7 +80,7 @@ digestRoute.get('/:country/latest', async (c) => {
 digestRoute.get('/:country', async (c) => {
     try {
         const { country } = c.req.param();
-        const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us';
+        const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         const date = c.req.query('date');
         const period = c.req.query('period');
@@ -130,7 +140,7 @@ digestRoute.get('/:country', async (c) => {
 digestRoute.get('/:country/:digestId', async (c) => {
     try {
         const { country, digestId } = c.req.param();
-        const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us';
+        const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         const table = COUNTRY_TABLES[validatedCountry];
         const digest = await db
