@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, real, unique, index } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
-import { users } from './global';
+import { users } from './global.js';
 
 export const weeklyComparisons = sqliteTable('weekly_comparisons', {
     id: text('id').primaryKey(),
