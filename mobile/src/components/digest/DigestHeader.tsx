@@ -58,3 +58,5 @@ export const DigestHeader = React.memo(({ title, date, period, summary, classNam
         </View>
     );
 });
+
+DigestHeader.displayName = 'DigestHeader';

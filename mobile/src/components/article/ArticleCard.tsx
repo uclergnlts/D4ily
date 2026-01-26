@@ -96,3 +96,5 @@ export const ArticleCard = React.memo(({ article }: ArticleCardProps) => {
         </Link>
     );
 });
+
+ArticleCard.displayName = 'ArticleCard';

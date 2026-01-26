@@ -89,5 +89,9 @@ export const interactionService = {
         }
 
         return response.data.data.bookmarks;
+    },
+
+    getSavedArticles: async (page = 1) => {
+        return interactionService.getBookmarks(page);
     }
 };

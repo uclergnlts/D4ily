@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Mail, Lock, User, Check, X } from 'lucide-react-native';
+import { ChevronLeft, Mail, Lock, User, Check } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { authService } from '../src/api/services/authService';
 
@@ -198,7 +198,7 @@ export default function AuthScreen() {
                                     {termsAccepted && <Check size={14} color="white" />}
                                 </View>
                                 <Text className="flex-1 text-xs text-zinc-500 font-medium">
-                                    <Text className="text-[#006FFF] font-bold">Kullanım Koşulları</Text>'nı ve <Text className="text-[#006FFF] font-bold">Gizlilik Politikası</Text>'nı okudum, kabul ediyorum.
+                                    <Text className="text-[#006FFF] font-bold">Kullanım Koşulları</Text>&apos;nı ve <Text className="text-[#006FFF] font-bold">Gizlilik Politikası</Text>&apos;nı okudum, kabul ediyorum.
                                 </Text>
                             </TouchableOpacity>
                         </View>
@@ -239,7 +239,7 @@ export default function AuthScreen() {
                         </Text>
                     </TouchableOpacity>
                 </View>
-            </ScrollView>
-        </View>
+            </ScrollView >
+        </View >
     );
 }

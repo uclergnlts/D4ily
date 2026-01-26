@@ -1,9 +1,11 @@
-/* eslint-disable react/display-name */
+ 
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Bell, Moon, Shield, FileText, Mail, ChevronRight } from 'lucide-react-native';
+
+import { useThemeStore } from '../src/store/useThemeStore';
 
 const SectionHeader = ({ title }: { title: string }) => (
     <Text className="px-6 py-2 text-sm font-bold text-zinc-500 uppercase tracking-wider mb-1 mt-4">
@@ -57,11 +59,9 @@ const SettingsItem = ({
     </TouchableOpacity>
 );
 
-import { useThemeStore } from '../src/store/useThemeStore';
-
 export default function SettingsScreen() {
     const router = useRouter();
-    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [_notificationsEnabled, _setNotificationsEnabled] = useState(true); // Kept for future use
     const { mode, setMode } = useThemeStore();
 
     // Simple toggle: If dark, go light. If light or system, go dark (enforce explicit mode)

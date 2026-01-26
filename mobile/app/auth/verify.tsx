@@ -9,7 +9,7 @@ export default function VerifyEmailScreen() {
     const { email } = useLocalSearchParams();
     const [code, setCode] = useState(['', '', '', '', '']);
     const [loading, setLoading] = useState(false);
-    const inputs = useRef<Array<TextInput | null>>([]);
+    const inputs = useRef<(TextInput | null)[]>([]);
 
     const handleInput = (text: string, index: number) => {
         const newCode = [...code];
@@ -58,7 +58,7 @@ export default function VerifyEmailScreen() {
                     {code.map((digit, index) => (
                         <TextInput
                             key={index}
-                            ref={ref => inputs.current[index] = ref}
+                            ref={(ref) => { inputs.current[index] = ref; }}
                             className="w-14 h-16 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-center text-2xl font-bold text-zinc-900 dark:text-white"
                             maxLength={1}
                             keyboardType="number-pad"

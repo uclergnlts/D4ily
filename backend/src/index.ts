@@ -2,29 +2,31 @@ import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from './config/logger.js';
-import { env } from './config/env.js';
-import { apiLimiter } from './middleware/rateLimit.js';
-import { startScraperCron } from './cron/scraperCron.js';
-import { startDigestCron } from './cron/digestCron.js';
-import { startWeeklyCron } from './cron/weeklyCron.js';
-import { startAlignmentNotificationCron } from './cron/alignmentNotificationCron.js';
+import { logger } from './config/logger';
+import { env } from './config/env';
+import { apiLimiter } from './middleware/rateLimit';
+import { startScraperCron } from './cron/scraperCron';
+import { startDigestCron } from './cron/digestCron';
+import { startWeeklyCron } from './cron/weeklyCron';
+import { startAlignmentNotificationCron } from './cron/alignmentNotificationCron';
 
 // Import routes
-import categoriesRoute from './routes/categories.js';
-import sourcesRoute from './routes/sources.js';
-import feedRoute from './routes/feed.js';
-import adminRoute from './routes/admin.js';
-import commentsRoute from './routes/comments.js';
-import authRoute from './routes/auth.js';
-import reactionRoute from './routes/reactions.js';
-import userRoute from './routes/user.js';
-import notificationsRoute from './routes/notifications.js';
-import digestRoute from './routes/digest.js';
-import weeklyRoute from './routes/weekly.js';
-import pollsRoute from './routes/polls.js';
-import topicsRoute from './routes/topics.js';
-import searchRoute from './routes/search.js';
+import categoriesRoute from './routes/categories';
+import sourcesRoute from './routes/sources';
+import feedRoute from './routes/feed';
+import adminRoute from './routes/admin';
+import commentsRoute from './routes/comments';
+import authRoute from './routes/auth';
+import reactionRoute from './routes/reactions';
+import userRoute from './routes/user';
+import notificationsRoute from './routes/notifications';
+import digestRoute from './routes/digest';
+import weeklyRoute from './routes/weekly';
+import pollsRoute from './routes/polls';
+import topicsRoute from './routes/topics';
+import searchRoute from './routes/search';
+import premiumRoute from './routes/premium';
+import historyRoute from './routes/history';
 
 const app = new Hono();
 
@@ -96,6 +98,8 @@ app.route('/weekly', weeklyRoute);
 app.route('/polls', pollsRoute);
 app.route('/topics', topicsRoute);
 app.route('/search', searchRoute);
+app.route('/premium', premiumRoute);
+app.route('/history', historyRoute);
 
 // Start cron jobs
 if (env.NODE_ENV !== 'test') {

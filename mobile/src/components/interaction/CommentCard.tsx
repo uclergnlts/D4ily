@@ -91,3 +91,5 @@ export const CommentCard = React.memo(({ comment, onLike, onReply, isLiked, clas
         </View>
     );
 });
+
+CommentCard.displayName = 'CommentCard';

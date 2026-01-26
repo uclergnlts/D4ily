@@ -70,3 +70,5 @@ export const ProfileHeader = React.memo(({ user, level, onLogout, onSettingsPres
         </View>
     );
 });
+
+ProfileHeader.displayName = 'ProfileHeader';

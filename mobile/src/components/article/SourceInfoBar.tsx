@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { AlignmentDot } from '../ui/AlignmentDot';
 import { ArticleSource } from '../../types';
@@ -64,3 +64,5 @@ export const SourceInfoBar = React.memo(({ sources, className }: SourceInfoBarPr
         </View>
     );
 });
+
+SourceInfoBar.displayName = 'SourceInfoBar';

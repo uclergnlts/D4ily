@@ -1,0 +1,6 @@
+export function useSavedArticles(page = 1) {
+    return useQuery({
+        queryKey: ["savedArticles", page],
+        queryFn: () => interactionService.getSavedArticles(page),
+    });
+}

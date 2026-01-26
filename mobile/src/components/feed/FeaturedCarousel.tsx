@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { Link } from 'expo-router';
 import { FlashList } from '@shopify/flash-list';
 import * as WebBrowser from 'expo-web-browser';
 import { Article } from '../../types';
@@ -27,7 +26,7 @@ export const FeaturedCarousel = React.memo(({ articles }: FeaturedCarouselProps)
             if (url) {
                 try {
                     await WebBrowser.openBrowserAsync(url);
-                } catch (e) {
+                } catch (_e) {
                     // Fallback or silent fail
                 }
             }
@@ -94,3 +93,5 @@ export const FeaturedCarousel = React.memo(({ articles }: FeaturedCarouselProps)
         </View>
     );
 });
+
+FeaturedCarousel.displayName = 'FeaturedCarousel';

@@ -1,36 +1,31 @@
-import React, { useState } from 'react';
-import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, KeyboardAvoidingView, Platform, TextInput, Alert, Linking } from 'react-native';
+import React from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, Alert, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { Share2, Bookmark, MessageSquare, Send, Globe, ChevronLeft } from 'lucide-react-native';
+import { Bookmark, Send, Globe, ChevronLeft } from 'lucide-react-native';
 import { Image } from 'expo-image';
 import { TimeAgo } from '../../src/components/ui/TimeAgo';
 import * as WebBrowser from 'expo-web-browser';
 
 import { feedService } from '../../src/api/services/feedService';
 import { usePerspectives } from '../../src/hooks/usePerspectives';
-import { useComments, usePostComment, useArticleReactionStatus, useToggleBookmark } from '../../src/hooks/useInteraction';
+import { useComments, useArticleReactionStatus, useToggleBookmark } from '../../src/hooks/useInteraction';
 import { useAuthStore } from '../../src/store/useAuthStore';
+import { MOCK_ARTICLE, MOCK_PERSPECTIVES } from '../../src/data/mock';
 
-// Phase 2 Components
 // Phase 2 Components
 import { PoliticalToneGauge } from '../../src/components/article/PoliticalToneGauge';
 import { EmotionalAnalysisCard } from '../../src/components/article/EmotionalAnalysisCard';
 import { PerspectivesSection } from '../../src/components/article/PerspectivesSection';
-import { ContentQualityBadges } from '../../src/components/article/ContentQualityBadges';
 import { CommentThread } from '../../src/components/interaction/CommentThread';
-import { CommentForm } from '../../src/components/interaction/CommentForm';
-import { AlignmentVotingWidget } from '../../src/components/interaction/AlignmentVotingWidget';
 
-import { useColorScheme } from 'react-native';
+
 
 export default function ArticleDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
     const { user } = useAuthStore();
-    const [commentText, setCommentText] = useState('');
-    const [userVote, setUserVote] = useState<number | null>(null);
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
 
@@ -41,7 +36,7 @@ export default function ArticleDetailScreen() {
     const { data: article, isLoading } = useQuery({
         queryKey: ['article', id],
         queryFn: async () => {
-            if (isDemo) return require('../../src/data/mock').MOCK_ARTICLE;
+            if (isDemo) return MOCK_ARTICLE;
             return feedService.getArticle('tr', id!);
         },
         enabled: !!id,
@@ -49,7 +44,7 @@ export default function ArticleDetailScreen() {
 
     // Perspectives
     const { data: perspectivesData } = usePerspectives('tr', id!, true);
-    const demoPerspectives = isDemo ? require('../../src/data/mock').MOCK_PERSPECTIVES : null;
+    const demoPerspectives = isDemo ? MOCK_PERSPECTIVES : null;
     const finalPerspectives = isDemo ? demoPerspectives : perspectivesData;
 
     // Comments
@@ -63,7 +58,7 @@ export default function ArticleDetailScreen() {
         if (!article?.sources?.[0]?.sourceUrl) return;
         try {
             await WebBrowser.openBrowserAsync(article.sources[0].sourceUrl);
-        } catch (e) {
+        } catch (_e) {
             Alert.alert('Hata', 'Kaynak açılamadı.');
         }
     };

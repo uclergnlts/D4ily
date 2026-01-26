@@ -36,3 +36,5 @@ export const CommentThread = React.memo(({ comment, onLike, onReply }: CommentTh
         </View>
     );
 });
+
+CommentThread.displayName = 'CommentThread';

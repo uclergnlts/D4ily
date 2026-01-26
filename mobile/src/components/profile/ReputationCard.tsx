@@ -19,7 +19,7 @@ export const ReputationCard = React.memo(({ level, accuracyPercentage, className
 
     useEffect(() => {
         width.value = withDelay(300, withTiming(accuracyPercentage, { duration: 1000 }));
-    }, [accuracyPercentage]);
+    }, [accuracyPercentage, width]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         width: `${width.value}%`,
@@ -60,3 +60,5 @@ export const ReputationCard = React.memo(({ level, accuracyPercentage, className
         </View>
     );
 });
+
+ReputationCard.displayName = 'ReputationCard';

@@ -20,7 +20,7 @@ export function AlignmentGauge({ score, showLabels = true, compact = false }: Al
             damping: 15,
             stiffness: 90
         });
-    }, [targetPercentage]);
+    }, [targetPercentage, progress]);
 
     const animatedIndicatorStyle = useAnimatedStyle(() => ({
         left: `${progress.value}%`,

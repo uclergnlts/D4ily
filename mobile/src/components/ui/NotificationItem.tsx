@@ -57,3 +57,5 @@ export const NotificationItem = React.memo(({ type, title, message, time, isRead
         </TouchableOpacity>
     );
 });
+
+NotificationItem.displayName = 'NotificationItem';

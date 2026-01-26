@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Linking, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Mic, ExternalLink, Headphones, Radio, PlayCircle } from 'lucide-react-native';
+import { ExternalLink, Headphones, Radio, PlayCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 // Spotify Links
@@ -50,7 +50,7 @@ const RECOMMENDED_PODCASTS = [
 ];
 
 export default function PodcastScreen() {
-    const router = useRouter();
+    const _router = useRouter(); // Kept for future navigation
 
     const openSpotify = async (url: string) => {
         try {

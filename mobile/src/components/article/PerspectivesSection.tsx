@@ -77,3 +77,5 @@ export const PerspectivesSection = React.memo(({ perspectives, className }: Pers
         </View>
     );
 });
+
+PerspectivesSection.displayName = 'PerspectivesSection';

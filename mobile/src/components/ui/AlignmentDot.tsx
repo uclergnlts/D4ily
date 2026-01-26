@@ -1,12 +1,11 @@
 import React, { useEffect } from 'react';
 import { View } from 'react-native';
-import Animated, { 
-    useAnimatedStyle, 
-    useSharedValue, 
-    withRepeat, 
-    withSequence, 
-    withTiming, 
-    withDelay 
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withRepeat,
+    withSequence,
+    withTiming
 } from 'react-native-reanimated';
 
 interface AlignmentDotProps {
@@ -45,7 +44,7 @@ export function AlignmentDot({ score, size = 8, className }: AlignmentDotProps) 
             scale.value = withTiming(1);
             opacity.value = withTiming(1);
         }
-    }, [isHighIntensity]);
+    }, [isHighIntensity, scale, opacity]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ scale: scale.value }],

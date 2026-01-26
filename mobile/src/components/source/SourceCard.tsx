@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { ShieldCheck, TrendingUp, Info } from 'lucide-react-native';
-import { AlignmentDot } from '../ui/AlignmentDot';
 
 interface SourceCardProps {
     name: string;
@@ -91,3 +90,5 @@ export const SourceCard = React.memo(({ name, logoUrl, alignmentScore, alignment
         </View>
     );
 });
+
+SourceCard.displayName = 'SourceCard';

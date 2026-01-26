@@ -1,4 +1,4 @@
-import { Article, ArticleSource, EmotionalTone, PerspectiveMatch, Comment } from '../types';
+import { Article, PerspectiveMatch, Comment } from '../types';
 
 export const MOCK_ARTICLE: Article = {
     id: 'demo-article-1',

@@ -1,7 +1,7 @@
-/* eslint-disable react/display-name */
+ 
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Search, Bookmark, LineChart, Newspaper } from 'lucide-react-native';
+import { Home, Search, LineChart, Newspaper } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 
 export default function TabLayout() {

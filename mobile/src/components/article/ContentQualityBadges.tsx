@@ -68,3 +68,5 @@ function SentimentBadge({ value }: { value: string }) {
         </View>
     );
 }
+
+ContentQualityBadges.displayName = 'ContentQualityBadges';

@@ -68,3 +68,5 @@ export const CommentForm = React.memo(({ onSubmit, replyTo, onCancelReply, isLoa
         </View>
     );
 });
+
+CommentForm.displayName = 'CommentForm';

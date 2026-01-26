@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Switch } from 'react-native';
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import Animated, { useAnimatedStyle, withTiming, useSharedValue } from 'react-native-reanimated';
 import { X, User, Settings, HelpCircle, Mic, LogOut, ChevronRight, Scale, Bookmark, History, Crown } from 'lucide-react-native';
@@ -31,7 +30,7 @@ export const SideMenu = () => {
             translateX.value = withTiming(-MENU_WIDTH, { duration: 300 });
             opacity.value = withTiming(0, { duration: 300 });
         }
-    }, [isSideMenuOpen]);
+    }, [isSideMenuOpen, translateX, opacity]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: translateX.value }],

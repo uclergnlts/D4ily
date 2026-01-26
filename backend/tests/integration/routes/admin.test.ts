@@ -1,7 +1,25 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import request from 'supertest';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
+
+// Test data - defined before mocks
+const TEST_ADMIN_USER = {
+    id: 'test-admin-uid',
+    email: 'admin@test.com',
+    name: 'Test Admin',
+    userRole: 'admin',
+    subscriptionStatus: 'free',
+};
+
+const TEST_SOURCE_DATA = {
+    id: 123,
+    sourceName: 'Test Source',
+    rssUrl: 'https://test.com/rss.xml',
+    countryCode: 'tr',
+    isActive: true,
+    sourceLogoUrl: 'https://test.com/logo.png',
+};
 
 // Mock Env BEFORE imports
 vi.mock('@/config/env.js', () => ({
@@ -17,43 +35,54 @@ vi.mock('@/config/env.js', () => ({
     }
 }));
 
-// Mock Database
-vi.mock('@/config/db.js', () => {
-    const mockQueryBuilder = {
+// Mock Firebase Auth - Admin middleware için gerekli
+vi.mock('@/config/firebase.js', () => ({
+    adminAuth: {
+        verifyIdToken: vi.fn().mockResolvedValue({
+            uid: 'test-admin-uid',
+            email: 'admin@test.com',
+            email_verified: true,
+        }),
+    },
+    isFirebaseEnabled: true,
+}));
+
+// Create mock query builder factory
+const createMockQueryBuilder = () => {
+    let callCount = 0;
+    
+    return {
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
-        get: vi.fn().mockResolvedValue({
-            id: 123,
-            sourceName: 'Test Source',
-            rssUrl: 'https://test.com/rss.xml',
-            countryCode: 'tr',
-            isActive: true,
-            sourceLogoUrl: 'https://test.com/logo.png',
+        get: vi.fn().mockImplementation(() => {
+            callCount++;
+            // Odd calls are for admin user check, even calls are for source
+            if (callCount % 2 === 1) {
+                return Promise.resolve(TEST_ADMIN_USER);
+            }
+            return Promise.resolve(TEST_SOURCE_DATA);
         }),
         orderBy: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
         offset: vi.fn().mockReturnThis(),
-        then: (resolve: any) => resolve([]),
+        then: (resolve: (value: unknown[]) => void) => resolve([]),
         all: vi.fn().mockResolvedValue([]),
         values: vi.fn().mockReturnThis(),
         returning: vi.fn().mockReturnThis(),
         set: vi.fn().mockReturnThis(),
     };
+};
 
-    return {
-        db: {
-            select: vi.fn().mockReturnValue(mockQueryBuilder),
-            insert: vi.fn().mockReturnValue(mockQueryBuilder),
-            delete: vi.fn().mockReturnValue(mockQueryBuilder),
-            update: vi.fn().mockReturnValue(mockQueryBuilder),
-        }
-    };
-});
+const mockQueryBuilder = createMockQueryBuilder();
 
-import { eq } from 'drizzle-orm';
-import { scrapeSource } from '@/services/scraper/scraperService.js';
-import adminRoute from '@/routes/admin.js';
-import { db } from '@/config/db.js';
+vi.mock('@/config/db.js', () => ({
+    db: {
+        select: vi.fn().mockReturnValue(mockQueryBuilder),
+        insert: vi.fn().mockReturnValue(mockQueryBuilder),
+        delete: vi.fn().mockReturnValue(mockQueryBuilder),
+        update: vi.fn().mockReturnValue(mockQueryBuilder),
+    }
+}));
 
 vi.mock('@/services/scraper/scraperService.js', () => ({
     scrapeSource: vi.fn().mockResolvedValue({
@@ -68,8 +97,19 @@ vi.mock('@/config/logger.js', () => ({
         info: vi.fn(),
         error: vi.fn(),
         warn: vi.fn(),
+        debug: vi.fn(),
     },
 }));
+
+// Mock rate limiter to avoid issues in tests
+vi.mock('@/middleware/rateLimiter.js', () => ({
+    scrapeRateLimiter: vi.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
+    authRateLimiter: vi.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
+}));
+
+// Import after mocks
+import adminRoute from '@/routes/admin.js';
+import { db } from '@/config/db.js';
 
 const app = new Hono();
 app.route('/admin', adminRoute);
@@ -78,16 +118,21 @@ const server = serve({
     port: 0, // Random port
 });
 
+// Test için kullanılacak auth token
+const TEST_AUTH_TOKEN = 'Bearer test-firebase-token';
+
 describe('Admin API Integration Tests', () => {
     afterAll(async () => {
         await new Promise<void>((resolve) => {
             server.close(() => resolve());
         });
     });
+
     describe('GET /admin/sources', () => {
         it('should return all RSS sources', async () => {
             const response = await request(server)
                 .get('/admin/sources')
+                .set('Authorization', TEST_AUTH_TOKEN)
                 .expect(200);
 
             expect(response.body.success).toBe(true);
@@ -98,6 +143,7 @@ describe('Admin API Integration Tests', () => {
         it('should include source details', async () => {
             const response = await request(server)
                 .get('/admin/sources')
+                .set('Authorization', TEST_AUTH_TOKEN)
                 .expect(200);
 
             const sources = response.body.data;
@@ -116,6 +162,7 @@ describe('Admin API Integration Tests', () => {
         it('should return all categories', async () => {
             const response = await request(server)
                 .get('/admin/categories')
+                .set('Authorization', TEST_AUTH_TOKEN)
                 .expect(200);
 
             expect(response.body.success).toBe(true);
@@ -125,6 +172,7 @@ describe('Admin API Integration Tests', () => {
         it('should include category properties', async () => {
             const response = await request(server)
                 .get('/admin/categories')
+                .set('Authorization', TEST_AUTH_TOKEN)
                 .expect(200);
 
             if (response.body.data.length > 0) {
@@ -140,6 +188,7 @@ describe('Admin API Integration Tests', () => {
         it('should trigger manual scrape', async () => {
             const response = await request(server)
                 .post('/admin/scrape/123')
+                .set('Authorization', TEST_AUTH_TOKEN)
                 .expect(200);
 
             expect(response.body.success).toBe(true);
@@ -150,11 +199,16 @@ describe('Admin API Integration Tests', () => {
         });
 
         it('should return 404 for invalid source', async () => {
-            // Mock get returns null
-            (db.select() as any).get.mockResolvedValueOnce(null);
+            // Mock get returns null for source (second call)
+            const mockGet = vi.fn()
+                .mockResolvedValueOnce(TEST_ADMIN_USER) // First call: admin user check
+                .mockResolvedValueOnce(null); // Second call: source not found
+            
+            (db.select() as ReturnType<typeof createMockQueryBuilder>).get = mockGet;
 
             const response = await request(server)
                 .post('/admin/scrape/999')
+                .set('Authorization', TEST_AUTH_TOKEN)
                 .expect(404);
 
             expect(response.body.success).toBe(false);

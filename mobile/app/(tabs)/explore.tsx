@@ -17,7 +17,7 @@ const CategoryPill = ({ item, isSelected, onPress }: { item: Category, isSelecte
     if (isSelected) {
       scale.value = withSequence(withSpring(1.05), withSpring(1));
     }
-  }, [isSelected]);
+  }, [isSelected, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -47,7 +47,7 @@ export default function ExploreScreen() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
 
-  const router = useRouter();
+  const _router = useRouter(); // Kept for future navigation
   const categoriesQuery = useCategories();
 
   // Debounce logic

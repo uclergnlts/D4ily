@@ -1,4 +1,4 @@
-/* eslint-disable react/display-name */
+ 
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

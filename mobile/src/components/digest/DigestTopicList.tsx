@@ -51,3 +51,5 @@ export const DigestTopicList = React.memo(({ topics, onTopicPress, className }: 
         </View>
     );
 });
+
+DigestTopicList.displayName = 'DigestTopicList';

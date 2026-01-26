@@ -18,7 +18,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     checkAuth();
-  }, []);
+  }, [checkAuth]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { TimeAgo } from '../ui/TimeAgo';
-import { Article } from '../../types';
 
 interface ArticleHeaderProps {
     title: string;
@@ -41,3 +40,5 @@ export const ArticleHeader = React.memo(({ title, publishedAt, category, classNa
         </View>
     );
 });
+
+ArticleHeader.displayName = 'ArticleHeader';

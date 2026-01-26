@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { AlignmentGauge } from '../ui/AlignmentGauge';
-import { Info, Scale } from 'lucide-react-native';
+import { Scale } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 interface PoliticalToneGaugeProps {
@@ -60,3 +60,5 @@ export const PoliticalToneGauge = React.memo(({ politicalTone, politicalConfiden
         </Animated.View>
     );
 });
+
+PoliticalToneGauge.displayName = 'PoliticalToneGauge';

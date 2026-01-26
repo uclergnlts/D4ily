@@ -55,3 +55,5 @@ export const SourceAlignmentHistory = React.memo(({ history, className }: Source
         </View>
     );
 });
+
+SourceAlignmentHistory.displayName = 'SourceAlignmentHistory';

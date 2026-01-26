@@ -72,3 +72,5 @@ export const ComparisonCard = React.memo(({ topicTitle, left, right, className, 
         </TouchableOpacity>
     );
 });
+
+ComparisonCard.displayName = 'ComparisonCard';

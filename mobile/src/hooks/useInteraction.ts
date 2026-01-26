@@ -46,6 +46,6 @@ export function useToggleBookmark() {
 export function useSavedArticles(country: string) {
     return useQuery({
         queryKey: ['savedArticles', country],
-        queryFn: () => interactionService.getSavedArticles(country),
+        queryFn: () => interactionService.getSavedArticles(1),
     });
 }

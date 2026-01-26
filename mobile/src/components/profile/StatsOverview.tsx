@@ -35,3 +35,5 @@ export const StatsOverview = React.memo(({ totalVotes, accurateVotes, className 
         </View>
     );
 });
+
+StatsOverview.displayName = 'StatsOverview';

@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share , useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useDigestDetail } from '../../src/hooks/useDigest';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
 import { DigestHeader } from '../../src/components/digest/DigestHeader';
 import { DigestTopicList } from '../../src/components/digest/DigestTopicList';
-import { useColorScheme } from 'react-native';
+
 
 export default function DigestDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();

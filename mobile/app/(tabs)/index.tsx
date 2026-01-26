@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, ActivityIndicator, RefreshControl, Switch, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ActivityIndicator, RefreshControl, TouchableOpacity, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import { Link, useRouter } from 'expo-router';
-import { FlaskConical, Menu, BellRing } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { Menu, BellRing } from 'lucide-react-native';
 
 import { useFeed } from '../../src/hooks/useFeed';
 import { useBalancedFeed } from '../../src/hooks/useBalancedFeed';
@@ -17,11 +17,10 @@ import { Article } from '../../src/types';
 import { BalancedFeedScreen } from '../../src/components/feed/BalancedFeedScreen';
 import { FeedFilterBar } from '../../src/components/feed/FeedFilterBar';
 import { SideMenu } from '../../src/components/navigation/SideMenu';
-import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useFeedStore } from '../../src/store/useFeedStore';
 
-import { useColorScheme } from 'react-native';
+
 
 export default function FeedScreen() {
   const router = useRouter();
@@ -31,7 +30,7 @@ export default function FeedScreen() {
   const { isBalanced } = useFeedStore();
   const [selectedCategory, setSelectedCategory] = useState({ id: 'all', name: 'Senin Akışın' });
 
-  const { toggleSideMenu, isSideMenuOpen, selectedCountry } = useAppStore();
+  const { toggleSideMenu, selectedCountry } = useAppStore();
 
   // Normal Feed
   const feedQuery = useFeed(selectedCountry);

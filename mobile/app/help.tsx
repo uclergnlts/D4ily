@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Linking, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Linking, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, MessageCircle, Mail, FileText, ChevronDown, Send, ThumbsUp, ThumbsDown } from 'lucide-react-native';
+import { ChevronLeft, MessageCircle, Mail, ChevronDown, Send, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 const FAQItem = ({ question, answer }: { question: string, answer: string }) => {

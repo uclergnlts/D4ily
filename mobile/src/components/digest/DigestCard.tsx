@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { Image } from 'expo-image';
 import { Sun, Moon, ArrowRight } from 'lucide-react-native';
 
 interface DigestCardProps {
@@ -14,7 +13,7 @@ interface DigestCardProps {
 export const DigestCard = ({ type, title, summary, onPress, disabled }: DigestCardProps) => {
     const isMorning = type === 'morning';
     const Icon = isMorning ? Sun : Moon;
-    const accentColor = isMorning ? '#F59E0B' : '#6366F1'; // Amber vs Indigo
+    const _accentColor = isMorning ? '#F59E0B' : '#6366F1'; // Amber vs Indigo (kept for future use)
     const bgColor = isMorning ? 'bg-amber-50 dark:bg-amber-950/30' : 'bg-indigo-50 dark:bg-indigo-950/30';
     const borderColor = isMorning ? 'border-amber-200 dark:border-amber-800' : 'border-indigo-200 dark:border-indigo-800';
     const iconColor = isMorning ? '#F59E0B' : '#6366F1';

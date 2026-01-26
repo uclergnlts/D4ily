@@ -96,3 +96,5 @@ export const EmotionalAnalysisCard = React.memo(({ emotionalTone, emotionalInten
         </Animated.View>
     );
 });
+
+EmotionalAnalysisCard.displayName = 'EmotionalAnalysisCard';

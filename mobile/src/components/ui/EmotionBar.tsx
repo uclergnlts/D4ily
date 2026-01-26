@@ -29,7 +29,7 @@ export function EmotionBar({ label, value, color, className, delay = 0 }: Emotio
 
     useEffect(() => {
         width.value = withDelay(delay, withTiming(targetWidth, { duration: 800 }));
-    }, [targetWidth, delay]);
+    }, [targetWidth, delay, width]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         width: `${width.value}%`,

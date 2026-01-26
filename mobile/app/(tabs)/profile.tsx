@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LineChart, PieChart, Activity, Award, ChevronRight, History, ShieldCheck, TrendingUp, BookOpen } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Activity, Award, ChevronRight, History, ShieldCheck, TrendingUp, BookOpen } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
+const { width: _width } = Dimensions.get('window'); // Kept for future use
 
 export default function AnalysisScreen() {
-    const [selectedTab, setSelectedTab] = useState<'overview' | 'stats'>('overview');
+    // const [selectedTab, setSelectedTab] = useState<'overview' | 'stats'>('overview'); // Commented out - not used yet
 
     // Mock User Data for Analysis
     const userStats = {

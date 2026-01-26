@@ -1,4 +1,4 @@
-/* eslint-disable react/display-name */
+ 
 import React, { useState } from 'react';
 import { View, Text, Switch, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -115,7 +115,7 @@ export default function NotificationsScreen() {
                 <View className="m-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
                     <Text className="text-blue-700 dark:text-blue-300 font-bold text-sm mb-1">İpucu</Text>
                     <Text className="text-blue-600 dark:text-blue-400 text-xs leading-5">
-                        Bildirimleri sessize almak için cihazınızın "Rahatsız Etme" modunu kullanabilirsiniz. Uygulama içi ayarlar anında geçerli olur.
+                        Bildirimleri sessize almak için cihazınızın &quot;Rahatsız Etme&quot; modunu kullanabilirsiniz. Uygulama içi ayarlar anında geçerli olur.
                     </Text>
                 </View>
             </ScrollView>

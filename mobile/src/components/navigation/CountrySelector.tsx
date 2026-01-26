@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
-import { ChevronDown, Globe, Check } from 'lucide-react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { ChevronDown } from 'lucide-react-native';
 import { useAppStore, CountryCode } from '../../store/useAppStore';
 
 const COUNTRIES: { code: CountryCode; name: string; flag: string }[] = [

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, Camera, Check } from 'lucide-react-native';
+import { ChevronLeft, Camera } from 'lucide-react-native';
 import { useAuthStore } from '../../src/store/useAuthStore';
 
 export default function EditProfileScreen() {

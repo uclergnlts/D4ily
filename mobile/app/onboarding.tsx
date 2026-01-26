@@ -1,11 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Dimensions, FlatList, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, Dimensions, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
-import { ArrowRight, Check } from 'lucide-react-native';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const SLIDES = [
     {

@@ -73,8 +73,8 @@ export const feedService = {
             }
 
             return response.data.data;
-        } catch (error) {
-            // console.warn('API connection failed, falling back to Mock Data for Analysis.', error);
+        } catch (_error) {
+            // console.warn('API connection failed, falling back to Mock Data for Analysis.', _error);
             // Fail silently or mock
             return getMockAnalysis(articleId);
         }
@@ -92,8 +92,8 @@ export const feedService = {
             }
 
             return response.data.data;
-        } catch (error) {
-            // console.warn('API connection failed, falling back to Mock Data for Perspectives.', error);
+        } catch (_error) {
+            // console.warn('API connection failed, falling back to Mock Data for Perspectives.', _error);
             return getMockPerspectives(articleId);
         }
     }

@@ -56,3 +56,5 @@ export const FeedFilterBar = React.memo(({ selectedCategory, onSelectCategory, c
         </View>
     );
 });
+
+FeedFilterBar.displayName = 'FeedFilterBar';

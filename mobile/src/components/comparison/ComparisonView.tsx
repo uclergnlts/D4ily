@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React from 'react';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { Scale, ArrowLeftRight, TrendingUp, ChevronRight, Zap, Search } from 'lucide-react-native';
 
 const ComparisonCard = ({ topic, source1, source2, diffScore }: any) => (

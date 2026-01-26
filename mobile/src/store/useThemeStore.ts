@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Appearance, ColorSchemeName } from 'react-native';
+import { Appearance } from 'react-native';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 

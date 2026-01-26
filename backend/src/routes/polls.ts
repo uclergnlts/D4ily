@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { db } from '../config/db.js';
+import { db } from '../config/db';
 import {
     pollVotes,
     tr_article_polls,
@@ -10,10 +10,10 @@ import {
     es_article_polls,
     it_article_polls,
     ru_article_polls,
-} from '../db/schema/index.js';
-import { authMiddleware, AuthUser } from '../middleware/auth.js';
+} from '../db/schema/index';
+import { authMiddleware, AuthUser } from '../middleware/auth';
 import { eq, and } from 'drizzle-orm';
-import { logger } from '../config/logger.js';
+import { logger } from '../config/logger';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -42,8 +42,8 @@ const COUNTRY_POLL_TABLES = {
 } as const;
 
 // Safe JSON parse helper
-function safeJsonParse<T>(value: string | T, fallback: T): T {
-    if (typeof value !== 'string') return value;
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+    if (typeof value !== 'string') return value as T;
     try {
         return JSON.parse(value) as T;
     } catch {
@@ -75,9 +75,8 @@ pollsRoute.get('/:country/:pollId', async (c) => {
             }, 404);
         }
 
-        // Parse options and results
-        const options = safeJsonParse(poll.options, []);
-        const results = safeJsonParse(poll.results, {});
+        const options = safeJsonParse<string[]>(poll.options, []);
+        const results = safeJsonParse<Record<string, number>>(poll.results, {});
 
         return c.json({
             success: true,
@@ -125,8 +124,8 @@ pollsRoute.get('/:country/:pollId/results', async (c) => {
             }, 404);
         }
 
-        const options = safeJsonParse(poll.options, []);
-        const results = safeJsonParse(poll.results, {});
+        const options = safeJsonParse<string[]>(poll.options, []);
+        const results = safeJsonParse<Record<string, number>>(poll.results, {});
 
         // Calculate percentages
         const percentages = options.map((_: string, index: number) => {
@@ -191,7 +190,7 @@ pollsRoute.post('/:country/:pollId/vote', authMiddleware, async (c) => {
         }
 
         // Check if option is valid
-        const options = safeJsonParse(poll.options, []);
+        const options = safeJsonParse<string[]>(poll.options, []);
         if (optionIndex >= options.length) {
             return c.json({
                 success: false,
@@ -226,7 +225,7 @@ pollsRoute.post('/:country/:pollId/vote', authMiddleware, async (c) => {
         });
 
         // Update poll results
-        const results = safeJsonParse(poll.results, {}) as Record<string, number>;
+        const results = safeJsonParse<Record<string, number>>(poll.results, {});
         results[optionIndex.toString()] = (results[optionIndex.toString()] || 0) + 1;
 
         await db

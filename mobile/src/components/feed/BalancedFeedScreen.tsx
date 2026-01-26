@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, Dimensions, LayoutChangeEvent } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, LayoutChangeEvent } from 'react-native';
 import { ArticleCard } from '../article/ArticleCard';
 import { Article } from '../../types';
 import { FlashList, ListRenderItemInfo } from '@shopify/flash-list';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 interface BalancedFeedScreenProps {
     proGovArticles: Article[];
@@ -37,7 +37,7 @@ export const BalancedFeedScreen = React.memo(({ proGovArticles, mixedArticles, a
                 stiffness: 150,
             });
         }
-    }, [activeTab, containerWidth]);
+    }, [activeTab, containerWidth, indicatorPosition]);
 
     const indicatorStyle = useAnimatedStyle(() => {
         return {
@@ -135,3 +135,5 @@ export const BalancedFeedScreen = React.memo(({ proGovArticles, mixedArticles, a
         </View>
     );
 });
+
+BalancedFeedScreen.displayName = 'BalancedFeedScreen';

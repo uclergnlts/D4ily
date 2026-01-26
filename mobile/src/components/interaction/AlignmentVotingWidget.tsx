@@ -94,3 +94,5 @@ export const AlignmentVotingWidget = React.memo(({ currentScore, onVote, userVot
         </View>
     );
 });
+
+AlignmentVotingWidget.displayName = 'AlignmentVotingWidget';
