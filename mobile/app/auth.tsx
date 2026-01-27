@@ -41,12 +41,10 @@ export default function AuthScreen() {
                 await login(data.user, data.token);
                 router.back();
             } else {
-                // Register flow -> Go to Verify Email
-                // In a real app we would call register here first, then redirect. 
-                // For this demo, let's assume register involves a 2-step verification naturally.
-                // We'll pass the email to the next screen or just assume it.
-                // const data = await authService.register(email, password, name);
-
+                // Register flow - call API first
+                const data = await authService.register(email, password, name);
+                // Store user data and token
+                await login(data.user, data.customToken);
                 // Navigate to Verify Page
                 router.push({ pathname: '/auth/verify', params: { email } });
             }

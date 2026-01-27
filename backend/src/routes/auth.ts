@@ -21,6 +21,15 @@ const registerSchema = z.object({
     name: z.string().min(2, 'Name must be at least 2 characters').max(50),
 });
 
+const loginSchema = z.object({
+    email: z.string().email('Invalid email format'),
+    password: z.string().min(1, 'Password is required'),
+});
+
+// Firebase REST API URL for sign in
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || '';
+const FIREBASE_SIGN_IN_URL = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
+
 /**
  * POST /auth/register
  * Register a new user with Firebase and create database record
@@ -92,6 +101,138 @@ authRoute.post('/register', authRateLimiter, async (c) => {
             success: false,
             error: error instanceof Error ? error.message : 'Registration failed',
         }, 400);
+    }
+});
+
+/**
+ * POST /auth/login
+ * Login with email and password using Firebase REST API
+ */
+authRoute.post('/login', authRateLimiter, async (c) => {
+    if (!isFirebaseEnabled || !auth) {
+        return c.json({
+            success: false,
+            error: 'Authentication is not configured',
+        }, 503);
+    }
+
+    if (!FIREBASE_API_KEY) {
+        return c.json({
+            success: false,
+            error: 'Firebase API key is not configured',
+        }, 503);
+    }
+
+    try {
+        const body = await c.req.json();
+        const validatedData = loginSchema.parse(body);
+
+        // Use Firebase REST API to verify email/password
+        const firebaseResponse = await fetch(FIREBASE_SIGN_IN_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                email: validatedData.email,
+                password: validatedData.password,
+                returnSecureToken: true,
+            }),
+        });
+
+        const firebaseData = await firebaseResponse.json() as {
+            localId?: string;
+            idToken?: string;
+            refreshToken?: string;
+            error?: { message: string };
+        };
+
+        if (!firebaseResponse.ok || firebaseData.error) {
+            const errorMessage = firebaseData.error?.message || 'Login failed';
+            
+            // Map Firebase error messages to user-friendly messages
+            let userMessage = 'Giriş başarısız';
+            if (errorMessage.includes('EMAIL_NOT_FOUND')) {
+                userMessage = 'Bu e-posta adresi kayıtlı değil';
+            } else if (errorMessage.includes('INVALID_PASSWORD') || errorMessage.includes('INVALID_LOGIN_CREDENTIALS')) {
+                userMessage = 'E-posta veya şifre hatalı';
+            } else if (errorMessage.includes('USER_DISABLED')) {
+                userMessage = 'Bu hesap devre dışı bırakılmış';
+            } else if (errorMessage.includes('TOO_MANY_ATTEMPTS')) {
+                userMessage = 'Çok fazla başarısız deneme. Lütfen daha sonra tekrar deneyin';
+            }
+
+            return c.json({
+                success: false,
+                error: userMessage,
+            }, 401);
+        }
+
+        const uid = firebaseData.localId!;
+        const idToken = firebaseData.idToken!;
+
+        // Get user from database
+        let user = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, uid))
+            .get();
+
+        // If user doesn't exist in DB, create them
+        if (!user) {
+            const firebaseUser = await auth.getUser(uid);
+            user = await db
+                .insert(users)
+                .values({
+                    id: uid,
+                    email: firebaseUser.email || validatedData.email,
+                    name: firebaseUser.displayName || 'User',
+                    avatarUrl: firebaseUser.photoURL || null,
+                    userRole: 'user',
+                    subscriptionStatus: 'free',
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .returning()
+                .get();
+        }
+
+        // Update last login
+        await db
+            .update(users)
+            .set({ updatedAt: new Date() })
+            .where(eq(users.id, uid));
+
+        logger.info({ userId: uid, email: validatedData.email }, 'User logged in successfully');
+
+        return c.json({
+            success: true,
+            data: {
+                user: {
+                    uid: user.id,
+                    email: user.email,
+                    name: user.name,
+                    avatarUrl: user.avatarUrl,
+                    role: user.userRole,
+                    subscriptionStatus: user.subscriptionStatus,
+                },
+                token: idToken,
+            },
+        });
+    } catch (error: any) {
+        logger.error({ error }, 'Login failed');
+
+        if (error instanceof z.ZodError) {
+            return c.json({
+                success: false,
+                error: 'Geçersiz e-posta veya şifre formatı',
+            }, 400);
+        }
+
+        return c.json({
+            success: false,
+            error: 'Giriş başarısız. Lütfen tekrar deneyin.',
+        }, 500);
     }
 });
 

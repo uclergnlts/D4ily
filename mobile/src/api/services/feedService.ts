@@ -2,6 +2,9 @@ import { client } from '../client';
 import { ApiResponse, Article, FeedResponse, EmotionalAnalysisResponse, BalancedFeedResponse, PerspectivesResult } from '../../types';
 import { getMockFeed, getMockBalancedFeed, getMockArticle, getMockAnalysis, getMockPerspectives } from '../mock/mockData';
 
+// Check if we're in development mode
+const isDevelopment = __DEV__;
+
 export const feedService = {
     getFeed: async (country: string, page = 1): Promise<FeedResponse> => {
         const params = new URLSearchParams();
@@ -12,15 +15,19 @@ export const feedService = {
             const response = await client.get<ApiResponse<FeedResponse>>(`/feed/${country}`, { params });
 
             if (!response.data.success) {
-                throw new Error(response.data.error || 'Failed to fetch feed');
+                throw new Error(response.data.error || 'Haberler yüklenemedi');
             }
 
             return response.data.data;
         } catch (error) {
-            console.warn('API connection failed, falling back to Mock Data for Feed.', error);
-            // Simulate network delay
-            await new Promise(resolve => setTimeout(resolve, 800));
-            return getMockFeed(country, page);
+            // Only use mock data in development
+            if (isDevelopment) {
+                console.warn('[DEV] API connection failed, using mock data for Feed.');
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return getMockFeed(country, page);
+            }
+            // In production, throw the error
+            throw new Error('Haberler yüklenemedi. Lütfen internet bağlantınızı kontrol edin.');
         }
     },
 
@@ -33,14 +40,17 @@ export const feedService = {
             const response = await client.get<ApiResponse<BalancedFeedResponse>>(`/feed/${country}`, { params });
 
             if (!response.data.success) {
-                throw new Error(response.data.error || 'Failed to fetch balanced feed');
+                throw new Error(response.data.error || 'Dengeli akış yüklenemedi');
             }
 
             return response.data.data;
         } catch (error) {
-            console.warn('API connection failed, falling back to Mock Data for Balanced Feed.', error);
-            await new Promise(resolve => setTimeout(resolve, 800));
-            return getMockBalancedFeed(country);
+            if (isDevelopment) {
+                console.warn('[DEV] API connection failed, using mock data for Balanced Feed.');
+                await new Promise(resolve => setTimeout(resolve, 300));
+                return getMockBalancedFeed(country);
+            }
+            throw new Error('Dengeli akış yüklenemedi. Lütfen internet bağlantınızı kontrol edin.');
         }
     },
 
@@ -50,14 +60,17 @@ export const feedService = {
             const response = await client.get<ApiResponse<Article>>(`/feed/${country}/${id}`);
 
             if (!response.data.success) {
-                throw new Error(response.data.error || 'Failed to fetch article');
+                throw new Error(response.data.error || 'Haber bulunamadı');
             }
 
             return response.data.data;
         } catch (error) {
-            console.warn('API connection failed, falling back to Mock Data for Article.', error);
-            await new Promise(resolve => setTimeout(resolve, 500));
-            return getMockArticle(id, country);
+            if (isDevelopment) {
+                console.warn('[DEV] API connection failed, using mock data for Article.');
+                await new Promise(resolve => setTimeout(resolve, 200));
+                return getMockArticle(id, country);
+            }
+            throw new Error('Haber yüklenemedi. Lütfen tekrar deneyin.');
         }
     },
 
@@ -69,13 +82,12 @@ export const feedService = {
             );
 
             if (!response.data.success) {
-                throw new Error(response.data.error || 'Failed to fetch analysis');
+                throw new Error(response.data.error || 'Analiz yüklenemedi');
             }
 
             return response.data.data;
         } catch {
-            // console.warn('API connection failed, falling back to Mock Data for Analysis.');
-            // Fail silently or mock
+            // Analysis is optional, return mock in all cases
             return getMockAnalysis(articleId);
         }
     },
@@ -88,12 +100,12 @@ export const feedService = {
             );
 
             if (!response.data.success) {
-                throw new Error(response.data.error || 'Failed to fetch perspectives');
+                throw new Error(response.data.error || 'Perspektifler yüklenemedi');
             }
 
             return response.data.data;
         } catch {
-            // console.warn('API connection failed, falling back to Mock Data for Perspectives.');
+            // Perspectives are optional, return mock in all cases
             return getMockPerspectives(articleId);
         }
     }
