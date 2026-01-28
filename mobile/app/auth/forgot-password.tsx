@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } fro
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Mail, ArrowRight, CheckCircle } from 'lucide-react-native';
+import { authService } from '../../src/api/services/authService';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
@@ -17,11 +18,14 @@ export default function ForgotPasswordScreen() {
         }
 
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            await authService.resetPassword(email);
             setSent(true);
-        }, 1500);
+        } catch (error: any) {
+            Alert.alert('Hata', error.message || 'Şifre sıfırlama başarısız');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

@@ -11,7 +11,7 @@ interface AlignmentVotingWidgetProps {
     className?: string;
 }
 
-export const AlignmentVotingWidget = React.memo(({ currentScore, onVote, userVote, className }: AlignmentVotingWidgetProps) => {
+export const AlignmentVotingWidget = React.memo(function AlignmentVotingWidget({ currentScore, onVote, userVote, className }: AlignmentVotingWidgetProps) {
     const [sliderValue, setSliderValue] = useState(userVote || currentScore);
     const [hasChanged, setHasChanged] = useState(false);
 

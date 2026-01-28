@@ -4,12 +4,14 @@ import {
     notifications,
     userDevices,
     userNotificationPreferences,
+    users,
 } from '../db/schema/index.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { messaging } from '../config/firebase.js';
 
 type Variables = {
     user: AuthUser;
@@ -397,6 +399,101 @@ notificationsRoute.put('/read-all', async (c) => {
         return c.json({
             success: false,
             error: 'Failed to mark all as read',
+        }, 500);
+    }
+});
+
+/**
+ * POST /notifications/send
+ * Send push notification to user (admin only)
+ */
+notificationsRoute.post('/send', async (c) => {
+    try {
+        const authUser = c.get('user') as AuthUser;
+        
+        // Check if user is admin
+        const user = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, authUser.uid))
+            .get();
+
+        if (!user || user.userRole !== 'admin') {
+            return c.json({
+                success: false,
+                error: 'Unauthorized',
+            }, 403);
+        }
+
+        const body = await c.req.json();
+        const schema = z.object({
+            userId: z.string().min(1),
+            title: z.string().min(1).max(100),
+            body: z.string().min(1).max(500),
+            data: z.record(z.string(), z.any()).optional(),
+        });
+        
+        const { userId, title, body: data } = schema.parse(body);
+
+        // Get user's FCM tokens
+        const devices = await db
+            .select()
+            .from(userDevices)
+            .where(and(
+                eq(userDevices.userId, userId),
+                eq(userDevices.isActive, true)
+            ));
+
+        if (devices.length === 0) {
+            return c.json({
+                success: false,
+                error: 'No active devices found for user',
+            }, 404);
+        }
+
+        // Store notification in database
+        const notificationId = crypto.randomUUID();
+        await db.insert(notifications).values({
+            id: notificationId,
+            userId,
+            type: 'news',
+            title,
+            body,
+            data: data ? JSON.stringify(data) : null,
+            isRead: false,
+            sentAt: new Date(),
+        });
+
+        // Send push notifications via Firebase
+        if (messaging) {
+            const fcmTokens = devices.map(d => d.fcmToken);
+            
+            const message = {
+                notification: {
+                    title,
+                    body,
+                },
+                data: data || {},
+                tokens: fcmTokens,
+            };
+
+            await messaging.sendMulticast(message);
+            logger.info({ notificationId, userId, deviceCount: fcmTokens.length }, 'Push notification sent');
+        }
+
+        return c.json({
+            success: true,
+            message: 'Notification sent',
+            data: {
+                notificationId,
+                deviceCount: devices.length,
+            },
+        }, 201);
+    } catch (error) {
+        logger.error({ error }, 'Send notification failed');
+        return c.json({
+            success: false,
+            error: 'Failed to send notification',
         }, 500);
     }
 });

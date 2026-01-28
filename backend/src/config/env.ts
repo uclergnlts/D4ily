@@ -20,6 +20,8 @@ const envSchema = z.object({
     FIREBASE_CLIENT_EMAIL: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
+    REVENUECAT_PUBLIC_API_KEY: z.string().optional(),
+    REVENUECAT_SECRET_API_KEY: z.string().optional(),
     REVENUECAT_WEBHOOK_SECRET: z.string().optional(),
     CLOUDINARY_CLOUD_NAME: z.string().optional(),
     CLOUDINARY_API_KEY: z.string().optional(),

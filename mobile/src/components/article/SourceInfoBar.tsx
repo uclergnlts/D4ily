@@ -9,7 +9,7 @@ interface SourceInfoBarProps {
     className?: string;
 }
 
-export const SourceInfoBar = React.memo(({ sources, className }: SourceInfoBarProps) => {
+export const SourceInfoBar = React.memo(function SourceInfoBar({ sources, className }: SourceInfoBarProps) {
     const primarySource = sources.find(s => s.isPrimary) || sources[0];
 
     if (!primarySource) return null;

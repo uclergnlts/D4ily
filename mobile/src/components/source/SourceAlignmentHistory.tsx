@@ -11,7 +11,7 @@ interface SourceAlignmentHistoryProps {
     className?: string;
 }
 
-export const SourceAlignmentHistory = React.memo(({ history, className }: SourceAlignmentHistoryProps) => {
+export const SourceAlignmentHistory = React.memo(function SourceAlignmentHistory({ history, className }: SourceAlignmentHistoryProps) {
     // Simplified visualization: A list of monthly snapshots
     // In a real app, use a Chart library (e.g., victory-native or react-native-chart-kit)
 

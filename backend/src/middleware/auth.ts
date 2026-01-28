@@ -140,3 +140,65 @@ export async function adminMiddleware(c: Context, next: Next) {
         }, 401);
     }
 }
+
+// Premium middleware - requires auth + premium subscription
+export async function premiumMiddleware(c: Context, next: Next) {
+    // First, verify authentication
+    if (!isFirebaseEnabled || !adminAuth) {
+        logger.warn('Firebase not configured. Premium middleware disabled.');
+        return next();
+    }
+
+    try {
+        const authHeader = c.req.header('Authorization');
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return c.json({
+                success: false,
+                error: 'Unauthorized: No token provided',
+            }, 401);
+        }
+
+        const token = authHeader.substring(7);
+        const decodedToken = await adminAuth.verifyIdToken(token);
+
+        // Check premium status in database
+        const user = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, decodedToken.uid))
+            .get();
+
+        if (!user) {
+            return c.json({
+                success: false,
+                error: 'User not found',
+            }, 404);
+        }
+
+        if (user.subscriptionStatus !== 'premium') {
+            logger.warn({ userId: decodedToken.uid }, 'Non-premium user attempted premium action');
+            return c.json({
+                success: false,
+                error: 'Forbidden: Premium subscription required',
+            }, 403);
+        }
+
+        // Attach user to context with role
+        c.set('user', {
+            uid: decodedToken.uid,
+            email: decodedToken.email,
+            emailVerified: decodedToken.email_verified || false,
+            userRole: user.userRole,
+        } as AuthUser);
+
+        await next();
+    } catch (error) {
+        logger.error({ error }, 'Premium auth verification failed');
+
+        return c.json({
+            success: false,
+            error: 'Unauthorized: Invalid or expired token',
+        }, 401);
+    }
+}

@@ -14,7 +14,7 @@ interface DigestTopicListProps {
     className?: string;
 }
 
-export const DigestTopicList = React.memo(({ topics, onTopicPress, className }: DigestTopicListProps) => {
+export const DigestTopicList = React.memo(function DigestTopicList({ topics, onTopicPress, className }: DigestTopicListProps) {
     if (!topics || topics.length === 0) return null;
 
     return (

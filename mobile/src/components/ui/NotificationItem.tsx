@@ -11,7 +11,7 @@ interface NotificationItemProps {
     onPress: () => void;
 }
 
-export const NotificationItem = React.memo(({ type, title, message, time, isRead, onPress }: NotificationItemProps) => {
+export const NotificationItem = React.memo(function NotificationItem({ type, title, message, time, isRead, onPress }: NotificationItemProps) {
     const getIcon = () => {
         switch (type) {
             case 'breaking': return <Newspaper size={20} color="#006FFF" />;

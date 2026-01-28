@@ -18,7 +18,7 @@ interface ComparisonCardProps {
     onPress?: () => void;
 }
 
-export const ComparisonCard = React.memo(({ topicTitle, left, right, className, onPress }: ComparisonCardProps) => {
+export const ComparisonCard = React.memo(function ComparisonCard({ topicTitle, left, right, className, onPress }: ComparisonCardProps) {
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.8} className={`bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-zinc-100 dark:border-zinc-800 p-4 ${className}`}>
             {/* Header */}

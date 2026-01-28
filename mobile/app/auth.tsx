@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ChevronLeft, Mail, Lock, User, Check } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { authService } from '../src/api/services/authService';
+import { signInWithGoogle, signInWithApple, getIdToken, firebaseUserToAppUser } from '../src/utils/firebaseAuth';
 
 export default function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);
@@ -57,18 +58,32 @@ export default function AuthScreen() {
 
     const handleSocialLogin = async (provider: 'google' | 'apple') => {
         setLoading(true);
-        // Simulation of Social Login
-        setTimeout(async () => {
-            const mockUser = {
-                uid: 'social-user-123',
-                email: 'user@example.com',
-                name: provider === 'google' ? 'Google Kullanıcısı' : 'Apple Kullanıcısı',
-                role: 'user' as const
-            };
-            await login(mockUser, 'mock-social-token');
+        try {
+            let firebaseUser;
+            if (provider === 'google') {
+                firebaseUser = await signInWithGoogle();
+            } else if (provider === 'apple') {
+                firebaseUser = await signInWithApple();
+            }
+            
+            if (firebaseUser) {
+                // Get Firebase ID token
+                const token = await getIdToken();
+                
+                // Convert Firebase user to app user format
+                const appUser = firebaseUserToAppUser(firebaseUser);
+                
+                // Store user data and token in Zustand store
+                await login(appUser, token || '');
+                
+                // Navigate back
+                router.back();
+            }
+        } catch (error: any) {
+            Alert.alert('Hata', error.message || 'Social login başarısız');
+        } finally {
             setLoading(false);
-            router.back();
-        }, 1500);
+        }
     };
 
     return (

@@ -23,7 +23,7 @@ interface FeedFilterBarProps {
     className?: string;
 }
 
-export const FeedFilterBar = React.memo(({ selectedCategory, onSelectCategory, className }: FeedFilterBarProps) => {
+export const FeedFilterBar = React.memo(function FeedFilterBar({ selectedCategory, onSelectCategory, className }: FeedFilterBarProps) {
     return (
         <View className={`bg-transparent border-b border-zinc-100 dark:border-zinc-800 ${className}`}>
             <ScrollView

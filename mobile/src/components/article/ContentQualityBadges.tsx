@@ -9,7 +9,7 @@ interface ContentQualityBadgesProps {
     className?: string;
 }
 
-export const ContentQualityBadges = React.memo(({ isClickbait, isAd, sentiment, className }: ContentQualityBadgesProps) => {
+export const ContentQualityBadges = React.memo(function ContentQualityBadges({ isClickbait, isAd, sentiment, className }: ContentQualityBadgesProps) {
     if (!isClickbait && !isAd && !sentiment) return null;
 
     return (

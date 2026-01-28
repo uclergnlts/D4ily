@@ -10,7 +10,7 @@ interface PoliticalToneGaugeProps {
     governmentMentioned?: boolean;
 }
 
-export const PoliticalToneGauge = React.memo(({ politicalTone, politicalConfidence, governmentMentioned }: PoliticalToneGaugeProps) => {
+export const PoliticalToneGauge = React.memo(function PoliticalToneGauge({ politicalTone, politicalConfidence, governmentMentioned }: PoliticalToneGaugeProps) {
     const confidencePercent = Math.round(politicalConfidence * 100);
 
     return (

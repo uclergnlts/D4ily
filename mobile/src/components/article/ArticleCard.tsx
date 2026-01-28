@@ -11,7 +11,7 @@ interface ArticleCardProps {
     article: Article;
 }
 
-export const ArticleCard = React.memo(({ article }: ArticleCardProps) => {
+export const ArticleCard = React.memo(function ArticleCard({ article }: ArticleCardProps) {
     const primarySource = article.sources?.find(s => s.isPrimary) || article.sources?.[0];
     const sourceName = primarySource?.sourceName || article.source || 'Kaynak';
 

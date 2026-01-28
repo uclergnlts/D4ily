@@ -13,7 +13,7 @@ interface CommentCardProps {
     className?: string;
 }
 
-export const CommentCard = React.memo(({ comment, onLike, onReply, isLiked, className }: CommentCardProps) => {
+export const CommentCard = React.memo(function CommentCard({ comment, onLike, onReply, isLiked, className }: CommentCardProps) {
     // Mock user name if not provided (Backend currently returns raw comment)
     const username = 'Kullanıcı';
     const avatarUrl = undefined; // Placeholder for real avatar

@@ -11,7 +11,7 @@ interface EmotionalAnalysisCardProps {
     className?: string;
 }
 
-export const EmotionalAnalysisCard = React.memo(({ emotionalTone, emotionalIntensity, className }: EmotionalAnalysisCardProps) => {
+export const EmotionalAnalysisCard = React.memo(function EmotionalAnalysisCard({ emotionalTone, emotionalIntensity, className }: EmotionalAnalysisCardProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     if (!emotionalTone) return null;

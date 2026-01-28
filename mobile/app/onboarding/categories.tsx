@@ -1,23 +1,62 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Check, Zap, Briefcase, Cpu, Trophy, Globe, Heart } from 'lucide-react-native';
+import { client } from '../../src/api/client';
+import { ApiResponse } from '../../src/types';
 
-const CATEGORIES = [
-    { id: '1', name: 'Gündem', icon: Zap, color: '#ef4444' },
-    { id: '2', name: 'Ekonomi', icon: Briefcase, color: '#006FFF' },
-    { id: '3', name: 'Teknoloji', icon: Cpu, color: '#a855f7' },
-    { id: '4', name: 'Spor', icon: Trophy, color: '#10b981' },
-    { id: '5', name: 'Dünya', icon: Globe, color: '#f59e0b' },
-    { id: '6', name: 'Sağlık', icon: Heart, color: '#ec4899' },
-];
+interface Category {
+    id: number;
+    name: string;
+    slug: string;
+    icon: string;
+    color: string;
+}
+
+const CATEGORY_ICONS: Record<string, any> = {
+    'Gündem': Zap,
+    'Ekonomi': Briefcase,
+    'Teknoloji': Cpu,
+    'Spor': Trophy,
+    'Dünya': Globe,
+    'Sağlık': Heart,
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+    'Gündem': '#ef4444',
+    'Ekonomi': '#006FFF',
+    'Teknoloji': '#a855f7',
+    'Spor': '#10b981',
+    'Dünya': '#f59e0b',
+    'Sağlık': '#ec4899',
+};
 
 export default function CategoriesScreen() {
     const router = useRouter();
-    const [selected, setSelected] = useState<string[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [selected, setSelected] = useState<number[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
-    const toggleSelection = (id: string) => {
+    useEffect(() => {
+        fetchCategories();
+    }, []);
+
+    const fetchCategories = async () => {
+        try {
+            const response = await client.get<ApiResponse<Category[]>>('/categories');
+            if (response.data.success) {
+                setCategories(response.data.data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSelection = (id: number) => {
         if (selected.includes(id)) {
             setSelected(selected.filter(s => s !== id));
         } else {
@@ -25,10 +64,21 @@ export default function CategoriesScreen() {
         }
     };
 
-    const handleComplete = () => {
-        // Here we would save preferences using a store
-        // useAuthStore.getState().setPreferences(...)
-        router.replace('/(tabs)');
+    const handleComplete = async () => {
+        if (selected.length === 0) {
+            Alert.alert('Hata', 'Lütfen en az bir kategori seçin.');
+            return;
+        }
+
+        setSaving(true);
+        try {
+            await client.post('/user/categories', { categoryIds: selected });
+            router.replace('/(tabs)');
+        } catch (error: any) {
+            Alert.alert('Hata', error.message || 'Kaydetme başarısız');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -43,17 +93,19 @@ export default function CategoriesScreen() {
 
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
                     <View className="flex-row flex-wrap gap-3">
-                        {CATEGORIES.map((category) => {
+                        {categories.map((category) => {
                             const isSelected = selected.includes(category.id);
+                            const Icon = CATEGORY_ICONS[category.name] || Zap;
+                            const color = CATEGORY_COLORS[category.name] || '#006FFF';
                             return (
                                 <TouchableOpacity
                                     key={category.id}
                                     onPress={() => toggleSelection(category.id)}
                                     className={`w-[48%] p-5 rounded-2xl border-2 mb-1 justify-between h-40 ${isSelected ? 'border-transparent' : 'border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900'}`}
-                                    style={isSelected ? { backgroundColor: category.color } : {}}
+                                    style={isSelected ? { backgroundColor: color } : {}}
                                 >
                                     <View className={`w-10 h-10 rounded-full items-center justify-center ${isSelected ? 'bg-white/20' : 'bg-white dark:bg-zinc-800'}`}>
-                                        <category.icon size={20} color={isSelected ? '#fff' : category.color} />
+                                        <Icon size={20} color={isSelected ? '#fff' : color} />
                                     </View>
 
                                     <View>

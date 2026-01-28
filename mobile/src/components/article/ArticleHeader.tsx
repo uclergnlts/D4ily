@@ -9,7 +9,7 @@ interface ArticleHeaderProps {
     className?: string;
 }
 
-export const ArticleHeader = React.memo(({ title, publishedAt, category, className }: ArticleHeaderProps) => {
+export const ArticleHeader = React.memo(function ArticleHeader({ title, publishedAt, category, className }: ArticleHeaderProps) {
     return (
         <View className={`px-5 pt-8 pb-4 ${className}`}>
             {/* Meta Row: Category & Date */}

@@ -13,7 +13,7 @@ interface SourceCardProps {
     className?: string;
 }
 
-export const SourceCard = React.memo(({ name, logoUrl, alignmentScore, alignmentLabel, trustScore = 85, articleCount, className }: SourceCardProps) => {
+export const SourceCard = React.memo(function SourceCard({ name, logoUrl, alignmentScore, alignmentLabel, trustScore = 85, articleCount, className }: SourceCardProps) {
     return (
         <View className={`bg-white dark:bg-zinc-900 p-5 rounded-[24px] shadow-sm border border-zinc-100 dark:border-zinc-800 ${className}`}>
 

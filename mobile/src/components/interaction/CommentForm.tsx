@@ -11,7 +11,7 @@ interface CommentFormProps {
     placeholder?: string;
 }
 
-export const CommentForm = React.memo(({ onSubmit, replyTo, onCancelReply, isLoading, className, placeholder }: CommentFormProps) => {
+export const CommentForm = React.memo(function CommentForm({ onSubmit, replyTo, onCancelReply, isLoading, className, placeholder }: CommentFormProps) {
     const [text, setText] = useState('');
 
     const handleSubmit = () => {

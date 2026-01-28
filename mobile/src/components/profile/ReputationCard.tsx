@@ -9,7 +9,7 @@ interface ReputationCardProps {
     className?: string;
 }
 
-export const ReputationCard = React.memo(({ level, accuracyPercentage, className }: ReputationCardProps) => {
+export const ReputationCard = React.memo(function ReputationCard({ level, accuracyPercentage, className }: ReputationCardProps) {
     const isExpert = level === 'Uzman';
     const levelColor = isExpert ? 'text-amber-500' : 'text-blue-600 dark:text-blue-400';
     const progressColor = isExpert ? 'bg-amber-500' : 'bg-blue-600 dark:bg-blue-500';

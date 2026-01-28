@@ -11,7 +11,7 @@ interface PerspectivesSectionProps {
     className?: string;
 }
 
-export const PerspectivesSection = React.memo(({ perspectives, className }: PerspectivesSectionProps) => {
+export const PerspectivesSection = React.memo(function PerspectivesSection({ perspectives, className }: PerspectivesSectionProps) {
     if (!perspectives || perspectives.length === 0) return null;
 
     return (

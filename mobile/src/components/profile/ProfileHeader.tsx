@@ -15,7 +15,7 @@ interface ProfileHeaderProps {
     className?: string;
 }
 
-export const ProfileHeader = React.memo(({ user, level, onLogout, onSettingsPress, className }: ProfileHeaderProps) => {
+export const ProfileHeader = React.memo(function ProfileHeader({ user, level, onLogout, onSettingsPress, className }: ProfileHeaderProps) {
     return (
         <View className={`flex-row items-start justify-between ${className}`}>
             <View className="flex-row items-center flex-1">

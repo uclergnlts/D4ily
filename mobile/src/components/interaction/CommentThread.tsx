@@ -9,7 +9,7 @@ interface CommentThreadProps {
     onReply?: (id: string, username: string) => void;
 }
 
-export const CommentThread = React.memo(({ comment, onLike, onReply }: CommentThreadProps) => {
+export const CommentThread = React.memo(function CommentThread({ comment, onLike, onReply }: CommentThreadProps) {
     return (
         <View className="mb-4">
             {/* Parent Comment */}

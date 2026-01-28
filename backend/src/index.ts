@@ -27,6 +27,7 @@ import topicsRoute from './routes/topics';
 import searchRoute from './routes/search';
 import premiumRoute from './routes/premium';
 import historyRoute from './routes/history';
+import webhookRoute from './routes/webhooks';
 
 const app = new Hono();
 
@@ -100,6 +101,7 @@ app.route('/topics', topicsRoute);
 app.route('/search', searchRoute);
 app.route('/premium', premiumRoute);
 app.route('/history', historyRoute);
+app.route('/webhooks', webhookRoute);
 
 // Start cron jobs
 if (env.NODE_ENV !== 'test') {

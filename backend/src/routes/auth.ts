@@ -381,6 +381,162 @@ authRoute.post('/verify-email', authMiddleware, async (c) => {
 });
 
 /**
+ * POST /auth/reset-password
+ * Send password reset email
+ */
+authRoute.post('/reset-password', authRateLimiter, async (c) => {
+    if (!FIREBASE_API_KEY) {
+        return c.json({
+            success: false,
+            error: 'Firebase API key is not configured',
+        }, 503);
+    }
+
+    try {
+        const body = await c.req.json();
+        const emailSchema = z.object({
+            email: z.string().email('Invalid email format'),
+        });
+        const { email } = emailSchema.parse(body);
+
+        // Use Firebase REST API to send password reset email
+        const firebaseResponse = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    email,
+                    requestType: 'PASSWORD_RESET',
+                }),
+            }
+        );
+
+        const firebaseData = await firebaseResponse.json() as {
+            error?: { message: string };
+        };
+
+        if (!firebaseResponse.ok || firebaseData.error) {
+            const errorMessage = firebaseData.error?.message || 'Password reset failed';
+            
+            // Map Firebase error messages to user-friendly messages
+            let userMessage = 'Şifre sıfırlama başarısız';
+            if (errorMessage.includes('EMAIL_NOT_FOUND')) {
+                userMessage = 'Bu e-posta adresi kayıtlı değil';
+            } else if (errorMessage.includes('INVALID_EMAIL')) {
+                userMessage = 'Geçersiz e-posta adresi';
+            }
+
+            return c.json({
+                success: false,
+                error: userMessage,
+            }, 400);
+        }
+
+        logger.info({ email }, 'Password reset email sent');
+
+        return c.json({
+            success: true,
+            message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi',
+        });
+    } catch (error: any) {
+        logger.error({ error }, 'Password reset failed');
+
+        if (error instanceof z.ZodError) {
+            return c.json({
+                success: false,
+                error: 'Geçersiz e-posta formatı',
+            }, 400);
+        }
+
+        return c.json({
+            success: false,
+            error: 'Şifre sıfırlama başarısız. Lütfen tekrar deneyin.',
+        }, 500);
+    }
+});
+
+/**
+ * POST /auth/verify-code
+ * Verify email verification code (for mobile app)
+ */
+authRoute.post('/verify-code', authRateLimiter, async (c) => {
+    if (!FIREBASE_API_KEY) {
+        return c.json({
+            success: false,
+            error: 'Firebase API key is not configured',
+        }, 503);
+    }
+
+    try {
+        const body = await c.req.json();
+        const codeSchema = z.object({
+            oobCode: z.string().min(1, 'Verification code is required'),
+        });
+        const { oobCode } = codeSchema.parse(body);
+
+        // Use Firebase REST API to verify email
+        const firebaseResponse = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:update?key=${FIREBASE_API_KEY}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    oobCode,
+                }),
+            }
+        );
+
+        const firebaseData = await firebaseResponse.json() as {
+            emailVerified?: boolean;
+            error?: { message: string };
+        };
+
+        if (!firebaseResponse.ok || firebaseData.error) {
+            const errorMessage = firebaseData.error?.message || 'Verification failed';
+            
+            let userMessage = 'Doğrulama başarısız';
+            if (errorMessage.includes('EXPIRED_OOB_CODE')) {
+                userMessage = 'Doğrulama kodunun süresi doldu. Yeni bir kod isteyin.';
+            } else if (errorMessage.includes('INVALID_OOB_CODE')) {
+                userMessage = 'Geçersiz doğrulama kodu';
+            }
+
+            return c.json({
+                success: false,
+                error: userMessage,
+            }, 400);
+        }
+
+        logger.info({ emailVerified: firebaseData.emailVerified }, 'Email verified successfully');
+
+        return c.json({
+            success: true,
+            message: 'E-posta başarıyla doğrulandı',
+            emailVerified: firebaseData.emailVerified,
+        });
+    } catch (error: any) {
+        logger.error({ error }, 'Email verification failed');
+
+        if (error instanceof z.ZodError) {
+            return c.json({
+                success: false,
+                error: 'Geçersiz doğrulama kodu',
+            }, 400);
+        }
+
+        return c.json({
+            success: false,
+            error: 'Doğrulama başarısız. Lütfen tekrar deneyin.',
+        }, 500);
+    }
+});
+
+/**
  * DELETE /auth/delete
  * Delete user account
  */

@@ -10,7 +10,7 @@ interface DigestHeaderProps {
     className?: string;
 }
 
-export const DigestHeader = React.memo(({ title, date, period, summary, className }: DigestHeaderProps) => {
+export const DigestHeader = React.memo(function DigestHeader({ title, date, period, summary, className }: DigestHeaderProps) {
 
     // Date formatting
     const dateObj = new Date(date);

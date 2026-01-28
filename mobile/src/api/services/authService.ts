@@ -20,5 +20,25 @@ export const authService = {
         }
 
         return response.data.data;
+    },
+
+    resetPassword: async (email: string) => {
+        const response = await client.post<ApiResponse<any>>('/auth/reset-password', { email });
+
+        if (!response.data.success) {
+            throw new Error(response.data.error || 'Password reset failed');
+        }
+
+        return response.data;
+    },
+
+    verifyEmailCode: async (oobCode: string) => {
+        const response = await client.post<ApiResponse<any>>('/auth/verify-code', { oobCode });
+
+        if (!response.data.success) {
+            throw new Error(response.data.error || 'Verification failed');
+        }
+
+        return response.data;
     }
 };

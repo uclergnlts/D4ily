@@ -95,3 +95,38 @@ export const sourceVotes = sqliteTable('source_votes', {
 }, (table) => ({
     userSourceIdx: index('source_votes_user_source_idx').on(table.userId, table.sourceId),
 }));
+
+// User subscriptions for premium
+export const subscriptions = sqliteTable('subscriptions', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id),
+    planId: text('plan_id', { enum: ['monthly', 'yearly'] }).notNull(),
+    status: text('status', { enum: ['active', 'cancelled', 'expired'] }).notNull(),
+    provider: text('provider', { enum: ['stripe', 'iyzico', 'apple', 'google'] }).notNull(),
+    providerSubscriptionId: text('provider_subscription_id').notNull(),
+    currentPeriodStart: integer('current_period_start', { mode: 'timestamp' }).notNull(),
+    currentPeriodEnd: integer('current_period_end', { mode: 'timestamp' }),
+    cancelAtPeriodEnd: integer('cancel_at_period_end', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+    userIdx: index('subscriptions_user_idx').on(table.userId),
+    statusIdx: index('subscriptions_status_idx').on(table.status),
+    providerIdx: index('subscriptions_provider_idx').on(table.providerSubscriptionId),
+}));
+
+// Payment history
+export const payments = sqliteTable('payments', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id),
+    subscriptionId: text('subscription_id').references(() => subscriptions.id),
+    provider: text('provider', { enum: ['stripe', 'iyzico', 'apple', 'google'] }).notNull(),
+    providerPaymentId: text('provider_payment_id').notNull(),
+    amount: real('amount').notNull(),
+    currency: text('currency').notNull().default('TRY'),
+    status: text('status', { enum: ['succeeded', 'failed', 'pending', 'refunded'] }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+    userIdx: index('payments_user_idx').on(table.userId),
+    subscriptionIdx: index('payments_subscription_idx').on(table.subscriptionId),
+}));

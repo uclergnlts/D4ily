@@ -19,7 +19,7 @@ const TABS = [
     { id: 'proGov', label: 'İktidar', color: 'text-amber-600', activeColor: '#d97706' },
 ] as const;
 
-export const BalancedFeedScreen = React.memo(({ proGovArticles, mixedArticles, antiGovArticles, isLoading, onRefresh }: BalancedFeedScreenProps) => {
+export const BalancedFeedScreen = React.memo(function BalancedFeedScreen({ proGovArticles, mixedArticles, antiGovArticles, isLoading, onRefresh }: BalancedFeedScreenProps) {
     const [activeTab, setActiveTab] = useState<'antiGov' | 'mixed' | 'proGov'>('mixed');
     const [containerWidth, setContainerWidth] = useState(0);
 

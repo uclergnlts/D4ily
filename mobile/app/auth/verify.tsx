@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Keyb
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Mail } from 'lucide-react-native';
+import { authService } from '../../src/api/services/authService';
 
 export default function VerifyEmailScreen() {
     const router = useRouter();
@@ -26,13 +27,22 @@ export default function VerifyEmailScreen() {
     };
 
     const handleVerify = async () => {
+        const oobCode = code.join('');
+        if (oobCode.length !== 5) {
+            Alert.alert('Hata', 'Lütfen 5 haneli doğrulama kodunu girin.');
+            return;
+        }
+
         setLoading(true);
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            await authService.verifyEmailCode(oobCode);
             // Navigate to next step: Source Selection
             router.push('/onboarding/sources');
-        }, 1500);
+        } catch (error: any) {
+            Alert.alert('Hata', error.message || 'Doğrulama başarısız');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

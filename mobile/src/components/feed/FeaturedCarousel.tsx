@@ -13,7 +13,7 @@ const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.8;
 const SPACING = 16;
 
-export const FeaturedCarousel = React.memo(({ articles }: FeaturedCarouselProps) => {
+export const FeaturedCarousel = React.memo(function FeaturedCarousel({ articles }: FeaturedCarouselProps) {
     if (!articles?.length) return null;
 
     const renderItem = ({ item }: { item: Article }) => {

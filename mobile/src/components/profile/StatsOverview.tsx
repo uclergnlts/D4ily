@@ -8,7 +8,7 @@ interface StatsOverviewProps {
     className?: string;
 }
 
-export const StatsOverview = React.memo(({ totalVotes, accurateVotes, className }: StatsOverviewProps) => {
+export const StatsOverview = React.memo(function StatsOverview({ totalVotes, accurateVotes, className }: StatsOverviewProps) {
     return (
         <View className={`flex-row gap-4 ${className}`}>
             {/* Total Votes Card */}
