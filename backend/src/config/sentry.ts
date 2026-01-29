@@ -13,17 +13,9 @@ export function initSentry() {
             environment: env.NODE_ENV,
             tracesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
             profilesSampleRate: env.NODE_ENV === 'production' ? 0.1 : 1.0,
-            
-            // Integrations
-            integrations: [
-                new Sentry.Integrations.Http({ tracing: true }),
-                new Sentry.Integrations.Express({ app: null }),
-                new Sentry.Integrations.OnUncaughtException(),
-                new Sentry.Integrations.OnUnhandledRejection(),
-            ],
 
             // Before send hook to filter sensitive data and anonymize user data
-            beforeSend(event, hint) {
+            beforeSend(event: any, hint: any) {
                 // Remove sensitive data from request headers
                 if (event.request?.headers) {
                     delete event.request.headers['authorization'];
@@ -83,7 +75,7 @@ export function clearSentryUser() {
  */
 export function captureException(error: Error, context?: Record<string, any>) {
     if (context) {
-        Sentry.withScope((scope) => {
+        Sentry.withScope((scope: any) => {
             Object.entries(context).forEach(([key, value]) => {
                 scope.setContext(key, value);
             });
@@ -110,16 +102,6 @@ export function addBreadcrumb(category: string, message: string, data?: Record<s
         message,
         level: 'info',
         data,
-    });
-}
-
-/**
- * Start a performance transaction
- */
-export function startTransaction(name: string, op: string) {
-    return Sentry.startTransaction({
-        name,
-        op,
     });
 }
 

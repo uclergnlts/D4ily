@@ -148,14 +148,14 @@ export const CommentThread = React.memo(function CommentThread({
                                             <View className="flex-row items-center justify-between">
                                                 <View>
                                                     <Text className="text-zinc-900 dark:text-white font-bold text-base">
-                                                        {(pkg as any).productTitle}
+                                                        {pkg.productTitle}
                                                     </Text>
                                                     <Text className="text-zinc-500 text-xs">
-                                                        {(pkg as any).description}
+                                                        {pkg.description}
                                                     </Text>
                                                 </View>
                                                 <Text className="text-primary font-bold text-lg">
-                                                    {(pkg as any).priceString}
+                                                    {pkg.priceString}
                                                 </Text>
                                             </View>
                                         </TouchableOpacity>

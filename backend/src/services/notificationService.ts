@@ -1,5 +1,5 @@
 import { db } from '../config/db';
-import { pushTokens } from '../db/schema';
+import { userDevices } from '../db/schema';
 import { eq, and, lt } from 'drizzle-orm';
 import { trackEvent, trackError } from '../config/posthog';
 import { addBreadcrumb } from '../config/sentry';
@@ -13,13 +13,13 @@ export interface PushToken {
     id: string;
     userId: string;
     token: string;
-    platform: 'ios' | 'android' | 'web';
+    platform: 'ios' | 'android';
     createdAt: Date;
     updatedAt: Date;
 }
 
 export interface NotificationPayload {
-    userId: string;
+    userId?: string;
     type: 'new_article' | 'digest' | 'comment' | 'like' | 'reply' | 'premium' | 'system';
     title: string;
     body: string;
@@ -34,46 +34,74 @@ export async function registerPushToken(
     token: string,
     platform: 'ios' | 'android' | 'web'
 ): Promise<PushToken | null> {
+    // Filter out web platform since userDevices only supports ios and android
+    if (platform === 'web') {
+        console.log('⚠️ Web platform not supported for push notifications');
+        return null;
+    }
     try {
         addBreadcrumb('notifications', 'Registering push token', { userId, platform });
 
         // Check if token already exists
         const existing = await db
             .select()
-            .from(pushTokens)
-            .where(eq(pushTokens.token, token))
+            .from(userDevices)
+            .where(eq(userDevices.fcmToken, token))
             .limit(1);
 
         if (existing.length > 0) {
             // Update existing token
             const [updated] = await db
-                .update(pushTokens)
+                .update(userDevices)
                 .set({
                     userId,
-                    platform,
-                    updatedAt: new Date(),
+                    deviceType: platform,
+                    lastActive: new Date(),
                 })
-                .where(eq(pushTokens.token, token))
+                .where(eq(userDevices.fcmToken, token))
                 .returning();
 
-            trackEvent('push_token_updated', { userId, platform });
-            return updated;
+            trackEvent(userId, 'push_token_updated', { platform });
+
+            // Map userDevices to PushToken interface
+            const updatedToken: PushToken = {
+                id: updated.id,
+                userId: updated.userId,
+                token: updated.fcmToken,
+                platform: updated.deviceType,
+                createdAt: updated.createdAt,
+                updatedAt: updated.lastActive,
+            };
+
+            return updatedToken;
         }
 
         // Insert new token
-        const [newToken] = await db
-            .insert(pushTokens)
+        const [newDevice] = await db
+            .insert(userDevices)
             .values({
+                id: crypto.randomUUID(),
                 userId,
-                token,
-                platform,
+                fcmToken: token,
+                deviceType: platform as 'ios' | 'android',
                 createdAt: new Date(),
-                updatedAt: new Date(),
+                lastActive: new Date(),
             })
             .returning();
 
-        trackEvent('push_token_registered', { userId, platform });
-        return newToken;
+            trackEvent(userId, 'push_token_registered', { platform });
+
+            // Map userDevices to PushToken interface
+            const newToken: PushToken = {
+                id: newDevice.id,
+                userId: newDevice.userId,
+                token: newDevice.fcmToken,
+                platform: newDevice.deviceType,
+                createdAt: newDevice.createdAt,
+                updatedAt: newDevice.lastActive,
+            };
+
+            return newToken;
     } catch (error) {
         console.error('❌ Failed to register push token:', error);
         trackError(userId, error as Error, { context: 'registerPushToken', platform });
@@ -92,10 +120,10 @@ export async function unregisterPushToken(
         addBreadcrumb('notifications', 'Unregistering push token', { userId });
 
         await db
-            .delete(pushTokens)
-            .where(and(eq(pushTokens.token, token), eq(pushTokens.userId, userId)));
+            .delete(userDevices)
+            .where(and(eq(userDevices.fcmToken, token), eq(userDevices.userId, userId)));
 
-        trackEvent('push_token_unregistered', { userId });
+        trackEvent(userId, 'push_token_unregistered');
         return true;
     } catch (error) {
         console.error('❌ Failed to unregister push token:', error);
@@ -109,10 +137,20 @@ export async function unregisterPushToken(
  */
 export async function getUserPushTokens(userId: string): Promise<PushToken[]> {
     try {
-        const tokens = await db
+        const devices = await db
             .select()
-            .from(pushTokens)
-            .where(eq(pushTokens.userId, userId));
+            .from(userDevices)
+            .where(eq(userDevices.userId, userId));
+
+        // Map userDevices to PushToken interface
+        const tokens: PushToken[] = devices.map(device => ({
+            id: device.id,
+            userId: device.userId,
+            token: device.fcmToken,
+            platform: device.deviceType,
+            createdAt: device.createdAt,
+            updatedAt: device.lastActive,
+        }));
 
         return tokens;
     } catch (error) {
@@ -172,7 +210,7 @@ export async function sendPushNotification(
         */
 
         console.log(`✅ Push notification sent to ${tokens.length} device(s) for user:`, userId);
-        trackEvent('push_notification_sent', { userId, type: payload.type, deviceCount: tokens.length });
+        trackEvent(userId, 'push_notification_sent', { type: payload.type, deviceCount: tokens.length });
         return true;
     } catch (error) {
         console.error('❌ Failed to send push notification:', error);
@@ -200,7 +238,7 @@ export async function sendBulkPushNotifications(
         }
     }
 
-    trackEvent('bulk_push_notifications_sent', {
+    trackEvent('system', 'bulk_push_notifications_sent', {
         totalUsers: userIds.length,
         success,
         failed,
@@ -218,12 +256,14 @@ export async function cleanupOldPushTokens(): Promise<number> {
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
         const result = await db
-            .delete(pushTokens)
-            .where(lt(pushTokens.updatedAt, thirtyDaysAgo));
+            .delete(userDevices)
+            .where(lt(userDevices.lastActive, thirtyDaysAgo))
+            .returning();
 
-        console.log(`✅ Cleaned up ${result.rowCount || 0} old push tokens`);
-        trackEvent('old_push_tokens_cleaned', { count: result.rowCount || 0 });
-        return result.rowCount || 0;
+        const deletedCount = result.length || 0;
+        console.log(`✅ Cleaned up ${deletedCount} old push tokens`);
+        trackEvent('system', 'old_push_tokens_cleaned', { count: deletedCount });
+        return deletedCount;
     } catch (error) {
         console.error('❌ Failed to cleanup old push tokens:', error);
         trackError('system', error as Error, { context: 'cleanupOldPushTokens' });
