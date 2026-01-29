@@ -8,7 +8,7 @@ import { generateWeeklyComparison } from '../services/weeklyService.js';
  */
 export function startWeeklyCron() {
     // Sunday at 20:00
-    cron.schedule('0 20 * * 0', async () => {
+    const weeklyJob = cron.schedule('0 20 * * 0', async () => {
         logger.info('Starting weekly comparison generation...');
 
         try {
@@ -27,6 +27,12 @@ export function startWeeklyCron() {
     });
 
     logger.info('Weekly comparison cron job started (Sunday 20:00)');
+    
+    // Return cleanup function
+    return () => {
+        weeklyJob.stop();
+        logger.info('Weekly cron job stopped');
+    };
 }
 
 /**

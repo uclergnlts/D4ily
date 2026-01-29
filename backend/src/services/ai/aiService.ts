@@ -1,13 +1,15 @@
 import { openai } from '../../config/openai.js';
 import { logger } from '../../config/logger.js';
+import { openAICircuitBreaker } from '../../utils/circuitBreaker.js';
 import crypto from 'crypto';
 
 // Simple in-memory cache for AI results (reduces API costs for duplicate content)
 const aiCache = new Map<string, { result: ProcessedArticle; timestamp: number }>();
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_CACHE_SIZE = 10000; // Maximum cache entries to prevent memory leaks
 
 // Cleanup expired cache entries every hour
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
     const now = Date.now();
     let cleaned = 0;
     for (const [key, entry] of aiCache.entries()) {
@@ -21,9 +23,32 @@ setInterval(() => {
     }
 }, 60 * 60 * 1000);
 
+// Ensure interval is cleaned up on process exit
+process.on('beforeExit', () => {
+    clearInterval(cleanupInterval);
+});
+
 function generateCacheKey(title: string, content: string): string {
     const hash = crypto.createHash('md5').update(title + content.substring(0, 500)).digest('hex');
     return hash;
+}
+
+/**
+ * Enforce maximum cache size using LRU eviction
+ */
+function enforceCacheSizeLimit(): void {
+    if (aiCache.size <= MAX_CACHE_SIZE) return;
+    
+    // Find and remove oldest entries
+    const entries = Array.from(aiCache.entries());
+    entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+    
+    const entriesToRemove = aiCache.size - MAX_CACHE_SIZE;
+    for (let i = 0; i < entriesToRemove; i++) {
+        aiCache.delete(entries[i][0]);
+    }
+    
+    logger.debug({ removed: entriesToRemove, remaining: aiCache.size }, 'AI cache LRU eviction completed');
 }
 
 export interface EmotionalTone {
@@ -125,21 +150,27 @@ Provide:
 
 Return ONLY valid JSON, no additional text.`;
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are a Turkish news analysis AI. Analyze political tone objectively based on framing, word choice, and emphasis. Always respond with valid JSON only.',
-                },
-                {
-                    role: 'user',
-                    content: prompt,
-                },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.3,
-        });
+        const response = await openAICircuitBreaker.execute(
+            'openai:chatCompletion',
+            async () => openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a Turkish news analysis AI. Analyze political tone objectively based on framing, word choice, and emphasis. Always respond with valid JSON only.',
+                    },
+                    {
+                        role: 'user',
+                        content: prompt,
+                    },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.3,
+            }),
+            () => {
+                throw new Error('OpenAI circuit breaker is open');
+            }
+        );
 
         const result = JSON.parse(response.choices[0].message.content || '{}');
 
@@ -203,7 +234,8 @@ Return ONLY valid JSON, no additional text.`;
             sensationalismScore: clampScore(result.sensationalism_score),
         };
 
-        // Store in cache
+        // Store in cache with LRU eviction
+        enforceCacheSizeLimit();
         aiCache.set(cacheKey, { result: processedResult, timestamp: Date.now() });
         logger.debug({ cacheKey: cacheKey.substring(0, 8), cacheSize: aiCache.size }, 'AI result cached');
 

@@ -8,16 +8,33 @@ interface RateLimitEntry {
 
 // In-memory store for rate limiting
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const MAX_STORE_SIZE = 100000; // Prevent memory leaks
 
 // Cleanup old entries every 5 minutes
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
     const now = Date.now();
+    let cleaned = 0;
     for (const [key, entry] of rateLimitStore.entries()) {
         if (entry.resetTime < now) {
             rateLimitStore.delete(key);
+            cleaned++;
+        }
+    }
+    // Emergency cleanup if store grows too large
+    if (rateLimitStore.size > MAX_STORE_SIZE) {
+        const entries = Array.from(rateLimitStore.entries());
+        entries.sort((a, b) => a[1].resetTime - b[1].resetTime);
+        const toRemove = rateLimitStore.size - MAX_STORE_SIZE;
+        for (let i = 0; i < toRemove; i++) {
+            rateLimitStore.delete(entries[i][0]);
         }
     }
 }, 5 * 60 * 1000);
+
+// Cleanup interval on process exit
+process.on('beforeExit', () => {
+    clearInterval(cleanupInterval);
+});
 
 interface RateLimitOptions {
     windowMs: number;      // Time window in milliseconds

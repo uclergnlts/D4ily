@@ -8,7 +8,7 @@ import { generateAllDigests } from '../services/digestService.js';
  */
 export function startDigestCron() {
     // Morning digest at 07:00
-    cron.schedule('0 7 * * *', async () => {
+    const morningJob = cron.schedule('0 7 * * *', async () => {
         logger.info('Starting morning digest generation...');
 
         try {
@@ -25,7 +25,7 @@ export function startDigestCron() {
     });
 
     // Evening digest at 19:00
-    cron.schedule('0 19 * * *', async () => {
+    const eveningJob = cron.schedule('0 19 * * *', async () => {
         logger.info('Starting evening digest generation...');
 
         try {
@@ -42,6 +42,13 @@ export function startDigestCron() {
     });
 
     logger.info('Digest cron jobs started (07:00 and 19:00 daily)');
+    
+    // Return cleanup function
+    return () => {
+        morningJob.stop();
+        eveningJob.stop();
+        logger.info('Digest cron jobs stopped');
+    };
 }
 
 /**

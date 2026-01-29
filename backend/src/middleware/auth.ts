@@ -16,8 +16,11 @@ export interface AuthUser {
 export async function authMiddleware(c: Context, next: Next) {
     // Skip if Firebase is not enabled
     if (!isFirebaseEnabled || !adminAuth) {
-        logger.warn('Firebase not configured. Auth middleware disabled.');
-        return next();
+        logger.error('Firebase not configured. Authentication required but unavailable.');
+        return c.json({
+            success: false,
+            error: 'Authentication service unavailable',
+        }, 503);
     }
 
     try {
@@ -83,8 +86,11 @@ export async function optionalAuthMiddleware(c: Context, next: Next) {
 export async function adminMiddleware(c: Context, next: Next) {
     // First, verify authentication
     if (!isFirebaseEnabled || !adminAuth) {
-        logger.warn('Firebase not configured. Admin middleware disabled.');
-        return next();
+        logger.error('Firebase not configured. Admin authentication required but unavailable.');
+        return c.json({
+            success: false,
+            error: 'Authentication service unavailable',
+        }, 503);
     }
 
     try {
@@ -145,8 +151,11 @@ export async function adminMiddleware(c: Context, next: Next) {
 export async function premiumMiddleware(c: Context, next: Next) {
     // First, verify authentication
     if (!isFirebaseEnabled || !adminAuth) {
-        logger.warn('Firebase not configured. Premium middleware disabled.');
-        return next();
+        logger.error('Firebase not configured. Premium authentication required but unavailable.');
+        return c.json({
+            success: false,
+            error: 'Authentication service unavailable',
+        }, 503);
     }
 
     try {

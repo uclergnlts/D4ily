@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
 import { comments, commentLikes } from '../db/schema/index.js';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
@@ -64,25 +64,36 @@ commentsRoute.get('/:country/:articleId', async (c) => {
                 isNull(comments.parentCommentId)
             ));
 
-        // Get replies for each top-level comment
-        const commentsWithReplies = await Promise.all(
-            topLevelComments.map(async (comment) => {
-                const replies = await db
-                    .select()
-                    .from(comments)
-                    .where(and(
-                        eq(comments.parentCommentId, comment.id),
-                        eq(comments.countryCode, validatedCountry)
-                    ))
-                    .orderBy(comments.createdAt);
+        // Get all replies for top-level comments in a single query (N+1 fix)
+        const parentIds = topLevelComments.map(c => c.id);
+        const allReplies = parentIds.length > 0 
+            ? await db
+                .select()
+                .from(comments)
+                .where(and(
+                    eq(comments.countryCode, validatedCountry),
+                    inArray(comments.parentCommentId, parentIds)
+                ))
+                .orderBy(comments.createdAt)
+            : [];
 
-                return {
-                    ...comment,
-                    replies,
-                    replyCount: replies.length,
-                };
-            })
-        );
+        // Group replies by parent comment ID
+        const repliesByParent = allReplies.reduce((acc, reply) => {
+            if (reply.parentCommentId) {
+                if (!acc[reply.parentCommentId]) {
+                    acc[reply.parentCommentId] = [];
+                }
+                acc[reply.parentCommentId].push(reply);
+            }
+            return acc;
+        }, {} as Record<string, typeof allReplies>);
+
+        // Map comments with their replies
+        const commentsWithReplies = topLevelComments.map((comment) => ({
+            ...comment,
+            replies: repliesByParent[comment.id] || [],
+            replyCount: (repliesByParent[comment.id] || []).length,
+        }));
 
         return c.json({
             success: true,

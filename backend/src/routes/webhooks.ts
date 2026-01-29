@@ -4,6 +4,7 @@ import { subscriptions, users, payments } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { createId } from '@paralleldrive/cuid2';
+import crypto from 'crypto';
 
 const webhookRoute = new Hono();
 
@@ -80,9 +81,31 @@ webhookRoute.post('/revenuecat', async (c) => {
  * Verify RevenueCat webhook signature
  */
 function verifyWebhookSignature(body: any, signature: string | undefined): boolean {
-    // TODO: Implement signature verification using REVENUECAT_WEBHOOK_SECRET
-    // For now, accept all webhooks in development
-    return true;
+    const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+    
+    // In development, allow missing signature if secret is not set
+    if (process.env.NODE_ENV === 'development' && !webhookSecret) {
+        logger.warn('RevenueCat webhook verification skipped in development');
+        return true;
+    }
+    
+    if (!signature || !webhookSecret) {
+        logger.error('Missing webhook signature or secret');
+        return false;
+    }
+    
+    try {
+        const hmac = crypto.createHmac('sha256', webhookSecret);
+        hmac.update(JSON.stringify(body));
+        const expectedSignature = hmac.digest('hex');
+        return crypto.timingSafeEqual(
+            Buffer.from(signature, 'hex'),
+            Buffer.from(expectedSignature, 'hex')
+        );
+    } catch (error) {
+        logger.error({ error }, 'Webhook signature verification failed');
+        return false;
+    }
 }
 
 /**

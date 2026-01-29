@@ -12,7 +12,7 @@ import {
  */
 export function startAlignmentNotificationCron() {
     // Process pending notifications every 5 minutes
-    cron.schedule('*/5 * * * *', async () => {
+    const processingJob = cron.schedule('*/5 * * * *', async () => {
         logger.info('Starting alignment notification processing...');
 
         try {
@@ -36,7 +36,7 @@ export function startAlignmentNotificationCron() {
     });
 
     // Retry failed notifications every hour
-    cron.schedule('0 * * * *', async () => {
+    const retryJob = cron.schedule('0 * * * *', async () => {
         logger.info('Retrying failed alignment notifications...');
 
         try {
@@ -50,6 +50,13 @@ export function startAlignmentNotificationCron() {
     });
 
     logger.info('Alignment notification cron jobs started (runs every 5 minutes)');
+    
+    // Return cleanup function
+    return () => {
+        processingJob.stop();
+        retryJob.stop();
+        logger.info('Alignment notification cron jobs stopped');
+    };
 }
 
 /**

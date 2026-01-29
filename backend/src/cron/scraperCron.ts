@@ -7,12 +7,18 @@ import { logger } from '../config/logger.js';
 
 export function startScraperCron() {
     // Run every 30 minutes
-    cron.schedule('*/30 * * * *', async () => {
+    const scraperJob = cron.schedule('*/30 * * * *', async () => {
         logger.info('Starting scheduled scraping...');
         await runScraper();
     });
 
     logger.info('Scraper cron job started (runs every 30 minutes)');
+    
+    // Return cleanup function
+    return () => {
+        scraperJob.stop();
+        logger.info('Scraper cron job stopped');
+    };
 }
 
 export async function runScraper() {

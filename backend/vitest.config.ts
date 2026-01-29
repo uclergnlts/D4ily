@@ -1,12 +1,19 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export default defineConfig({
     test: {
         globals: true,
         environment: 'node',
         include: ['tests/**/*.test.ts'],
-        // setupFiles: ['./tests/setup.ts'], // Temporarily disabled for debugging
+        // setupFiles: ['./tests/setup.ts'],
+        deps: {
+            interopDefault: true,
+        },
         env: {
             NODE_ENV: 'test',
             PORT: '3333',
@@ -35,6 +42,9 @@ export default defineConfig({
                 '**/drizzle/**',
             ],
             all: true,
+        },
+        alias: {
+            '@': path.resolve(__dirname, './src'),
         },
         testTimeout: 10000,
         hookTimeout: 10000,

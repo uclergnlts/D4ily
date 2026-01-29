@@ -75,12 +75,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 // Listen for auth state changes
-onAuthStateChanged(auth, async (user) => {
+const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
   if (user) {
     useAuthStore.setState({ user, isLoading: true });
-    const isAdmin = await useAuthStore.getState().checkAdminStatus();
-    useAuthStore.setState({ isLoading: false, isAdmin });
+    try {
+      const isAdmin = await useAuthStore.getState().checkAdminStatus();
+      useAuthStore.setState({ isLoading: false, isAdmin });
+    } catch (error) {
+      useAuthStore.setState({ isLoading: false, isAdmin: false, error: 'Failed to verify admin status' });
+    }
   } else {
     useAuthStore.setState({ user: null, isAdmin: false, isLoading: false });
   }
 });
+
+// Export cleanup function for testing or hot reloading
+export { unsubscribeAuth };

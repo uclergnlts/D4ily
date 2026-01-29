@@ -1,5 +1,6 @@
 import xml2js from 'xml2js';
 import { logger } from '../../config/logger.js';
+import { sanitizeUrl } from '../../utils/sanitize.js';
 
 export interface RSSItem {
     title: string;
@@ -68,13 +69,13 @@ export async function parseRSSFeed(url: string): Promise<RSSFeed> {
                 if (!imageUrl && item.description) {
                     const imgMatch = item.description.match(/<img[^>]+src="([^">]+)"/);
                     if (imgMatch) {
-                        imageUrl = imgMatch[1];
+                        imageUrl = sanitizeUrl(imgMatch[1]);
                     }
                 }
 
                 return {
                     title: item.title || '',
-                    link: item.link || '',
+                    link: sanitizeUrl(item.link) || '',
                     description: item.description || '',
                     content: item['content:encoded'] || item.description || '',
                     pubDate: item.pubDate || '',
