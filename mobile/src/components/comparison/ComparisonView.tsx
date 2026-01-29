@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { Scale, ArrowLeftRight, TrendingUp, ChevronRight, Zap, Search } from 'lucide-react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { Scale, ArrowLeftRight, TrendingUp, ChevronRight, Zap, Search, Lock, Crown } from 'lucide-react-native';
+import { usePremium } from '../../hooks/usePremium';
 
 const ComparisonCard = ({ topic, source1, source2, diffScore }: any) => (
     <TouchableOpacity className="bg-white dark:bg-zinc-900 w-72 rounded-2xl p-4 mr-4 border border-zinc-100 dark:border-zinc-800 shadow-sm">
@@ -115,6 +116,17 @@ const MonthlyStats = () => (
 );
 
 export const ComparisonView = () => {
+    const { isPremium, requirePremium, purchasePackage, packages } = usePremium();
+    const [showPremiumModal, setShowPremiumModal] = React.useState(false);
+
+    const handlePremiumFeature = (callback: () => void) => {
+        if (isPremium) {
+            callback();
+        } else {
+            setShowPremiumModal(true);
+        }
+    };
+
     return (
         <ScrollView className="flex-1 bg-zinc-50 dark:bg-black" contentContainerStyle={{ paddingBottom: 100 }}>
             {/* Header */}
@@ -127,13 +139,29 @@ export const ComparisonView = () => {
                 </Text>
             </View>
 
-            {/* Mock Chart */}
-            <MediaLandscapeChart />
+            {/* Mock Chart - Premium Feature */}
+            <TouchableOpacity
+                onPress={() => handlePremiumFeature(() => {
+                    console.log('Open detailed chart');
+                })}
+                activeOpacity={0.8}
+            >
+                <MediaLandscapeChart />
+                {!isPremium && (
+                    <View className="absolute inset-0 bg-black/30 items-center justify-center rounded-3xl">
+                        <View className="bg-white/90 dark:bg-zinc-900/90 p-4 rounded-2xl items-center">
+                            <Lock size={32} color="#006FFF" className="mb-2" />
+                            <Text className="text-zinc-900 dark:text-white font-bold text-base mb-1">Premium Özellik</Text>
+                            <Text className="text-zinc-500 text-sm text-center">Detaylı medya analizi için premium'a geç</Text>
+                        </View>
+                    </View>
+                )}
+            </TouchableOpacity>
 
             {/* Quick Stats */}
             <MonthlyStats />
 
-            {/* Trending Carousel */}
+            {/* Trending Carousel - Premium Feature */}
             <View className="mb-8">
                 <View className="px-6 flex-row items-center justify-between mb-4">
                     <Text className="text-lg font-bold text-zinc-900 dark:text-white">Popüler Karşılaştırmalar</Text>
@@ -163,27 +191,63 @@ export const ComparisonView = () => {
                 </ScrollView>
             </View>
 
-            {/* Tools Section */}
+            {/* Tools Section - Premium Features */}
             <View className="px-6">
                 <Text className="text-lg font-bold text-zinc-900 dark:text-white mb-4">Analiz Araçları</Text>
-                <ToolCard
-                    icon={Scale}
-                    title="Duruş Analizi"
-                    desc="Bir haberin sağ, sol veya merkez medyada nasıl işlendiğini gör."
-                    color="#a855f7"
-                />
-                <ToolCard
-                    icon={TrendingUp}
-                    title="Manipülasyon Dedektörü"
-                    desc="Metindeki duygusal yükü ve yönlendirici dili yapay zeka ile tara."
-                    color="#f59e0b"
-                />
-                <ToolCard
-                    icon={Zap}
-                    title="Anlık Doğrulama"
-                    desc="İddiaları güvenilir kaynaklarla çapraz kontrol et."
-                    color="#006FFF"
-                />
+                <TouchableOpacity
+                    onPress={() => handlePremiumFeature(() => {
+                        console.log('Open stance analysis');
+                    })}
+                    activeOpacity={0.8}
+                >
+                    <ToolCard
+                        icon={Scale}
+                        title="Duruş Analizi"
+                        desc="Bir haberin sağ, sol veya merkez medyada nasıl işlendiğini gör."
+                        color="#a855f7"
+                    />
+                    {!isPremium && (
+                        <View className="absolute top-4 right-4">
+                            <Lock size={16} color="#a1a1aa" />
+                        </View>
+                    )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => handlePremiumFeature(() => {
+                        console.log('Open manipulation detector');
+                    })}
+                    activeOpacity={0.8}
+                >
+                    <ToolCard
+                        icon={TrendingUp}
+                        title="Manipülasyon Dedektörü"
+                        desc="Metindeki duygusal yükü ve yönlendirici dili yapay zeka ile tara."
+                        color="#f59e0b"
+                    />
+                    {!isPremium && (
+                        <View className="absolute top-4 right-4">
+                            <Lock size={16} color="#a1a1aa" />
+                        </View>
+                    )}
+                </TouchableOpacity>
+                <TouchableOpacity
+                    onPress={() => handlePremiumFeature(() => {
+                        console.log('Open instant verification');
+                    })}
+                    activeOpacity={0.8}
+                >
+                    <ToolCard
+                        icon={Zap}
+                        title="Anlık Doğrulama"
+                        desc="İddiaları güvenilir kaynaklarla çapraz kontrol et."
+                        color="#006FFF"
+                    />
+                    {!isPremium && (
+                        <View className="absolute top-4 right-4">
+                            <Lock size={16} color="#a1a1aa" />
+                        </View>
+                    )}
+                </TouchableOpacity>
             </View>
 
             {/* Footer Banner */}
@@ -193,10 +257,107 @@ export const ComparisonView = () => {
                 </View>
                 <Text className="text-white font-bold text-xl mb-2 w-2/3">Kendi Analizini Yap</Text>
                 <Text className="text-zinc-400 text-sm mb-4 w-2/3">Merak ettiğin bir haberi veya linki yapıştır, gerçek yüzünü ortaya çıkaralım.</Text>
-                <TouchableOpacity className="bg-white py-3 px-6 rounded-xl self-start">
+                <TouchableOpacity
+                    onPress={() => handlePremiumFeature(() => {
+                        console.log('Start analysis');
+                    })}
+                    className="bg-white py-3 px-6 rounded-xl self-start"
+                >
                     <Text className="text-black font-bold">Analiz Başlat</Text>
                 </TouchableOpacity>
             </View>
+
+            {/* Premium Modal */}
+            <Modal
+                visible={showPremiumModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowPremiumModal(false)}
+            >
+                <View className="flex-1 bg-black/50 items-center justify-center p-6">
+                    <View className="bg-white dark:bg-zinc-900 rounded-3xl p-6 w-full max-w-sm">
+                        <View className="items-center mb-6">
+                            <View className="w-16 h-16 bg-primary/20 rounded-full items-center justify-center mb-4">
+                                <Crown size={32} color="#006FFF" />
+                            </View>
+                            <Text className="text-2xl font-bold text-zinc-900 dark:text-white mb-2">
+                                Premium'a Geç
+                            </Text>
+                            <Text className="text-zinc-500 text-center text-sm leading-6">
+                                Medya analizi araçlarının kilidini aç ve manipülasyonu keşfet.
+                            </Text>
+                        </View>
+
+                        {/* Features */}
+                        <View className="mb-6 space-y-3">
+                            <View className="flex-row items-center">
+                                <View className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full items-center justify-center mr-3">
+                                    <Text className="text-green-600 dark:text-green-400 text-xs">✓</Text>
+                                </View>
+                                <Text className="text-zinc-700 dark:text-zinc-300 text-sm">Detaylı medya analizi</Text>
+                            </View>
+                            <View className="flex-row items-center">
+                                <View className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full items-center justify-center mr-3">
+                                    <Text className="text-green-600 dark:text-green-400 text-xs">✓</Text>
+                                </View>
+                                <Text className="text-zinc-700 dark:text-zinc-300 text-sm">Manipülasyon dedektörü</Text>
+                            </View>
+                            <View className="flex-row items-center">
+                                <View className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full items-center justify-center mr-3">
+                                    <Text className="text-green-600 dark:text-green-400 text-xs">✓</Text>
+                                </View>
+                                <Text className="text-zinc-700 dark:text-zinc-300 text-sm">Anlık doğrulama</Text>
+                            </View>
+                            <View className="flex-row items-center">
+                                <View className="w-6 h-6 bg-green-100 dark:bg-green-900/30 rounded-full items-center justify-center mr-3">
+                                    <Text className="text-green-600 dark:text-green-400 text-xs">✓</Text>
+                                </View>
+                                <Text className="text-zinc-700 dark:text-zinc-300 text-sm">Reklamsız deneyim</Text>
+                            </View>
+                        </View>
+
+                        {/* Pricing */}
+                        <View className="mb-6">
+                            {packages.length > 0 && (
+                                <View className="space-y-3">
+                                    {packages.map((pkg) => (
+                                        <TouchableOpacity
+                                            key={pkg.identifier}
+                                            onPress={() => {
+                                                purchasePackage(pkg);
+                                                setShowPremiumModal(false);
+                                            }}
+                                            className="bg-zinc-100 dark:bg-zinc-800 p-4 rounded-xl border-2 border-transparent active:border-primary"
+                                        >
+                                            <View className="flex-row items-center justify-between">
+                                                <View>
+                                                    <Text className="text-zinc-900 dark:text-white font-bold text-base">
+                                                        {pkg.productTitle}
+                                                    </Text>
+                                                    <Text className="text-zinc-500 text-xs">
+                                                        {pkg.description}
+                                                    </Text>
+                                                </View>
+                                                <Text className="text-primary font-bold text-lg">
+                                                    {pkg.priceString}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            )}
+                        </View>
+
+                        {/* Close Button */}
+                        <TouchableOpacity
+                            onPress={() => setShowPremiumModal(false)}
+                            className="py-3"
+                        >
+                            <Text className="text-zinc-500 text-center text-sm">Kapat</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
         </ScrollView>
     );

@@ -1,0 +1,567 @@
+openapi: 3.0.3
+info:
+  title: D4ily News Platform API
+  description: API for D4ily News Platform - A news aggregation and analysis platform
+  version: 1.0.0
+  contact:
+    name: D4ily Team
+    email: team@d4ily.com
+    url: https://d4ily.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.d4ily.com/v1
+    description: Production server
+  - url: https://staging-api.d4ily.com/v1
+    description: Staging server
+  - url: http://localhost:3000/v1
+    description: Local development server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Feed
+    description: News feed and articles
+  - name: Categories
+    description: News categories
+  - name: Sources
+    description: News sources
+  - name: Comments
+    description: Article comments
+  - name: Reactions
+    description: Article reactions
+  - name: Notifications
+    description: User notifications
+  - name: Premium
+    description: Premium subscriptions
+  - name: Admin
+    description: Admin operations
+
+paths:
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+                - displayName
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                displayName:
+                  type: string
+                  minLength: 2
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  token:
+                    type: string
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feed/{country}:
+    get:
+      tags:
+        - Feed
+      summary: Get news feed for a country
+      parameters:
+        - name: country
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [tr, us, uk, de, fr]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: Feed retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  articles:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Article'
+                  total:
+                    type: integer
+                  hasMore:
+                    type: boolean
+
+  /feed/{country}/{articleId}:
+    get:
+      tags:
+        - Feed
+      summary: Get article details
+      parameters:
+        - name: country
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: articleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Article retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArticleDetail'
+        '404':
+          description: Article not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /categories:
+    get:
+      tags:
+        - Categories
+      summary: Get all categories
+      responses:
+        '200':
+          description: Categories retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+
+  /sources:
+    get:
+      tags:
+        - Sources
+      summary: Get all sources
+      parameters:
+        - name: country
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sources retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Source'
+
+  /comments:
+    get:
+      tags:
+        - Comments
+      summary: Get comments for an article
+      parameters:
+        - name: articleId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+
+    post:
+      tags:
+        - Comments
+      summary: Create a new comment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - articleId
+                - content
+              properties:
+                articleId:
+                  type: string
+                content:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                parentId:
+                  type: string
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /reactions:
+    post:
+      tags:
+        - Reactions
+      summary: Add or remove reaction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - articleId
+                - type
+              properties:
+                articleId:
+                  type: string
+                type:
+                  type: string
+                  enum: [like, love, laugh, angry, sad]
+      responses:
+        '200':
+          description: Reaction updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  reactionCount:
+                    type: integer
+
+  /notifications/register:
+    post:
+      tags:
+        - Notifications
+      summary: Register push notification token
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - platform
+              properties:
+                token:
+                  type: string
+                platform:
+                  type: string
+                  enum: [ios, android, web]
+      responses:
+        '200':
+          description: Token registered successfully
+        '401':
+          description: Unauthorized
+
+  /premium/subscribe:
+    post:
+      tags:
+        - Premium
+      summary: Subscribe to premium plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - planId
+                - provider
+                - providerSubscriptionId
+              properties:
+                planId:
+                  type: string
+                  enum: [monthly, yearly]
+                provider:
+                  type: string
+                  enum: [stripe, iyzico, apple, google]
+                providerSubscriptionId:
+                  type: string
+                currentPeriodStart:
+                  type: integer
+                  format: int64
+                currentPeriodEnd:
+                  type: integer
+                  format: int64
+      responses:
+        '200':
+          description: Subscription created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Subscription'
+        '401':
+          description: Unauthorized
+        '400':
+          description: Invalid subscription data
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+        avatar:
+          type: string
+          format: uri
+        isPremium:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Article:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        content:
+          type: string
+        imageUrl:
+          type: string
+          format: uri
+        source:
+          $ref: '#/components/schemas/Source'
+        category:
+          $ref: '#/components/schemas/Category'
+        publishedAt:
+          type: string
+          format: date-time
+        alignmentScore:
+          type: number
+          minimum: -10
+          maximum: 10
+        emotionalTone:
+          type: string
+          enum: [positive, negative, neutral]
+
+    ArticleDetail:
+      allOf:
+        - $ref: '#/components/schemas/Article'
+        - type: object
+          properties:
+            fullContent:
+              type: string
+            relatedArticles:
+              type: array
+              items:
+                $ref: '#/components/schemas/Article'
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        slug:
+          type: string
+        icon:
+          type: string
+          format: uri
+
+    Source:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        logo:
+          type: string
+          format: uri
+        url:
+          type: string
+          format: uri
+        country:
+          type: string
+        politicalTone:
+          type: number
+          minimum: -10
+          maximum: 10
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        articleId:
+          type: string
+        userId:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        content:
+          type: string
+        parentId:
+          type: string
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Subscription:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        planId:
+          type: string
+          enum: [monthly, yearly]
+        status:
+          type: string
+          enum: [active, cancelled, expired]
+        provider:
+          type: string
+          enum: [stripe, iyzico, apple, google]
+        currentPeriodStart:
+          type: string
+          format: date-time
+        currentPeriodEnd:
+          type: string
+          format: date-time
+        cancelAtPeriodEnd:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        statusCode:
+          type: integer

@@ -28,6 +28,9 @@ const envSchema = z.object({
     CLOUDINARY_API_SECRET: z.string().optional(),
     LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
     LOGTAIL_TOKEN: z.string().optional(),
+    SENTRY_DSN: z.string().optional(),
+    POSTHOG_API_KEY: z.string().optional(),
+    POSTHOG_HOST: z.string().optional(),
 });
 
 let env: z.infer<typeof envSchema>;

@@ -199,6 +199,25 @@ export function usePremium() {
         purchasePackage,
         restorePurchases,
         checkSubscriptionStatus,
+        // Premium gate helpers
+        requirePremium: (callback: () => void) => {
+            if (isPremium) {
+                callback();
+            } else {
+                // Show premium upgrade modal or navigate to premium screen
+                console.log('Premium required');
+            }
+        },
+        isPremiumFeature: (feature: string) => {
+            // Define premium features
+            const premiumFeatures = [
+                'comparison_view',
+                'unlimited_comments',
+                'advanced_analytics',
+                'ad_free',
+            ];
+            return premiumFeatures.includes(feature) ? isPremium : true;
+        },
     };
 }
 

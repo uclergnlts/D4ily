@@ -1,0 +1,211 @@
+# Default values for d4ily-backend
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 2
+
+image:
+  repository: d4ily/backend
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+podSecurityContext: {}
+
+service:
+  type: ClusterIP
+  port: 3000
+  annotations: {}
+  labels: {}
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.d4ily.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: d4ily-tls
+      hosts:
+        - api.d4ily.com
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 500m
+    memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Environment variables
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  LOG_LEVEL: info
+
+# Secrets (should be overridden with --set-file or external secrets)
+secrets:
+  tursoDatabaseUrl: ""
+  tursoAuthToken: ""
+  upstashRedisRestUrl: ""
+  upstashRedisRestToken: ""
+  firebaseProjectId: ""
+  firebasePrivateKey: ""
+  firebaseClientEmail: ""
+  openaiApiKey: ""
+  resendApiKey: ""
+  revenuecatPublicKey: ""
+  revenuecatSecretKey: ""
+  revenuecatWebhookSecret: ""
+  cloudinaryCloudName: ""
+  cloudinaryApiKey: ""
+  cloudinaryApiSecret: ""
+  sentryDsn: ""
+  posthogApiKey: ""
+  posthogHost: ""
+
+# Redis configuration
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  image:
+    repository: bitnami/redis
+    tag: 7.2
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 250m
+      memory: 128Mi
+
+# Cron jobs
+cronJobs:
+  scraper:
+    enabled: true
+    schedule: "*/30 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    backoffLimit: 3
+    activeDeadlineSeconds: 3600
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 250m
+        memory: 128Mi
+
+  digest:
+    enabled: true
+    schedule: "0 8 * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    backoffLimit: 3
+    activeDeadlineSeconds: 3600
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 250m
+        memory: 128Mi
+
+  weekly:
+    enabled: true
+    schedule: "0 9 * * 1"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    backoffLimit: 3
+    activeDeadlineSeconds: 3600
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 250m
+        memory: 128Mi
+
+  alignmentNotification:
+    enabled: true
+    schedule: "*/5 * * * *"
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 3
+    failedJobsHistoryLimit: 3
+    backoffLimit: 3
+    activeDeadlineSeconds: 3600
+    resources:
+      limits:
+        cpu: 500m
+        memory: 256Mi
+      requests:
+        cpu: 250m
+        memory: 128Mi
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  successThreshold: 1
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 3000
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  successThreshold: 1
+  failureThreshold: 3
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Service monitor for Prometheus
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
