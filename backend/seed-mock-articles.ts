@@ -63,6 +63,9 @@ async function main() {
         const articleId = nanoid();
         console.log(`Inserting: ${art.title}`);
 
+        // Generate distinct summary and detail content
+        const detailContent = `${art.summary} Bu gelişme uzmanlar tarafından farklı açılardan değerlendiriliyor. Konuya ilişkin detaylı analizler ve uzman görüşleri haberin devamında yer alıyor. İlgili kurumlar konuya ilişkin resmi açıklamalarını önümüzdeki günlerde yapması bekleniyor.`;
+
         await db.insert(tr_articles).values({
             id: articleId,
             originalTitle: art.title,
@@ -70,6 +73,7 @@ async function main() {
             originalLanguage: 'tr',
             translatedTitle: art.title, // Same for TR
             summary: art.summary,
+            detailContent: detailContent, // Distinct from summary
             isClickbait: false,
             isAd: false,
             isFiltered: false,

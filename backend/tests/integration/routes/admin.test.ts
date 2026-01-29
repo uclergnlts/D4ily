@@ -47,42 +47,56 @@ vi.mock('@/config/firebase.js', () => ({
     isFirebaseEnabled: true,
 }));
 
-// Create mock query builder factory
-const createMockQueryBuilder = () => {
-    let callCount = 0;
+vi.mock('@/config/db.js', () => {
+    const createMockQueryBuilder = () => {
+        let callCount = 0;
+        
+        return {
+            from: vi.fn().mockReturnThis(),
+            where: vi.fn().mockReturnThis(),
+            get: vi.fn().mockImplementation(() => {
+                callCount++;
+                // Odd calls are for admin user check, even calls are for source
+                if (callCount % 2 === 1) {
+                    return Promise.resolve({
+                        id: 'test-admin-uid',
+                        email: 'admin@test.com',
+                        name: 'Test Admin',
+                        userRole: 'admin',
+                        subscriptionStatus: 'free',
+                    });
+                }
+                return Promise.resolve({
+                    id: 123,
+                    sourceName: 'Test Source',
+                    rssUrl: 'https://test.com/rss.xml',
+                    countryCode: 'tr',
+                    isActive: true,
+                    sourceLogoUrl: 'https://test.com/logo.png',
+                });
+            }),
+            orderBy: vi.fn().mockReturnThis(),
+            limit: vi.fn().mockReturnThis(),
+            offset: vi.fn().mockReturnThis(),
+            then: (resolve: (value: unknown[]) => void) => resolve([]),
+            all: vi.fn().mockResolvedValue([]),
+            values: vi.fn().mockReturnThis(),
+            returning: vi.fn().mockReturnThis(),
+            set: vi.fn().mockReturnThis(),
+        };
+    };
+    
+    const mockQueryBuilder = createMockQueryBuilder();
     
     return {
-        from: vi.fn().mockReturnThis(),
-        where: vi.fn().mockReturnThis(),
-        get: vi.fn().mockImplementation(() => {
-            callCount++;
-            // Odd calls are for admin user check, even calls are for source
-            if (callCount % 2 === 1) {
-                return Promise.resolve(TEST_ADMIN_USER);
-            }
-            return Promise.resolve(TEST_SOURCE_DATA);
-        }),
-        orderBy: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockReturnThis(),
-        offset: vi.fn().mockReturnThis(),
-        then: (resolve: (value: unknown[]) => void) => resolve([]),
-        all: vi.fn().mockResolvedValue([]),
-        values: vi.fn().mockReturnThis(),
-        returning: vi.fn().mockReturnThis(),
-        set: vi.fn().mockReturnThis(),
+        db: {
+            select: vi.fn().mockReturnValue(mockQueryBuilder),
+            insert: vi.fn().mockReturnValue(mockQueryBuilder),
+            delete: vi.fn().mockReturnValue(mockQueryBuilder),
+            update: vi.fn().mockReturnValue(mockQueryBuilder),
+        }
     };
-};
-
-const mockQueryBuilder = createMockQueryBuilder();
-
-vi.mock('@/config/db.js', () => ({
-    db: {
-        select: vi.fn().mockReturnValue(mockQueryBuilder),
-        insert: vi.fn().mockReturnValue(mockQueryBuilder),
-        delete: vi.fn().mockReturnValue(mockQueryBuilder),
-        update: vi.fn().mockReturnValue(mockQueryBuilder),
-    }
-}));
+});
 
 vi.mock('@/services/scraper/scraperService.js', () => ({
     scrapeSource: vi.fn().mockResolvedValue({
@@ -204,7 +218,7 @@ describe('Admin API Integration Tests', () => {
                 .mockResolvedValueOnce(TEST_ADMIN_USER) // First call: admin user check
                 .mockResolvedValueOnce(null); // Second call: source not found
             
-            (db.select() as ReturnType<typeof createMockQueryBuilder>).get = mockGet;
+            (db.select() as any).get = mockGet;
 
             const response = await request(server)
                 .post('/admin/scrape/999')

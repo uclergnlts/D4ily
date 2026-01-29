@@ -36,7 +36,8 @@ export interface EmotionalTone {
 
 export interface ProcessedArticle {
     translatedTitle: string;
-    summary: string;
+    summary: string;  // Concise 2-3 sentence overview for article cards/previews
+    detailContent: string;  // Comprehensive, in-depth content for detail view
     isClickbait: boolean;
     isAd: boolean;
     category: string;
@@ -63,6 +64,7 @@ export async function processArticleWithAI(
         return {
             translatedTitle: title,
             summary: content || title,
+            detailContent: content || title,
             isClickbait: false,
             isAd: false,
             category: 'Dünya',
@@ -94,8 +96,9 @@ Content: ${content.substring(0, 1500)}
 
 Provide:
 1. translated_title: Translate to Turkish
-2. summary: 1-2 sentence summary in Turkish
-3. is_clickbait: Is this clickbait? (true/false)
+2. summary: A concise 2-3 sentence overview in Turkish for article previews. Focus on the main news angle and key takeaway. DO NOT include all details.
+3. detail_content: A comprehensive, in-depth article content in Turkish (4-6 sentences minimum). Include context, background, implications, and multiple perspectives. This should be DISTINCT from the summary and provide full coverage of the story.
+4. is_clickbait: Is this clickbait? (true/false)
 4. is_ad: Is this an advertisement? (true/false)
 5. category: One of: Politika, Ekonomi, Spor, Teknoloji, Sağlık, Bilim, Kültür, Dünya
 6. topics: Array of hashtags (e.g., ["#Ekonomi", "#Enflasyon"])
@@ -164,9 +167,28 @@ Return ONLY valid JSON, no additional text.`;
             emotionalIntensity: result.emotional_intensity,
         }, 'Article processed with OpenAI');
 
+        // Validate detailContent is different from summary
+        let detailContent = result.detail_content || '';
+        const summary = result.summary || '';
+        
+        // Guard: If detailContent is too similar to summary or empty, generate an expanded version
+        if (!detailContent || detailContent.toLowerCase().trim() === summary.toLowerCase().trim()) {
+            // Create an expanded version based on the original content
+            detailContent = content.length > 500 
+                ? content.substring(0, 800) + (content.length > 800 ? '...' : '')
+                : summary + ' Daha fazla detay ve analiz için haberin devamını takip edin. Konuya ilişkin uzman görüşleri ve gelişmeler aktarılıyor.';
+            
+            logger.warn({ 
+                title: title.substring(0, 50),
+                summaryLength: summary.length,
+                detailLength: detailContent.length 
+            }, 'AI returned similar summary/detailContent, using fallback');
+        }
+
         const processedResult: ProcessedArticle = {
             translatedTitle: result.translated_title || title,
-            summary: result.summary || '',
+            summary,
+            detailContent,
             isClickbait: result.is_clickbait || false,
             isAd: result.is_ad || false,
             category: result.category || 'Dünya',
@@ -201,6 +223,7 @@ Return ONLY valid JSON, no additional text.`;
         return {
             translatedTitle: title,
             summary: content.substring(0, 200),
+            detailContent: content.substring(0, 800),
             isClickbait: false,
             isAd: false,
             category: 'Dünya',

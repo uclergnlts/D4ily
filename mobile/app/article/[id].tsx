@@ -147,10 +147,9 @@ export default function ArticleDetailScreen() {
                         {article.translatedTitle}
                     </Text>
 
-                    {/* Summary (Simulated content body) */}
-                    {/* Summary (Simulated content body) */}
+                    {/* Article Detail Content */}
                     <Text className="text-[18px] leading-[28px] text-zinc-700 dark:text-zinc-300 font-normal mb-8 text-left tracking-wide">
-                        {article.summary}
+                        {article.detailContent || article.summary}
                     </Text>
 
                     {/* Primary Actions */}

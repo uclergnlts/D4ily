@@ -5,6 +5,7 @@ export const mockArticle = {
     originalLanguage: 'en',
     translatedTitle: 'Test Haber Makalesi',
     summary: 'Bu bir test özeti',
+    detailContent: 'Bu bir test özeti. Detaylı içerik burada yer alıyor ve haberin tüm yönlerini kapsıyor. Uzmanlar konuya ilişkin değerlendirmelerini paylaşıyor.',
     isClickbait: false,
     isAd: false,
     isFiltered: false,

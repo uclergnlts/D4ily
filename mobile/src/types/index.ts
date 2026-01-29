@@ -107,7 +107,8 @@ export type Article = {
     originalContent: string | null;
     originalLanguage: string;
     translatedTitle: string;
-    summary: string;
+    summary: string;  // Concise 2-3 sentence overview for article cards/previews
+    detailContent?: string | null;  // Comprehensive, in-depth content for detail view
     isClickbait: boolean;
     isAd: boolean;
     isFiltered: boolean;

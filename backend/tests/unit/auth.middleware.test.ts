@@ -1,18 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 
-// Mock Firebase BEFORE imports
-const mockVerifyIdToken = vi.fn();
-let mockIsFirebaseEnabled = true;
+// Use vi.hoisted to define mock functions that can be referenced in vi.mock
+const mockState = vi.hoisted(() => {
+    return {
+        mockVerifyIdToken: vi.fn(),
+        isFirebaseEnabled: true,
+    };
+});
 
+// Mock Firebase with hoisted values
 vi.mock('@/config/firebase.js', () => ({
     get adminAuth() {
-        return mockIsFirebaseEnabled ? {
-            verifyIdToken: mockVerifyIdToken,
+        return mockState.isFirebaseEnabled ? {
+            verifyIdToken: mockState.mockVerifyIdToken,
         } : null;
     },
     get isFirebaseEnabled() {
-        return mockIsFirebaseEnabled;
+        return mockState.isFirebaseEnabled;
     },
 }));
 
@@ -30,7 +35,7 @@ import { authMiddleware, optionalAuthMiddleware, AuthUser } from '@/middleware/a
 describe('Auth Middleware Unit Tests', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        mockIsFirebaseEnabled = true;
+        mockState.isFirebaseEnabled = true;
     });
 
     describe('authMiddleware', () => {
@@ -59,7 +64,7 @@ describe('Auth Middleware Unit Tests', () => {
         });
 
         it('should return 401 when token verification fails', async () => {
-            mockVerifyIdToken.mockRejectedValue(new Error('Invalid token'));
+            mockState.mockVerifyIdToken.mockRejectedValue(new Error('Invalid token'));
 
             const app = new Hono();
             app.use('*', authMiddleware);
@@ -75,7 +80,7 @@ describe('Auth Middleware Unit Tests', () => {
         });
 
         it('should set user in context when token is valid', async () => {
-            mockVerifyIdToken.mockResolvedValue({
+            mockState.mockVerifyIdToken.mockResolvedValue({
                 uid: 'test-user-id',
                 email: 'test@example.com',
                 email_verified: true,
@@ -101,7 +106,7 @@ describe('Auth Middleware Unit Tests', () => {
         });
 
         it('should skip auth when Firebase is disabled', async () => {
-            mockIsFirebaseEnabled = false;
+            mockState.isFirebaseEnabled = false;
 
             const app = new Hono();
             app.use('*', authMiddleware);
@@ -133,7 +138,7 @@ describe('Auth Middleware Unit Tests', () => {
         });
 
         it('should set user when valid token provided', async () => {
-            mockVerifyIdToken.mockResolvedValue({
+            mockState.mockVerifyIdToken.mockResolvedValue({
                 uid: 'test-user-id',
                 email: 'test@example.com',
                 email_verified: true,
@@ -157,7 +162,7 @@ describe('Auth Middleware Unit Tests', () => {
         });
 
         it('should continue without user when token is invalid', async () => {
-            mockVerifyIdToken.mockRejectedValue(new Error('Invalid token'));
+            mockState.mockVerifyIdToken.mockRejectedValue(new Error('Invalid token'));
 
             const app = new Hono();
             app.use('*', optionalAuthMiddleware);
@@ -177,7 +182,7 @@ describe('Auth Middleware Unit Tests', () => {
         });
 
         it('should skip when Firebase is disabled', async () => {
-            mockIsFirebaseEnabled = false;
+            mockState.isFirebaseEnabled = false;
 
             const app = new Hono();
             app.use('*', optionalAuthMiddleware);

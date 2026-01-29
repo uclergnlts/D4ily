@@ -12,6 +12,7 @@ export function createArticleTable(countryCode: string) {
         originalLanguage: text('original_language').notNull(),
         translatedTitle: text('translated_title').notNull(),
         summary: text('summary').notNull(),
+        detailContent: text('detail_content'), // Full article content for detail view
         imageUrl: text('image_url'),
         isClickbait: integer('is_clickbait', { mode: 'boolean' }).notNull(),
         isAd: integer('is_ad', { mode: 'boolean' }).notNull(),

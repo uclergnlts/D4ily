@@ -123,6 +123,22 @@ export async function scrapeSource(
 
                 // Create article
                 const articleId = nanoid();
+                
+                // Log metrics for detailContent quality
+                const detailContentLength = aiResult.detailContent?.length || 0;
+                const summaryLength = aiResult.summary?.length || 0;
+                const isDetailContentValid = detailContentLength > summaryLength && 
+                    aiResult.detailContent !== aiResult.summary;
+                
+                if (!isDetailContentValid) {
+                    logger.warn({
+                        title: item.title.substring(0, 50),
+                        summaryLength,
+                        detailContentLength,
+                        isDetailContentValid
+                    }, 'Article created with potentially low-quality detailContent');
+                }
+                
                 await db.insert(tables.articles).values({
                     id: articleId,
                     originalTitle: item.title,
@@ -130,6 +146,7 @@ export async function scrapeSource(
                     originalLanguage: countryCode === 'tr' ? 'tr' : countryCode === 'de' ? 'de' : 'en',
                     translatedTitle: aiResult.translatedTitle,
                     summary: aiResult.summary,
+                    detailContent: aiResult.detailContent,
                     imageUrl: item.imageUrl,
                     isClickbait: aiResult.isClickbait,
                     isAd: aiResult.isAd,

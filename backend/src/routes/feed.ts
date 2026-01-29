@@ -127,10 +127,38 @@ app.get('/:country', async (c) => {
             });
         }
 
-        // Get articles
+        // Get articles - exclude detailContent for list performance
         const tables = COUNTRY_TABLES[country];
         const articles = await db
-            .select()
+            .select({
+                id: tables.articles.id,
+                originalTitle: tables.articles.originalTitle,
+                originalContent: tables.articles.originalContent,
+                originalLanguage: tables.articles.originalLanguage,
+                translatedTitle: tables.articles.translatedTitle,
+                summary: tables.articles.summary,
+                // detailContent intentionally excluded for list performance
+                imageUrl: tables.articles.imageUrl,
+                isClickbait: tables.articles.isClickbait,
+                isAd: tables.articles.isAd,
+                isFiltered: tables.articles.isFiltered,
+                sourceCount: tables.articles.sourceCount,
+                sentiment: tables.articles.sentiment,
+                politicalTone: tables.articles.politicalTone,
+                politicalConfidence: tables.articles.politicalConfidence,
+                governmentMentioned: tables.articles.governmentMentioned,
+                emotionalTone: tables.articles.emotionalTone,
+                emotionalIntensity: tables.articles.emotionalIntensity,
+                loadedLanguageScore: tables.articles.loadedLanguageScore,
+                sensationalismScore: tables.articles.sensationalismScore,
+                categoryId: tables.articles.categoryId,
+                publishedAt: tables.articles.publishedAt,
+                scrapedAt: tables.articles.scrapedAt,
+                viewCount: tables.articles.viewCount,
+                likeCount: tables.articles.likeCount,
+                dislikeCount: tables.articles.dislikeCount,
+                commentCount: tables.articles.commentCount,
+            })
             .from(tables.articles)
             .where(eq(tables.articles.isFiltered, false))
             .orderBy(desc(tables.articles.publishedAt))
@@ -214,10 +242,38 @@ app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
 
         const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
-        // Get article (don't cache to ensure fresh view count)
+        // Get article with detailContent (don't cache to ensure fresh view count)
         const tables = COUNTRY_TABLES[country];
         const articles = await db
-            .select()
+            .select({
+                id: tables.articles.id,
+                originalTitle: tables.articles.originalTitle,
+                originalContent: tables.articles.originalContent,
+                originalLanguage: tables.articles.originalLanguage,
+                translatedTitle: tables.articles.translatedTitle,
+                summary: tables.articles.summary,
+                detailContent: tables.articles.detailContent,
+                imageUrl: tables.articles.imageUrl,
+                isClickbait: tables.articles.isClickbait,
+                isAd: tables.articles.isAd,
+                isFiltered: tables.articles.isFiltered,
+                sourceCount: tables.articles.sourceCount,
+                sentiment: tables.articles.sentiment,
+                politicalTone: tables.articles.politicalTone,
+                politicalConfidence: tables.articles.politicalConfidence,
+                governmentMentioned: tables.articles.governmentMentioned,
+                emotionalTone: tables.articles.emotionalTone,
+                emotionalIntensity: tables.articles.emotionalIntensity,
+                loadedLanguageScore: tables.articles.loadedLanguageScore,
+                sensationalismScore: tables.articles.sensationalismScore,
+                categoryId: tables.articles.categoryId,
+                publishedAt: tables.articles.publishedAt,
+                scrapedAt: tables.articles.scrapedAt,
+                viewCount: tables.articles.viewCount,
+                likeCount: tables.articles.likeCount,
+                dislikeCount: tables.articles.dislikeCount,
+                commentCount: tables.articles.commentCount,
+            })
             .from(tables.articles)
             .where(eq(tables.articles.id, articleId))
             .limit(1);
@@ -283,8 +339,14 @@ app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
             .set({ viewCount: article.viewCount + 1 })
             .where(eq(tables.articles.id, articleId));
 
-        const response = {
+        // Ensure detailContent is populated - fallback to summary if null (backward compatibility)
+        const articleWithDetail = {
             ...article,
+            detailContent: article.detailContent || article.summary,
+        };
+
+        const response = {
+            ...articleWithDetail,
             viewCount: article.viewCount + 1, // Return updated count
             sources,
             category: categoryInfo,

@@ -102,6 +102,7 @@ vi.mock('@/config/db.js', () => {
             id: 'test-article-id-12345',
             translatedTitle: 'Test Article Title',
             summary: 'This is a test article summary',
+            detailContent: 'This is a test article summary with additional detail content for the full article view. It provides comprehensive coverage of the story.',
             originalTitle: 'Test Article Title Original',
             originalContent: 'Test article content',
             originalLanguage: 'tr',
@@ -334,8 +335,11 @@ describe('Feed API Integration Tests', () => {
             expect(response.body.data).toHaveProperty('id', testArticleId);
             expect(response.body.data).toHaveProperty('translatedTitle');
             expect(response.body.data).toHaveProperty('summary');
+            expect(response.body.data).toHaveProperty('detailContent');
             expect(response.body.data).toHaveProperty('sources');
             expect(Array.isArray(response.body.data.sources)).toBe(true);
+            // Verify detailContent is different from or equal to summary (fallback behavior)
+            expect(response.body.data.detailContent).toBeDefined();
         });
 
         it('should increment view count', async () => {
