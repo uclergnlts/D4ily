@@ -1,8 +1,16 @@
 import DOMPurify from 'dompurify';
 import { JSDOM } from 'jsdom';
 
-const window = new JSDOM('').window;
-const purify = DOMPurify(window);
+// Lazy initialization to avoid issues during module load
+let purify: ReturnType<typeof DOMPurify> | null = null;
+
+function getPurify() {
+    if (!purify) {
+        const window = new JSDOM('').window;
+        purify = DOMPurify(window);
+    }
+    return purify;
+}
 
 // Configure DOMPurify for RSS content
 const purifyConfig = {
@@ -18,7 +26,7 @@ const purifyConfig = {
  */
 export function sanitizeHtml(dirty: string | undefined | null): string {
     if (!dirty) return '';
-    return purify.sanitize(dirty, purifyConfig);
+    return getPurify().sanitize(dirty, purifyConfig);
 }
 
 /**
@@ -28,7 +36,7 @@ export function sanitizeHtml(dirty: string | undefined | null): string {
  */
 export function stripHtml(html: string | undefined | null): string {
     if (!html) return '';
-    return purify.sanitize(html, { ALLOWED_TAGS: [] });
+    return getPurify().sanitize(html, { ALLOWED_TAGS: [] });
 }
 
 /**
