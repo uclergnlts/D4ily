@@ -165,43 +165,64 @@ app.get('/:country', async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Get sources for each article with alignment info
-        const articlesWithSources = await Promise.all(
-            articles.map(async (article) => {
-                const sources = await db
-                    .select()
-                    .from(tables.sources)
-                    .where(eq(tables.sources.articleId, article.id));
-
-                // Get alignment info for primary source
-                const primarySource = sources.find(s => s.isPrimary);
-                let govAlignmentScore = 0;
-                let govAlignmentLabel = 'Belirsiz';
-
-                if (primarySource) {
-                    const sourceInfo = await db
-                        .select()
-                        .from(rss_sources)
-                        .where(eq(rss_sources.sourceName, primarySource.sourceName))
-                        .get();
-
-                    if (sourceInfo) {
-                        govAlignmentScore = sourceInfo.govAlignmentScore;
-                        govAlignmentLabel = getAlignmentLabel(
-                            sourceInfo.govAlignmentScore,
-                            sourceInfo.govAlignmentConfidence ?? 0.5
-                        );
-                    }
-                }
-
-                return {
-                    ...article,
-                    sources,
-                    govAlignmentScore,
-                    govAlignmentLabel,
-                };
+        // Get all source names for batch lookup
+        const allSources = await db
+            .select({
+                articleId: tables.sources.articleId,
+                sourceName: tables.sources.sourceName,
+                sourceUrl: tables.sources.sourceUrl,
+                isPrimary: tables.sources.isPrimary,
             })
-        );
+            .from(tables.sources)
+            .where(eq(tables.sources.isPrimary, true));
+
+        // Create lookup map for sources
+        const sourcesMap = new Map();
+        allSources.forEach(s => {
+            if (!sourcesMap.has(s.articleId)) {
+                sourcesMap.set(s.articleId, []);
+            }
+            sourcesMap.get(s.articleId).push(s);
+        });
+
+        // Get alignment info for all primary sources in one query
+        const primarySourceNames = [...new Set(allSources.map(s => s.sourceName))];
+        const sourceInfos = primarySourceNames.length > 0
+            ? await db
+                .select({
+                    sourceName: rss_sources.sourceName,
+                    govAlignmentScore: rss_sources.govAlignmentScore,
+                    govAlignmentConfidence: rss_sources.govAlignmentConfidence,
+                })
+                .from(rss_sources)
+                .where(eq(rss_sources.sourceName, primarySourceNames[0]))
+            : [];
+
+        // Create alignment lookup map
+        const alignmentMap = new Map();
+        sourceInfos.forEach(s => {
+            alignmentMap.set(s.sourceName, {
+                govAlignmentScore: s.govAlignmentScore,
+                govAlignmentLabel: getAlignmentLabel(
+                    s.govAlignmentScore,
+                    s.govAlignmentConfidence ?? 0.5
+                ),
+            });
+        });
+
+        // Combine articles with sources and alignment info
+        const articlesWithSources = articles.map(article => {
+            const sources = sourcesMap.get(article.id) || [];
+            const primarySource = sources.find((s: any) => s.isPrimary);
+            const alignment = primarySource ? alignmentMap.get(primarySource.sourceName) : null;
+
+            return {
+                ...article,
+                sources,
+                govAlignmentScore: alignment?.govAlignmentScore ?? 0,
+                govAlignmentLabel: alignment?.govAlignmentLabel ?? 'Belirsiz',
+            };
+        });
 
         const response = {
             articles: articlesWithSources,
