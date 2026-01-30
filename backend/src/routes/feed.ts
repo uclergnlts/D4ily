@@ -135,14 +135,15 @@ app.get('/:country', async (c) => {
                 originalTitle: tables.articles.originalTitle,
                 // originalContent: tables.articles.originalContent, // PERFORMANCE: Excluded for list view
                 originalLanguage: tables.articles.originalLanguage,
-                translatedTitle: tables.articles.translatedTitle,
-                summary: tables.articles.summary,
+                // translatedTitle: tables.articles.translatedTitle,
+                // summary: tables.articles.summary, // TESTING: Excluded to debug hang
                 // detailContent intentionally excluded for list performance
                 imageUrl: tables.articles.imageUrl,
                 isClickbait: tables.articles.isClickbait,
                 isAd: tables.articles.isAd,
                 isFiltered: tables.articles.isFiltered,
                 sourceCount: tables.articles.sourceCount,
+                /*
                 sentiment: tables.articles.sentiment,
                 politicalTone: tables.articles.politicalTone,
                 politicalConfidence: tables.articles.politicalConfidence,
@@ -152,8 +153,9 @@ app.get('/:country', async (c) => {
                 loadedLanguageScore: tables.articles.loadedLanguageScore,
                 sensationalismScore: tables.articles.sensationalismScore,
                 categoryId: tables.articles.categoryId,
+                */
                 publishedAt: tables.articles.publishedAt,
-                scrapedAt: tables.articles.scrapedAt,
+                // scrapedAt: tables.articles.scrapedAt,
                 viewCount: tables.articles.viewCount,
                 likeCount: tables.articles.likeCount,
                 dislikeCount: tables.articles.dislikeCount,
@@ -166,7 +168,10 @@ app.get('/:country', async (c) => {
             .offset(offset);
 
         // Create lookup map for sources
+        console.log('[DEBUG] Articles fetched, count:', articles.length);
         const articleIds = articles.map(a => a.id);
+
+        console.log('[DEBUG] Fetching sources for articleIds count:', articleIds.length);
 
         const allSources = articleIds.length > 0
             ? await db
@@ -225,6 +230,12 @@ app.get('/:country', async (c) => {
 
             return {
                 ...article,
+                // Placeholder for summary
+                summary: '',
+                // Placeholder defaults for excluded columns
+                translatedTitle: '',
+                scrapedAt: new Date().toISOString(),
+
                 sources,
                 govAlignmentScore: alignment?.govAlignmentScore ?? 0,
                 govAlignmentLabel: alignment?.govAlignmentLabel ?? 'Belirsiz',
