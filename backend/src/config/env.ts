@@ -18,6 +18,7 @@ const envSchema = z.object({
     FIREBASE_PROJECT_ID: z.string().optional(),
     FIREBASE_PRIVATE_KEY: z.string().optional(),
     FIREBASE_CLIENT_EMAIL: z.string().optional(),
+    FIREBASE_API_KEY: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     REVENUECAT_PUBLIC_API_KEY: z.string().optional(),
@@ -31,6 +32,7 @@ const envSchema = z.object({
     SENTRY_DSN: z.string().optional(),
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
+    RELEASE_VERSION: z.string().optional(),
 });
 
 let env: z.infer<typeof envSchema>;

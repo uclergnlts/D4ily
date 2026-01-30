@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
+import { env } from '../config/env.js';
 import { subscriptions, users, payments } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
@@ -81,10 +82,10 @@ webhookRoute.post('/revenuecat', async (c) => {
  * Verify RevenueCat webhook signature
  */
 function verifyWebhookSignature(body: any, signature: string | undefined): boolean {
-    const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
+    const webhookSecret = env.REVENUECAT_WEBHOOK_SECRET;
     
     // In development, allow missing signature if secret is not set
-    if (process.env.NODE_ENV === 'development' && !webhookSecret) {
+    if (env.NODE_ENV === 'development' && !webhookSecret) {
         logger.warn('RevenueCat webhook verification skipped in development');
         return true;
     }

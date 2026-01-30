@@ -44,7 +44,7 @@ export function initSentry() {
             },
 
             // Release tracking
-            release: process.env.RELEASE_VERSION || '1.0.0',
+            release: env.RELEASE_VERSION || '1.0.0',
         });
 
         console.log('✅ Sentry initialized successfully');
