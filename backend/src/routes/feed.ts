@@ -22,7 +22,7 @@ import {
     bookmarks,
     rss_sources,
 } from '../db/schema/index.js';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, inArray } from 'drizzle-orm';
 import { handleError } from '../utils/errors.js';
 import { countrySchema, paginationSchema } from '../utils/schemas.js';
 import { cacheGet, cacheSet, cacheInvalidate } from '../config/redis.js';
@@ -165,16 +165,23 @@ app.get('/:country', async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Get all source names for batch lookup
-        const allSources = await db
-            .select({
-                articleId: tables.sources.articleId,
-                sourceName: tables.sources.sourceName,
-                sourceUrl: tables.sources.sourceUrl,
-                isPrimary: tables.sources.isPrimary,
-            })
-            .from(tables.sources)
-            .where(eq(tables.sources.isPrimary, true));
+        // Create lookup map for sources
+        const articleIds = articles.map(a => a.id);
+
+        const allSources = articleIds.length > 0
+            ? await db
+                .select({
+                    articleId: tables.sources.articleId,
+                    sourceName: tables.sources.sourceName,
+                    sourceUrl: tables.sources.sourceUrl,
+                    isPrimary: tables.sources.isPrimary,
+                })
+                .from(tables.sources)
+                .where(and(
+                    eq(tables.sources.isPrimary, true),
+                    inArray(tables.sources.articleId, articleIds)
+                ))
+            : [];
 
         // Create lookup map for sources
         const sourcesMap = new Map();
@@ -195,7 +202,7 @@ app.get('/:country', async (c) => {
                     govAlignmentConfidence: rss_sources.govAlignmentConfidence,
                 })
                 .from(rss_sources)
-                .where(eq(rss_sources.sourceName, primarySourceNames[0]))
+                .where(inArray(rss_sources.sourceName, primarySourceNames))
             : [];
 
         // Create alignment lookup map

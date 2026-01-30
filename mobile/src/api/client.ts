@@ -1,17 +1,23 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
+import Constants from "expo-constants";
+
 /**
  * Custom Axios instance for API requests
  * Provides automatic authentication, error handling, and request/response interceptors
  */
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://d4ily-production.up.railway.app';
+// Debug logging for Environment
+console.log("[ENV] EXPO_PUBLIC_API_URL =", process.env.EXPO_PUBLIC_API_URL);
+console.log("[ENV] Constants.expoConfig?.extra?.API_URL =", Constants.expoConfig?.extra?.API_URL);
+
+const API_BASE_URL = Constants.expoConfig?.extra?.API_URL || process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.4:3333';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -173,7 +179,7 @@ export function handleApiError(error: any): never {
   if (error.response) {
     const { status, data } = error.response;
     const message = data?.message || 'An error occurred';
-    
+
     throw new Error(`API Error (${status}): ${message}`);
   }
 
