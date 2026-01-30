@@ -127,39 +127,41 @@ app.get('/:country', async (c) => {
             });
         }
 
-        // Get articles with sources in a single optimized query using LEFT JOIN
+        // Get articles with sources in a single optimized query
         const tables = COUNTRY_TABLES[country];
         
-        // Fetch articles with their primary sources and alignment info in parallel
-        const [articles, sourcesWithAlignment] = await Promise.all([
-            // Get articles
-            db
-                .select({
-                    id: tables.articles.id,
-                    originalTitle: tables.articles.originalTitle,
-                    originalLanguage: tables.articles.originalLanguage,
-                    translatedTitle: tables.articles.translatedTitle,
-                    summary: tables.articles.summary,
-                    imageUrl: tables.articles.imageUrl,
-                    isClickbait: tables.articles.isClickbait,
-                    isAd: tables.articles.isAd,
-                    isFiltered: tables.articles.isFiltered,
-                    sourceCount: tables.articles.sourceCount,
-                    publishedAt: tables.articles.publishedAt,
-                    scrapedAt: tables.articles.scrapedAt,
-                    viewCount: tables.articles.viewCount,
-                    likeCount: tables.articles.likeCount,
-                    dislikeCount: tables.articles.dislikeCount,
-                    commentCount: tables.articles.commentCount,
-                })
-                .from(tables.articles)
-                .where(eq(tables.articles.isFiltered, false))
-                .orderBy(desc(tables.articles.publishedAt))
-                .limit(limit)
-                .offset(offset),
-            
-            // Pre-fetch all potential sources with alignment info
-            db
+        // Get articles first
+        const articles = await db
+            .select({
+                id: tables.articles.id,
+                originalTitle: tables.articles.originalTitle,
+                originalLanguage: tables.articles.originalLanguage,
+                translatedTitle: tables.articles.translatedTitle,
+                summary: tables.articles.summary,
+                imageUrl: tables.articles.imageUrl,
+                isClickbait: tables.articles.isClickbait,
+                isAd: tables.articles.isAd,
+                isFiltered: tables.articles.isFiltered,
+                sourceCount: tables.articles.sourceCount,
+                publishedAt: tables.articles.publishedAt,
+                scrapedAt: tables.articles.scrapedAt,
+                viewCount: tables.articles.viewCount,
+                likeCount: tables.articles.likeCount,
+                dislikeCount: tables.articles.dislikeCount,
+                commentCount: tables.articles.commentCount,
+            })
+            .from(tables.articles)
+            .where(eq(tables.articles.isFiltered, false))
+            .orderBy(desc(tables.articles.publishedAt))
+            .limit(limit)
+            .offset(offset);
+
+        // Get article IDs for fetching sources
+        const articleIds = articles.map(a => a.id);
+        
+        // Fetch only the sources for these articles (much faster than fetching all sources)
+        const sourcesWithAlignment = articleIds.length > 0
+            ? await db
                 .select({
                     articleId: tables.sources.articleId,
                     sourceName: tables.sources.sourceName,
@@ -174,8 +176,11 @@ app.get('/:country', async (c) => {
                     rss_sources,
                     eq(tables.sources.sourceName, rss_sources.sourceName)
                 )
-                .where(eq(tables.sources.isPrimary, true)),
-        ]);
+                .where(and(
+                    eq(tables.sources.isPrimary, true),
+                    inArray(tables.sources.articleId, articleIds)
+                ))
+            : [];
 
         // Create lookup map for sources with alignment
         const sourcesMap = new Map();
