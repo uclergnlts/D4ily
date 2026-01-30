@@ -11,7 +11,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://d4ily-productio
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 60000,
+  timeout: 120000, // Increased from 60s to 120s for large data operations
   headers: {
     'Content-Type': 'application/json',
   },

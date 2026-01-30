@@ -1,6 +1,7 @@
 import { db } from '../config/db.js';
 import { openai } from '../config/openai.js';
 import { logger } from '../config/logger.js';
+import { cacheGet, cacheSet } from '../config/redis.js';
 import {
     tr_articles,
     tr_article_sources,
@@ -24,6 +25,40 @@ import {
 import { eq, and, gte, lte, ne, sql, desc } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { getAlignmentLabel, AlignmentLabel } from '../utils/alignment.js';
+
+// Simple in-memory cache for entity extraction to reduce OpenAI calls
+const entityCache = new Map<string, { entities: ExtractedEntities; timestamp: number }>();
+const ENTITY_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_ENTITY_CACHE_SIZE = 5000;
+
+function getEntityCacheKey(text: string): string {
+    // Use first 100 chars as cache key
+    return text.substring(0, 100).toLowerCase().trim();
+}
+
+function getCachedEntities(text: string): ExtractedEntities | null {
+    const key = getEntityCacheKey(text);
+    const cached = entityCache.get(key);
+    if (cached && Date.now() - cached.timestamp < ENTITY_CACHE_TTL) {
+        return cached.entities;
+    }
+    return null;
+}
+
+function setCachedEntities(text: string, entities: ExtractedEntities): void {
+    // Enforce cache size limit
+    if (entityCache.size >= MAX_ENTITY_CACHE_SIZE) {
+        const entries = Array.from(entityCache.entries());
+        entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+        const toRemove = Math.floor(MAX_ENTITY_CACHE_SIZE * 0.2); // Remove 20%
+        for (let i = 0; i < toRemove; i++) {
+            entityCache.delete(entries[i][0]);
+        }
+    }
+    
+    const key = getEntityCacheKey(text);
+    entityCache.set(key, { entities, timestamp: Date.now() });
+}
 
 const COUNTRY_TABLES = {
     tr: { articles: tr_articles, sources: tr_article_sources },
@@ -72,9 +107,16 @@ export interface PerspectivesResult {
 }
 
 /**
- * Extract named entities from text using OpenAI
+ * Extract named entities from text using OpenAI (with caching)
  */
 export async function extractEntities(text: string): Promise<ExtractedEntities> {
+    // Check cache first
+    const cached = getCachedEntities(text);
+    if (cached) {
+        logger.debug({ textPreview: text.substring(0, 50) }, 'Entity cache hit');
+        return cached;
+    }
+
     try {
         const response = await openai.chat.completions.create({
             model: 'gpt-4o-mini',
@@ -102,12 +144,17 @@ Return ONLY valid JSON, no additional text.`,
 
         const result = JSON.parse(response.choices[0].message.content || '{}');
 
-        return {
+        const entities: ExtractedEntities = {
             persons: result.persons || [],
             organizations: result.organizations || [],
             locations: result.locations || [],
             events: result.events || [],
         };
+
+        // Cache the result
+        setCachedEntities(text, entities);
+        
+        return entities;
     } catch (error) {
         logger.error({ error }, 'Entity extraction failed');
         return { persons: [], organizations: [], locations: [], events: [] };
@@ -265,7 +312,15 @@ export async function findPerspectives(
     const mainGovScore = mainSourceInfo?.govAlignmentScore ?? 0;
     const mainConfidence = mainSourceInfo?.govAlignmentConfidence ?? 0.5;
 
-    // 2. Check cache first
+    // 2. Check Redis cache first for API responses (faster than DB)
+    const redisCacheKey = `perspectives:${countryCode}:${articleId}`;
+    const redisCached = await cacheGet<PerspectivesResult>(redisCacheKey);
+    if (redisCached) {
+        logger.info({ articleId }, 'Returning Redis cached perspectives');
+        return redisCached;
+    }
+
+    // 3. Check database cache
     const cachedPerspectives = await db
         .select()
         .from(articlePerspectives)
@@ -323,7 +378,7 @@ export async function findPerspectives(
             })
         );
 
-        return {
+        const result = {
             mainArticle: {
                 id: mainArticle.id,
                 title: mainArticle.translatedTitle,
@@ -334,6 +389,11 @@ export async function findPerspectives(
             },
             relatedPerspectives: perspectives.filter((p): p is PerspectiveMatch => p !== null),
         };
+
+        // Cache in Redis for 1 hour
+        await cacheSet(redisCacheKey, result, 3600);
+
+        return result;
     }
 
     // 3. Time window filter (±24 hours)
@@ -488,7 +548,7 @@ export async function findPerspectives(
         perspectivesMatched: perspectives.length,
     }, 'Perspectives search completed');
 
-    return {
+    const result = {
         mainArticle: {
             id: mainArticle.id,
             title: mainArticle.translatedTitle,
@@ -499,6 +559,11 @@ export async function findPerspectives(
         },
         relatedPerspectives: perspectives,
     };
+
+    // Cache result in Redis for 1 hour
+    await cacheSet(redisCacheKey, result, 3600);
+
+    return result;
 }
 
 /**

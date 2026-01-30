@@ -39,6 +39,10 @@ export function createArticleTable(countryCode: string) {
         publishedIdx: index(`${countryCode}_articles_published_idx`).on(table.publishedAt),
         categoryIdx: index(`${countryCode}_articles_category_idx`).on(table.categoryId),
         politicalToneIdx: index(`${countryCode}_articles_political_tone_idx`).on(table.politicalTone),
+        // Critical composite index for feed queries: WHERE isFiltered = false ORDER BY publishedAt DESC
+        isFilteredPublishedIdx: index(`${countryCode}_articles_filtered_published_idx`).on(table.isFiltered, table.publishedAt),
+        // Index for source count queries
+        sourceCountIdx: index(`${countryCode}_articles_source_count_idx`).on(table.sourceCount),
     }));
 }
 

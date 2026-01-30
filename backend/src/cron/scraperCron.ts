@@ -5,6 +5,9 @@ import { eq } from 'drizzle-orm';
 import { scrapeSource } from '../services/scraper/scraperService.js';
 import { logger } from '../config/logger.js';
 
+// Process sources in parallel batches to improve performance
+const BATCH_SIZE = 5;
+
 export function startScraperCron() {
     // Run every 30 minutes
     const scraperJob = cron.schedule('*/30 * * * *', async () => {
@@ -29,35 +32,65 @@ export async function runScraper() {
             .from(rss_sources)
             .where(eq(rss_sources.isActive, true));
 
-        logger.info({ sourceCount: sources.length }, 'Found active sources');
+        logger.info({ sourceCount: sources.length, batchSize: BATCH_SIZE }, 'Found active sources');
 
         let totalProcessed = 0;
         let totalDuplicates = 0;
         let totalFiltered = 0;
 
-        for (const source of sources) {
-            if (!source.rssUrl) {
-                logger.warn({ sourceId: source.id }, 'Source has no RSS URL, skipping');
-                continue;
+        // Process sources in parallel batches
+        for (let i = 0; i < sources.length; i += BATCH_SIZE) {
+            const batch = sources.slice(i, i + BATCH_SIZE);
+            
+            logger.info({
+                batchIndex: Math.floor(i / BATCH_SIZE) + 1,
+                totalBatches: Math.ceil(sources.length / BATCH_SIZE),
+                batchSize: batch.length
+            }, 'Processing batch');
+
+            // Process batch in parallel
+            const batchResults = await Promise.allSettled(
+                batch.map(async (source) => {
+                    if (!source.rssUrl) {
+                        logger.warn({ sourceId: source.id }, 'Source has no RSS URL, skipping');
+                        return { processed: 0, duplicates: 0, filtered: 0 };
+                    }
+
+                    try {
+                        const result = await scrapeSource(
+                            source.id,
+                            source.sourceName,
+                            source.sourceLogoUrl,
+                            source.rssUrl,
+                            source.countryCode as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru'
+                        );
+
+                        logger.info({
+                            sourceId: source.id,
+                            sourceName: source.sourceName,
+                            ...result
+                        }, 'Source scraped successfully');
+
+                        return result;
+                    } catch (error) {
+                        logger.error({ error, sourceId: source.id, sourceName: source.sourceName }, 'Failed to scrape source');
+                        return { processed: 0, duplicates: 0, filtered: 0 };
+                    }
+                })
+            );
+
+            // Aggregate results from batch
+            for (const result of batchResults) {
+                if (result.status === 'fulfilled') {
+                    totalProcessed += result.value.processed;
+                    totalDuplicates += result.value.duplicates;
+                    totalFiltered += result.value.filtered;
+                }
             }
 
-            try {
-                const result = await scrapeSource(
-                    source.id,
-                    source.sourceName,
-                    source.sourceLogoUrl,
-                    source.rssUrl,
-                    source.countryCode as 'tr' | 'de' | 'us'
-                );
-
-                totalProcessed += result.processed;
-                totalDuplicates += result.duplicates;
-                totalFiltered += result.filtered;
-
-                // Wait 2 seconds between sources to avoid rate limiting
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            } catch (error) {
-                logger.error({ error, sourceId: source.id }, 'Failed to scrape source');
+            // Small delay between batches to avoid overwhelming the system
+            if (i + BATCH_SIZE < sources.length) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
 

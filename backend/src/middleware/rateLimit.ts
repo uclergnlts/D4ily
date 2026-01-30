@@ -35,7 +35,7 @@ export const rateLimitMiddleware = (options: {
 // Predefined rate limiters
 export const apiLimiter = rateLimitMiddleware({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
+    max: 300, // Increased from 100 to 300 for better mobile app experience
     keyPrefix: 'api',
 });
 
