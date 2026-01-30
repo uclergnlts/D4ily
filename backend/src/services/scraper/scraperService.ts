@@ -37,6 +37,34 @@ const COUNTRY_TABLES = {
     ru: { articles: ru_articles, sources: ru_article_sources },
 } as const;
 
+// Simple in-memory queue for async AI processing
+const aiProcessingQueue: Array<() => Promise<void>> = [];
+let isProcessingQueue = false;
+
+// Process AI queue in background
+async function processAIQueue() {
+    if (isProcessingQueue || aiProcessingQueue.length === 0) return;
+    
+    isProcessingQueue = true;
+    logger.info({ queueSize: aiProcessingQueue.length }, 'Starting AI processing queue');
+    
+    while (aiProcessingQueue.length > 0) {
+        const task = aiProcessingQueue.shift();
+        if (task) {
+            try {
+                await task();
+                // Add delay between AI calls to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (error) {
+                logger.error({ error }, 'AI queue task failed');
+            }
+        }
+    }
+    
+    isProcessingQueue = false;
+    logger.info('AI processing queue completed');
+}
+
 export async function scrapeSource(
     sourceId: number,
     sourceName: string,
@@ -98,70 +126,38 @@ export async function scrapeSource(
                     continue;
                 }
 
-                // Process with OpenAI
-                const aiResult = await processArticleWithAI(
-                    item.title,
-                    item.content || item.description || '',
-                    countryCode === 'tr' ? 'tr' : countryCode === 'de' ? 'de' : 'en'
-                );
-
-                // Filter clickbait and ads
-                if (aiResult.isClickbait || aiResult.isAd) {
-                    filtered++;
-                    logger.info({ title: item.title.substring(0, 50) }, 'Article filtered');
-                    continue;
-                }
-
-                // Get category ID
+                // Create article immediately with basic info
+                const articleId = nanoid();
                 const categoryResult = await db
                     .select()
                     .from(categories)
-                    .where(eq(categories.name, aiResult.category))
+                    .where(eq(categories.name, 'Dünya'))
                     .limit(1);
+                const defaultCategoryId = categoryResult[0]?.id || null;
 
-                const categoryId = categoryResult[0]?.id || null;
-
-                // Create article
-                const articleId = nanoid();
-                
-                // Log metrics for detailContent quality
-                const detailContentLength = aiResult.detailContent?.length || 0;
-                const summaryLength = aiResult.summary?.length || 0;
-                const isDetailContentValid = detailContentLength > summaryLength && 
-                    aiResult.detailContent !== aiResult.summary;
-                
-                if (!isDetailContentValid) {
-                    logger.warn({
-                        title: item.title.substring(0, 50),
-                        summaryLength,
-                        detailContentLength,
-                        isDetailContentValid
-                    }, 'Article created with potentially low-quality detailContent');
-                }
-                
+                // Insert article with default values first
                 await db.insert(tables.articles).values({
                     id: articleId,
                     originalTitle: item.title,
                     originalContent: item.content || item.description || '',
                     originalLanguage: countryCode === 'tr' ? 'tr' : countryCode === 'de' ? 'de' : 'en',
-                    translatedTitle: aiResult.translatedTitle,
-                    summary: aiResult.summary,
-                    detailContent: aiResult.detailContent,
+                    translatedTitle: item.title, // Will be updated by AI
+                    summary: item.description || item.title, // Will be updated by AI
+                    detailContent: item.content || item.description || '', // Will be updated by AI
                     imageUrl: item.imageUrl,
-                    isClickbait: aiResult.isClickbait,
-                    isAd: aiResult.isAd,
+                    isClickbait: false, // Will be updated by AI
+                    isAd: false, // Will be updated by AI
                     isFiltered: false,
                     sourceCount: 1,
-                    sentiment: aiResult.sentiment,
-                    politicalTone: aiResult.politicalTone,
-                    politicalConfidence: aiResult.politicalConfidence,
-                    governmentMentioned: aiResult.governmentMentioned,
-                    // AI emotional analysis
-                    emotionalTone: aiResult.emotionalTone,
-                    emotionalIntensity: aiResult.emotionalIntensity,
-                    loadedLanguageScore: aiResult.loadedLanguageScore,
-                    sensationalismScore: aiResult.sensationalismScore,
-                    categoryId,
+                    sentiment: 'neutral', // Will be updated by AI
+                    politicalTone: 0, // Will be updated by AI
+                    politicalConfidence: 0, // Will be updated by AI
+                    governmentMentioned: false, // Will be updated by AI
+                    emotionalTone: null, // Will be updated by AI
+                    emotionalIntensity: 0, // Will be updated by AI
+                    loadedLanguageScore: 0, // Will be updated by AI
+                    sensationalismScore: 0, // Will be updated by AI
+                    categoryId: defaultCategoryId,
                     publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
                     scrapedAt: new Date(),
                     viewCount: 0,
@@ -182,13 +178,71 @@ export async function scrapeSource(
                 });
 
                 processed++;
-                logger.info({ articleId, title: aiResult.translatedTitle.substring(0, 50) }, 'Article created');
+                logger.info({ articleId, title: item.title.substring(0, 50) }, 'Article created (pending AI processing)');
+
+                // Queue AI processing for background execution
+                aiProcessingQueue.push(async () => {
+                    try {
+                        const aiResult = await processArticleWithAI(
+                            item.title,
+                            item.content || item.description || '',
+                            countryCode === 'tr' ? 'tr' : countryCode === 'de' ? 'de' : 'en'
+                        );
+
+                        // Check if article should be filtered
+                        if (aiResult.isClickbait || aiResult.isAd) {
+                            await db
+                                .update(tables.articles)
+                                .set({ isFiltered: true, isClickbait: aiResult.isClickbait, isAd: aiResult.isAd })
+                                .where(eq(tables.articles.id, articleId));
+                            logger.info({ articleId, title: item.title.substring(0, 50) }, 'Article filtered by AI');
+                            return;
+                        }
+
+                        // Get category ID from AI result
+                        const aiCategoryResult = await db
+                            .select()
+                            .from(categories)
+                            .where(eq(categories.name, aiResult.category))
+                            .limit(1);
+                        const aiCategoryId = aiCategoryResult[0]?.id || defaultCategoryId;
+
+                        // Update article with AI results
+                        await db
+                            .update(tables.articles)
+                            .set({
+                                translatedTitle: aiResult.translatedTitle,
+                                summary: aiResult.summary,
+                                detailContent: aiResult.detailContent,
+                                isClickbait: aiResult.isClickbait,
+                                isAd: aiResult.isAd,
+                                sentiment: aiResult.sentiment,
+                                politicalTone: aiResult.politicalTone,
+                                politicalConfidence: aiResult.politicalConfidence,
+                                governmentMentioned: aiResult.governmentMentioned,
+                                emotionalTone: aiResult.emotionalTone,
+                                emotionalIntensity: aiResult.emotionalIntensity,
+                                loadedLanguageScore: aiResult.loadedLanguageScore,
+                                sensationalismScore: aiResult.sensationalismScore,
+                                categoryId: aiCategoryId,
+                            })
+                            .where(eq(tables.articles.id, articleId));
+
+                        logger.info({ articleId, title: aiResult.translatedTitle.substring(0, 50) }, 'Article AI processing completed');
+                    } catch (error) {
+                        logger.error({ error, articleId, title: item.title }, 'AI processing failed for article');
+                    }
+                });
+
             } catch (error) {
                 logger.error({ error, item: item.title }, 'Failed to process article');
             }
         }
 
-        logger.info({ sourceId, processed, duplicates, filtered }, 'Scrape completed');
+        // Start processing AI queue in background
+        setImmediate(processAIQueue);
+
+        logger.info({ sourceId, processed, duplicates, filtered, aiQueueSize: aiProcessingQueue.length }, 'Scrape completed');
         return { processed, duplicates, filtered };
     } catch (error) {
         logger.error({ error, sourceId }, 'Scrape failed');

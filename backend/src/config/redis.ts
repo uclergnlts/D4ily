@@ -21,7 +21,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     return redisCircuitBreaker.execute(
         'redis:cacheGet',
         async () => {
-            const data = await withTimeout(redis.get(key), 3000);
+            const data = await withTimeout(redis.get(key), 5000);
             return data as T | null;
         },
         () => null // Fallback returns null
@@ -33,9 +33,9 @@ export async function cacheSet(key: string, value: any, ttlSeconds?: number) {
         'redis:cacheSet',
         async () => {
             if (ttlSeconds) {
-                await withTimeout(redis.set(key, value, { ex: ttlSeconds }), 3000);
+                await withTimeout(redis.set(key, value, { ex: ttlSeconds }), 5000);
             } else {
-                await withTimeout(redis.set(key, value), 3000);
+                await withTimeout(redis.set(key, value), 5000);
             }
         },
         () => undefined // Fallback does nothing
@@ -46,9 +46,9 @@ export async function cacheInvalidate(pattern: string) {
     return redisCircuitBreaker.execute(
         'redis:cacheInvalidate',
         async () => {
-            const keys = await withTimeout(redis.keys(pattern), 3000);
+            const keys = await withTimeout(redis.keys(pattern), 5000);
             if (keys && keys.length > 0) {
-                await withTimeout(redis.del(...keys), 3000);
+                await withTimeout(redis.del(...keys), 5000);
             }
         },
         () => undefined // Fallback does nothing

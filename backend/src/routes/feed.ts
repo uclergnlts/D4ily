@@ -106,8 +106,8 @@ app.get('/:country', async (c) => {
 
             const balancedData = await getBalancedFeed(country, { limit, page });
 
-            // Cache for 1 minute for fresher data
-            await cacheSet(cacheKey, balancedData, 60);
+            // Cache for 30 minutes to reduce database load
+            await cacheSet(cacheKey, balancedData, 1800);
 
             return c.json({
                 success: true,
@@ -127,99 +127,83 @@ app.get('/:country', async (c) => {
             });
         }
 
-        // Get articles - exclude detailContent for list performance
+        // Get articles with sources in a single optimized query using LEFT JOIN
         const tables = COUNTRY_TABLES[country];
-        const articles = await db
-            .select({
-                id: tables.articles.id,
-                originalTitle: tables.articles.originalTitle,
-                // originalContent: tables.articles.originalContent, // PERFORMANCE: Excluded for list view
-                originalLanguage: tables.articles.originalLanguage,
-                translatedTitle: tables.articles.translatedTitle,
-                summary: tables.articles.summary,
-                // detailContent intentionally excluded for list performance
-                imageUrl: tables.articles.imageUrl,
-                isClickbait: tables.articles.isClickbait,
-                isAd: tables.articles.isAd,
-                isFiltered: tables.articles.isFiltered,
-                sourceCount: tables.articles.sourceCount,
-                /*
-                sentiment: tables.articles.sentiment,
-                politicalTone: tables.articles.politicalTone,
-                politicalConfidence: tables.articles.politicalConfidence,
-                governmentMentioned: tables.articles.governmentMentioned,
-                emotionalTone: tables.articles.emotionalTone,
-                emotionalIntensity: tables.articles.emotionalIntensity,
-                loadedLanguageScore: tables.articles.loadedLanguageScore,
-                sensationalismScore: tables.articles.sensationalismScore,
-                categoryId: tables.articles.categoryId,
-                */
-                publishedAt: tables.articles.publishedAt,
-                scrapedAt: tables.articles.scrapedAt,
-                viewCount: tables.articles.viewCount,
-                likeCount: tables.articles.likeCount,
-                dislikeCount: tables.articles.dislikeCount,
-                commentCount: tables.articles.commentCount,
-            })
-            .from(tables.articles)
-            .where(eq(tables.articles.isFiltered, false))
-            .orderBy(desc(tables.articles.publishedAt))
-            .limit(limit)
-            .offset(offset);
-
-        // Create lookup map for sources
-        console.log('[DEBUG] Articles fetched, count:', articles.length);
-        const articleIds = articles.map(a => a.id);
-
-        console.log('[DEBUG] Fetching sources for articleIds count:', articleIds.length);
-
-        const allSources = articleIds.length > 0
-            ? await db
+        
+        // Fetch articles with their primary sources and alignment info in parallel
+        const [articles, sourcesWithAlignment] = await Promise.all([
+            // Get articles
+            db
+                .select({
+                    id: tables.articles.id,
+                    originalTitle: tables.articles.originalTitle,
+                    originalLanguage: tables.articles.originalLanguage,
+                    translatedTitle: tables.articles.translatedTitle,
+                    summary: tables.articles.summary,
+                    imageUrl: tables.articles.imageUrl,
+                    isClickbait: tables.articles.isClickbait,
+                    isAd: tables.articles.isAd,
+                    isFiltered: tables.articles.isFiltered,
+                    sourceCount: tables.articles.sourceCount,
+                    publishedAt: tables.articles.publishedAt,
+                    scrapedAt: tables.articles.scrapedAt,
+                    viewCount: tables.articles.viewCount,
+                    likeCount: tables.articles.likeCount,
+                    dislikeCount: tables.articles.dislikeCount,
+                    commentCount: tables.articles.commentCount,
+                })
+                .from(tables.articles)
+                .where(eq(tables.articles.isFiltered, false))
+                .orderBy(desc(tables.articles.publishedAt))
+                .limit(limit)
+                .offset(offset),
+            
+            // Pre-fetch all potential sources with alignment info
+            db
                 .select({
                     articleId: tables.sources.articleId,
                     sourceName: tables.sources.sourceName,
                     sourceUrl: tables.sources.sourceUrl,
+                    sourceLogoUrl: tables.sources.sourceLogoUrl,
                     isPrimary: tables.sources.isPrimary,
-                })
-                .from(tables.sources)
-                .where(and(
-                    eq(tables.sources.isPrimary, true),
-                    inArray(tables.sources.articleId, articleIds)
-                ))
-            : [];
-
-        // Create lookup map for sources
-        const sourcesMap = new Map();
-        allSources.forEach(s => {
-            if (!sourcesMap.has(s.articleId)) {
-                sourcesMap.set(s.articleId, []);
-            }
-            sourcesMap.get(s.articleId).push(s);
-        });
-
-        // Get alignment info for all primary sources in one query
-        const primarySourceNames = [...new Set(allSources.map(s => s.sourceName))];
-        const sourceInfos = primarySourceNames.length > 0
-            ? await db
-                .select({
-                    sourceName: rss_sources.sourceName,
                     govAlignmentScore: rss_sources.govAlignmentScore,
                     govAlignmentConfidence: rss_sources.govAlignmentConfidence,
                 })
-                .from(rss_sources)
-                .where(inArray(rss_sources.sourceName, primarySourceNames))
-            : [];
+                .from(tables.sources)
+                .innerJoin(
+                    rss_sources,
+                    eq(tables.sources.sourceName, rss_sources.sourceName)
+                )
+                .where(eq(tables.sources.isPrimary, true)),
+        ]);
+
+        // Create lookup map for sources with alignment
+        const sourcesMap = new Map();
+        sourcesWithAlignment.forEach(s => {
+            if (!sourcesMap.has(s.articleId)) {
+                sourcesMap.set(s.articleId, []);
+            }
+            sourcesMap.get(s.articleId).push({
+                articleId: s.articleId,
+                sourceName: s.sourceName,
+                sourceUrl: s.sourceUrl,
+                sourceLogoUrl: s.sourceLogoUrl,
+                isPrimary: s.isPrimary,
+            });
+        });
 
         // Create alignment lookup map
         const alignmentMap = new Map();
-        sourceInfos.forEach(s => {
-            alignmentMap.set(s.sourceName, {
-                govAlignmentScore: s.govAlignmentScore,
-                govAlignmentLabel: getAlignmentLabel(
-                    s.govAlignmentScore,
-                    s.govAlignmentConfidence ?? 0.5
-                ),
-            });
+        sourcesWithAlignment.forEach(s => {
+            if (!alignmentMap.has(s.sourceName)) {
+                alignmentMap.set(s.sourceName, {
+                    govAlignmentScore: s.govAlignmentScore,
+                    govAlignmentLabel: getAlignmentLabel(
+                        s.govAlignmentScore,
+                        s.govAlignmentConfidence ?? 0.5
+                    ),
+                });
+            }
         });
 
         // Combine articles with sources and alignment info
@@ -230,7 +214,6 @@ app.get('/:country', async (c) => {
 
             return {
                 ...article,
-
                 sources,
                 govAlignmentScore: alignment?.govAlignmentScore ?? 0,
                 govAlignmentLabel: alignment?.govAlignmentLabel ?? 'Belirsiz',
@@ -246,8 +229,8 @@ app.get('/:country', async (c) => {
             },
         };
 
-        // Cache for 1 minute for fresher data
-        await cacheSet(cacheKey, response, 60);
+        // Cache for 30 minutes to reduce database load
+        await cacheSet(cacheKey, response, 1800);
 
         return c.json({
             success: true,
