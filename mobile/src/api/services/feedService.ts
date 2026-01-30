@@ -19,10 +19,11 @@ export const feedService = {
             }
 
             return response.data.data;
-        } catch (error) {
+        } catch (error: any) {
             // Only use mock data in development
             if (isDevelopment) {
                 console.warn('[DEV] API connection failed, using mock data for Feed.');
+                console.error('[Feed Error Details]', error.message, error.response?.status, error.response?.data);
                 await new Promise(resolve => setTimeout(resolve, 300));
                 return getMockFeed(country, page);
             }

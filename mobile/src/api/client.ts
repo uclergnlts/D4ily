@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
 /**
@@ -11,7 +11,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://d4ily-productio
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -19,14 +19,11 @@ const apiClient: AxiosInstance = axios.create({
 
 // Request interceptor - Add auth token
 apiClient.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) => {
     const { token } = useAuthStore.getState();
-    
+
     if (token) {
-      config.headers = {
-        ...config.headers,
-        Authorization: `Bearer ${token}`,
-      };
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
     // Log request in development
@@ -125,6 +122,28 @@ apiClient.interceptors.response.use(
 /**
  * API client methods
  */
+export const client = {
+  get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return apiClient.get<T>(url, config);
+  },
+
+  post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return apiClient.post<T>(url, data, config);
+  },
+
+  put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return apiClient.put<T>(url, data, config);
+  },
+
+  patch: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return apiClient.patch<T>(url, data, config);
+  },
+
+  delete: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return apiClient.delete<T>(url, config);
+  },
+};
+
 export const api = {
   get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.get<T>(url, config);

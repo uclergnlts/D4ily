@@ -1,5 +1,6 @@
-import { initializeAuth, getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, User, UserCredential } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence, GoogleAuthProvider, OAuthProvider, signInWithPopup, User, UserCredential } from 'firebase/auth';
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -14,8 +15,10 @@ const firebaseConfig = {
 // Initialize Firebase App
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firebase Auth
-const auth = getAuth(app);
+// Initialize Firebase Auth with AsyncStorage persistence
+const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
 
 /**
  * Sign in with Google
