@@ -135,8 +135,8 @@ app.get('/:country', async (c) => {
                 originalTitle: tables.articles.originalTitle,
                 // originalContent: tables.articles.originalContent, // PERFORMANCE: Excluded for list view
                 originalLanguage: tables.articles.originalLanguage,
-                // translatedTitle: tables.articles.translatedTitle,
-                // summary: tables.articles.summary, // TESTING: Excluded to debug hang
+                translatedTitle: tables.articles.translatedTitle,
+                summary: tables.articles.summary,
                 // detailContent intentionally excluded for list performance
                 imageUrl: tables.articles.imageUrl,
                 isClickbait: tables.articles.isClickbait,
@@ -155,7 +155,7 @@ app.get('/:country', async (c) => {
                 categoryId: tables.articles.categoryId,
                 */
                 publishedAt: tables.articles.publishedAt,
-                // scrapedAt: tables.articles.scrapedAt,
+                scrapedAt: tables.articles.scrapedAt,
                 viewCount: tables.articles.viewCount,
                 likeCount: tables.articles.likeCount,
                 dislikeCount: tables.articles.dislikeCount,
@@ -230,11 +230,6 @@ app.get('/:country', async (c) => {
 
             return {
                 ...article,
-                // Placeholder for summary
-                summary: '',
-                // Placeholder defaults for excluded columns
-                translatedTitle: '',
-                scrapedAt: new Date().toISOString(),
 
                 sources,
                 govAlignmentScore: alignment?.govAlignmentScore ?? 0,
