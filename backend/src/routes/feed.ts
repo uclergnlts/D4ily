@@ -133,7 +133,7 @@ app.get('/:country', async (c) => {
             .select({
                 id: tables.articles.id,
                 originalTitle: tables.articles.originalTitle,
-                originalContent: tables.articles.originalContent,
+                // originalContent: tables.articles.originalContent, // PERFORMANCE: Excluded for list view
                 originalLanguage: tables.articles.originalLanguage,
                 translatedTitle: tables.articles.translatedTitle,
                 summary: tables.articles.summary,
