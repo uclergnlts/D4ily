@@ -25,7 +25,8 @@ import {
 import { eq, desc, and, inArray } from 'drizzle-orm';
 import { handleError } from '../utils/errors.js';
 import { countrySchema, paginationSchema } from '../utils/schemas.js';
-import { cacheGet, cacheSet, cacheInvalidate } from '../config/redis.js';
+import { cacheGet, cacheSet } from '../config/redis.js';
+import { logger } from '../config/logger.js';
 import type { ApiResponse, EmotionalAnalysisResponse } from '../types/index.js';
 import { z } from 'zod';
 import { optionalAuthMiddleware, AuthUser } from '../middleware/auth.js';
@@ -36,6 +37,81 @@ import {
     getIntensityLabelTr,
     getSensationalismLabelTr,
 } from '../services/ai/emotionalAnalysisService.js';
+
+// Stale-while-revalidate cache settings
+const CACHE_TTL = 1800;           // 30 minutes fresh cache
+const STALE_TTL = 3600;           // 60 minutes stale cache (serve while revalidating)
+const QUERY_TIMEOUT = 8000;       // 8 seconds query timeout (leaving 2s buffer for 10s request timeout)
+
+/**
+ * Execute a database query with timeout protection
+ */
+async function withQueryTimeout<T>(
+    queryFn: () => Promise<T>,
+    timeoutMs: number = QUERY_TIMEOUT,
+    fallback?: T
+): Promise<T> {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            if (fallback !== undefined) {
+                logger.warn({ timeoutMs }, 'Query timeout, using fallback');
+                resolve(fallback);
+            } else {
+                reject(new Error('Query timeout'));
+            }
+        }, timeoutMs);
+
+        queryFn()
+            .then((result) => {
+                clearTimeout(timeoutId);
+                resolve(result);
+            })
+            .catch((error) => {
+                clearTimeout(timeoutId);
+                reject(error);
+            });
+    });
+}
+
+/**
+ * Get cache with stale-while-revalidate support
+ * Returns cached data even if stale, and triggers background refresh
+ */
+async function getCacheWithSWR<T>(
+    cacheKey: string,
+    fetchFn: () => Promise<T>,
+    ttl: number = CACHE_TTL
+): Promise<{ data: T; isStale: boolean }> {
+    // Try to get from cache first
+    const cached = await cacheGet<{ data: T; timestamp: number }>(cacheKey + ':swr');
+
+    if (cached) {
+        const age = Date.now() - cached.timestamp;
+        const isStale = age > ttl * 1000;
+
+        // If data is stale but within stale TTL, return it and trigger background refresh
+        if (isStale && age < STALE_TTL * 1000) {
+            // Background refresh (fire and forget)
+            fetchFn().then(async (newData) => {
+                await cacheSet(cacheKey + ':swr', { data: newData, timestamp: Date.now() }, STALE_TTL);
+            }).catch((error) => {
+                logger.warn({ cacheKey, error: error.message }, 'Background cache refresh failed');
+            });
+
+            return { data: cached.data, isStale: true };
+        }
+
+        // Fresh cache
+        if (!isStale) {
+            return { data: cached.data, isStale: false };
+        }
+    }
+
+    // No cache or expired, fetch fresh data
+    const data = await fetchFn();
+    await cacheSet(cacheKey + ':swr', { data, timestamp: Date.now() }, STALE_TTL);
+    return { data, isStale: false };
+}
 
 type Variables = {
     user?: AuthUser;
@@ -91,156 +167,185 @@ app.get('/:country', async (c) => {
         const { page, limit } = paginationValidation.data;
         const offset = (page - 1) * limit;
 
-        // Handle balanced feed
+        // Handle balanced feed with stale-while-revalidate
         if (balanced) {
             const cacheKey = `feed:${country}:balanced:page:${page}:limit:${limit}`;
-            const cached = await cacheGet<any>(cacheKey);
 
-            if (cached) {
+            try {
+                const { data, isStale } = await getCacheWithSWR(
+                    cacheKey,
+                    async () => {
+                        return await withQueryTimeout(
+                            () => getBalancedFeed(country, { limit, page }),
+                            QUERY_TIMEOUT,
+                            { proGov: [], mixed: [], antiGov: [] } // Fallback on timeout
+                        );
+                    }
+                );
+
                 return c.json({
                     success: true,
-                    data: cached,
+                    data,
                     cached: true,
+                    stale: isStale,
                 });
+            } catch (error) {
+                // Try to get stale cache on error
+                const staleCache = await cacheGet<{ data: any }>(cacheKey + ':swr');
+                if (staleCache) {
+                    logger.warn({ cacheKey }, 'Serving stale cache due to error');
+                    return c.json({
+                        success: true,
+                        data: staleCache.data,
+                        cached: true,
+                        stale: true,
+                    });
+                }
+                throw error;
             }
-
-            const balancedData = await getBalancedFeed(country, { limit, page });
-
-            // Cache for 30 minutes to reduce database load
-            await cacheSet(cacheKey, balancedData, 1800);
-
-            return c.json({
-                success: true,
-                data: balancedData,
-            });
         }
 
-        // Check cache for normal feed
+        // Normal feed with stale-while-revalidate
         const cacheKey = `feed:${country}:page:${page}:limit:${limit}`;
-        const cached = await cacheGet<any>(cacheKey);
-
-        if (cached) {
-            return c.json({
-                success: true,
-                data: cached,
-                cached: true,
-            });
-        }
-
-        // Get articles with sources in a single optimized query
         const tables = COUNTRY_TABLES[country];
-        
-        // Get articles first
-        const articles = await db
-            .select({
-                id: tables.articles.id,
-                originalTitle: tables.articles.originalTitle,
-                originalLanguage: tables.articles.originalLanguage,
-                translatedTitle: tables.articles.translatedTitle,
-                summary: tables.articles.summary,
-                imageUrl: tables.articles.imageUrl,
-                isClickbait: tables.articles.isClickbait,
-                isAd: tables.articles.isAd,
-                isFiltered: tables.articles.isFiltered,
-                sourceCount: tables.articles.sourceCount,
-                publishedAt: tables.articles.publishedAt,
-                scrapedAt: tables.articles.scrapedAt,
-                viewCount: tables.articles.viewCount,
-                likeCount: tables.articles.likeCount,
-                dislikeCount: tables.articles.dislikeCount,
-                commentCount: tables.articles.commentCount,
-            })
-            .from(tables.articles)
-            .where(eq(tables.articles.isFiltered, false))
-            .orderBy(desc(tables.articles.publishedAt))
-            .limit(limit)
-            .offset(offset);
 
-        // Get article IDs for fetching sources
-        const articleIds = articles.map(a => a.id);
-        
-        // Fetch only the sources for these articles (much faster than fetching all sources)
-        const sourcesWithAlignment = articleIds.length > 0
-            ? await db
-                .select({
-                    articleId: tables.sources.articleId,
-                    sourceName: tables.sources.sourceName,
-                    sourceUrl: tables.sources.sourceUrl,
-                    sourceLogoUrl: tables.sources.sourceLogoUrl,
-                    isPrimary: tables.sources.isPrimary,
-                    govAlignmentScore: rss_sources.govAlignmentScore,
-                    govAlignmentConfidence: rss_sources.govAlignmentConfidence,
-                })
-                .from(tables.sources)
-                .innerJoin(
-                    rss_sources,
-                    eq(tables.sources.sourceName, rss_sources.sourceName)
+        const fetchFeed = async () => {
+            // Get articles with query timeout protection
+            const articles = await withQueryTimeout(
+                () => db
+                    .select({
+                        id: tables.articles.id,
+                        originalTitle: tables.articles.originalTitle,
+                        originalLanguage: tables.articles.originalLanguage,
+                        translatedTitle: tables.articles.translatedTitle,
+                        summary: tables.articles.summary,
+                        imageUrl: tables.articles.imageUrl,
+                        isClickbait: tables.articles.isClickbait,
+                        isAd: tables.articles.isAd,
+                        isFiltered: tables.articles.isFiltered,
+                        sourceCount: tables.articles.sourceCount,
+                        publishedAt: tables.articles.publishedAt,
+                        scrapedAt: tables.articles.scrapedAt,
+                        viewCount: tables.articles.viewCount,
+                        likeCount: tables.articles.likeCount,
+                        dislikeCount: tables.articles.dislikeCount,
+                        commentCount: tables.articles.commentCount,
+                    })
+                    .from(tables.articles)
+                    .where(eq(tables.articles.isFiltered, false))
+                    .orderBy(desc(tables.articles.publishedAt))
+                    .limit(limit)
+                    .offset(offset),
+                QUERY_TIMEOUT,
+                [] // Return empty array on timeout
+            );
+
+            // Get article IDs for fetching sources
+            const articleIds = articles.map(a => a.id);
+
+            // Fetch sources with timeout protection
+            const sourcesWithAlignment = articleIds.length > 0
+                ? await withQueryTimeout(
+                    () => db
+                        .select({
+                            articleId: tables.sources.articleId,
+                            sourceName: tables.sources.sourceName,
+                            sourceUrl: tables.sources.sourceUrl,
+                            sourceLogoUrl: tables.sources.sourceLogoUrl,
+                            isPrimary: tables.sources.isPrimary,
+                            govAlignmentScore: rss_sources.govAlignmentScore,
+                            govAlignmentConfidence: rss_sources.govAlignmentConfidence,
+                        })
+                        .from(tables.sources)
+                        .innerJoin(
+                            rss_sources,
+                            eq(tables.sources.sourceName, rss_sources.sourceName)
+                        )
+                        .where(and(
+                            eq(tables.sources.isPrimary, true),
+                            inArray(tables.sources.articleId, articleIds)
+                        )),
+                    QUERY_TIMEOUT,
+                    []
                 )
-                .where(and(
-                    eq(tables.sources.isPrimary, true),
-                    inArray(tables.sources.articleId, articleIds)
-                ))
-            : [];
+                : [];
 
-        // Create lookup map for sources with alignment
-        const sourcesMap = new Map();
-        sourcesWithAlignment.forEach(s => {
-            if (!sourcesMap.has(s.articleId)) {
-                sourcesMap.set(s.articleId, []);
-            }
-            sourcesMap.get(s.articleId).push({
-                articleId: s.articleId,
-                sourceName: s.sourceName,
-                sourceUrl: s.sourceUrl,
-                sourceLogoUrl: s.sourceLogoUrl,
-                isPrimary: s.isPrimary,
-            });
-        });
-
-        // Create alignment lookup map
-        const alignmentMap = new Map();
-        sourcesWithAlignment.forEach(s => {
-            if (!alignmentMap.has(s.sourceName)) {
-                alignmentMap.set(s.sourceName, {
-                    govAlignmentScore: s.govAlignmentScore,
-                    govAlignmentLabel: getAlignmentLabel(
-                        s.govAlignmentScore,
-                        s.govAlignmentConfidence ?? 0.5
-                    ),
+            // Create lookup map for sources with alignment
+            const sourcesMap = new Map();
+            sourcesWithAlignment.forEach(s => {
+                if (!sourcesMap.has(s.articleId)) {
+                    sourcesMap.set(s.articleId, []);
+                }
+                sourcesMap.get(s.articleId).push({
+                    articleId: s.articleId,
+                    sourceName: s.sourceName,
+                    sourceUrl: s.sourceUrl,
+                    sourceLogoUrl: s.sourceLogoUrl,
+                    isPrimary: s.isPrimary,
                 });
-            }
-        });
+            });
 
-        // Combine articles with sources and alignment info
-        const articlesWithSources = articles.map(article => {
-            const sources = sourcesMap.get(article.id) || [];
-            const primarySource = sources.find((s: any) => s.isPrimary);
-            const alignment = primarySource ? alignmentMap.get(primarySource.sourceName) : null;
+            // Create alignment lookup map
+            const alignmentMap = new Map();
+            sourcesWithAlignment.forEach(s => {
+                if (!alignmentMap.has(s.sourceName)) {
+                    alignmentMap.set(s.sourceName, {
+                        govAlignmentScore: s.govAlignmentScore,
+                        govAlignmentLabel: getAlignmentLabel(
+                            s.govAlignmentScore,
+                            s.govAlignmentConfidence ?? 0.5
+                        ),
+                    });
+                }
+            });
+
+            // Combine articles with sources and alignment info
+            const articlesWithSources = articles.map(article => {
+                const sources = sourcesMap.get(article.id) || [];
+                const primarySource = sources.find((s: any) => s.isPrimary);
+                const alignment = primarySource ? alignmentMap.get(primarySource.sourceName) : null;
+
+                return {
+                    ...article,
+                    sources,
+                    govAlignmentScore: alignment?.govAlignmentScore ?? 0,
+                    govAlignmentLabel: alignment?.govAlignmentLabel ?? 'Belirsiz',
+                };
+            });
 
             return {
-                ...article,
-                sources,
-                govAlignmentScore: alignment?.govAlignmentScore ?? 0,
-                govAlignmentLabel: alignment?.govAlignmentLabel ?? 'Belirsiz',
+                articles: articlesWithSources,
+                pagination: {
+                    page,
+                    limit,
+                    hasMore: articles.length === limit,
+                },
             };
-        });
-
-        const response = {
-            articles: articlesWithSources,
-            pagination: {
-                page,
-                limit,
-                hasMore: articles.length === limit,
-            },
         };
 
-        // Cache for 30 minutes to reduce database load
-        await cacheSet(cacheKey, response, 1800);
+        try {
+            const { data, isStale } = await getCacheWithSWR(cacheKey, fetchFeed);
 
-        return c.json({
-            success: true,
-            data: response,
-        });
+            return c.json({
+                success: true,
+                data,
+                cached: isStale ? true : undefined,
+                stale: isStale || undefined,
+            });
+        } catch (error) {
+            // Try to get stale cache on error (graceful degradation)
+            const staleCache = await cacheGet<{ data: any }>(cacheKey + ':swr');
+            if (staleCache) {
+                logger.warn({ cacheKey }, 'Serving stale cache due to error');
+                return c.json({
+                    success: true,
+                    data: staleCache.data,
+                    cached: true,
+                    stale: true,
+                });
+            }
+            throw error;
+        }
     } catch (error) {
         return handleError(c, error, 'Failed to fetch feed');
     }

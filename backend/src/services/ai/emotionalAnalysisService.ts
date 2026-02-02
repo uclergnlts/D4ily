@@ -1,5 +1,6 @@
-import { openai } from '../../config/openai.js';
 import { logger } from '../../config/logger.js';
+import { aiChatCompletion } from '../../utils/aiRequestWrapper.js';
+import { getEmotionalAnalysisFallback, shouldSkipAI } from '../../utils/aiFallbacks.js';
 
 export interface EmotionalTone {
     anger: number;    // 0-1
@@ -26,22 +27,27 @@ export async function analyzeArticleEmotions(
     content: string,
     language: string
 ): Promise<EmotionalAnalysis> {
+    const isTurkish = language === 'tr' || language === 'turkish';
+
+    // Skip AI for very short content
+    if (shouldSkipAI(content)) {
+        logger.debug({ title: title.substring(0, 50) }, 'Content too short, skipping emotional analysis');
+        return getEmotionalAnalysisFallback(isTurkish);
+    }
+
     try {
         // Clean and prepare content - remove HTML tags and extra whitespace
         const cleanContent = content
             .replace(/<[^>]*>/g, '') // Remove HTML tags
             .replace(/\s+/g, ' ')    // Normalize whitespace
             .trim();
-        
+
         // Use more content for better analysis (up to 3500 chars)
         const analysisContent = cleanContent.substring(0, 3500);
-        
-        // Determine prompt language based on content language
-        const isTurkish = language === 'tr' || language === 'turkish';
-        
-        const systemPrompt = isTurkish 
-            ? `Sen bir medya analisti ve haber içerik uzmanısın. Verilen haber metninin SADECE HABERİN KENDİSİNDEKİ duygusal tonunu analiz et. 
-               
+
+        const systemPrompt = isTurkish
+            ? `Sen bir medya analisti ve haber içerik uzmanısın. Verilen haber metninin SADECE HABERİN KENDİSİNDEKİ duygusal tonunu analiz et.
+
                ÖNEMLİ KURALLAR:
                - Haberin KONUSU hakkında değil, HABERİN YAZILIŞ ŞEKLİ hakkında analiz yap
                - Gazetecinin kullandığı dil ve üsluba odaklan
@@ -49,7 +55,7 @@ export async function analyzeArticleEmotions(
                - Manipülatif veya yönlendirici dil kullanımını tespit et
                - Sadece geçerli JSON döndür, başka metin ekleme`
             : `You are a media analyst and news content expert. Analyze ONLY the emotional tone of HOW the news is written, not the topic itself.
-               
+
                IMPORTANT RULES:
                - Analyze the WRITING STYLE, not the news topic
                - Focus on the language and tone used by the journalist
@@ -57,7 +63,7 @@ export async function analyzeArticleEmotions(
                - Detect manipulative or biased language usage
                - Return only valid JSON, no additional text`;
 
-        const prompt = isTurkish 
+        const prompt = isTurkish
             ? `Bu haber metninin YAZILIŞ ŞEKLİNİ ve DUYGUSAL TONUNU analiz et.
 
 BAŞLIK: ${title}
@@ -105,23 +111,23 @@ Respond in JSON format:
   "analysis_notes": "1-2 sentence explanation about the writing style in ${isTurkish ? 'Turkish' : 'English'}"
 }`;
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: systemPrompt,
-                },
-                {
-                    role: 'user',
-                    content: prompt,
-                },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.1, // Lower temperature for more consistent results
-        });
-
-        const result = JSON.parse(response.choices[0].message.content || '{}');
+        // Use the AI wrapper with circuit breaker and fallback
+        const result = await aiChatCompletion<any>(
+            {
+                model: 'gpt-4o-mini',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: prompt },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.1,
+            },
+            {
+                circuitName: 'openai:emotionalAnalysis',
+                useQuickClient: true,
+                fallback: () => getEmotionalAnalysisFallback(isTurkish),
+            }
+        );
 
         // Validate and normalize emotional tone values
         const emotionalTone: EmotionalTone = {
@@ -161,21 +167,8 @@ Respond in JSON format:
             title: title.substring(0, 50)
         }, 'Emotional analysis failed');
 
-        // Return neutral fallback
-        return {
-            emotionalTone: {
-                anger: 0,
-                fear: 0,
-                joy: 0,
-                sadness: 0,
-                surprise: 0,
-            },
-            emotionalIntensity: 0,
-            loadedLanguageScore: 0,
-            sensationalismScore: 0,
-            dominantEmotion: 'neutral',
-            analysisNotes: 'Analiz yapılamadı',
-        };
+        // Return fallback
+        return getEmotionalAnalysisFallback(isTurkish);
     }
 }
 

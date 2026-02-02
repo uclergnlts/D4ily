@@ -1,7 +1,8 @@
 import { db } from '../config/db.js';
-import { openai } from '../config/openai.js';
 import { logger } from '../config/logger.js';
 import { cacheGet, cacheSet } from '../config/redis.js';
+import { aiChatCompletion, aiEmbedding } from '../utils/aiRequestWrapper.js';
+import { getEntityExtractionFallback } from '../utils/aiFallbacks.js';
 import {
     tr_articles,
     tr_article_sources,
@@ -118,16 +119,17 @@ export async function extractEntities(text: string): Promise<ExtractedEntities> 
     }
 
     try {
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: 'You are a named entity extraction AI. Extract entities from news text and return JSON only.',
-                },
-                {
-                    role: 'user',
-                    content: `Extract named entities from the following text. Return JSON with these arrays:
+        const result = await aiChatCompletion<any>(
+            {
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a named entity extraction AI. Extract entities from news text and return JSON only.',
+                    },
+                    {
+                        role: 'user',
+                        content: `Extract named entities from the following text. Return JSON with these arrays:
 - persons: Names of people mentioned
 - organizations: Names of organizations, companies, political parties
 - locations: Cities, countries, places
@@ -136,13 +138,17 @@ export async function extractEntities(text: string): Promise<ExtractedEntities> 
 Text: ${text.substring(0, 1500)}
 
 Return ONLY valid JSON, no additional text.`,
-                },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.2,
-        });
-
-        const result = JSON.parse(response.choices[0].message.content || '{}');
+                    },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.2,
+            },
+            {
+                circuitName: 'openai:entityExtraction',
+                useQuickClient: true,
+                fallback: () => getEntityExtractionFallback(),
+            }
+        );
 
         const entities: ExtractedEntities = {
             persons: result.persons || [],
@@ -153,11 +159,11 @@ Return ONLY valid JSON, no additional text.`,
 
         // Cache the result
         setCachedEntities(text, entities);
-        
+
         return entities;
     } catch (error) {
         logger.error({ error }, 'Entity extraction failed');
-        return { persons: [], organizations: [], locations: [], events: [] };
+        return getEntityExtractionFallback();
     }
 }
 
@@ -216,19 +222,24 @@ export function getCommonEntities(entities1: ExtractedEntities, entities2: Extra
  */
 export async function calculateSemanticSimilarity(text1: string, text2: string): Promise<number> {
     try {
-        const [embedding1, embedding2] = await Promise.all([
-            openai.embeddings.create({
-                model: 'text-embedding-3-small',
-                input: text1.substring(0, 2000),
+        // Use aiEmbedding wrapper with circuit breaker
+        const [vec1, vec2] = await Promise.all([
+            aiEmbedding(text1, {
+                circuitName: 'openai:embedding',
+                useQuickClient: true,
+                fallback: () => [] as number[],
             }),
-            openai.embeddings.create({
-                model: 'text-embedding-3-small',
-                input: text2.substring(0, 2000),
+            aiEmbedding(text2, {
+                circuitName: 'openai:embedding',
+                useQuickClient: true,
+                fallback: () => [] as number[],
             }),
         ]);
 
-        const vec1 = embedding1.data[0].embedding;
-        const vec2 = embedding2.data[0].embedding;
+        // If either embedding failed (empty array), return 0
+        if (vec1.length === 0 || vec2.length === 0) {
+            return 0;
+        }
 
         // Cosine similarity
         let dotProduct = 0;

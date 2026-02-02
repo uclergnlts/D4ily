@@ -1,6 +1,7 @@
 import { db } from '../config/db.js';
-import { openai } from '../config/openai.js';
 import { logger } from '../config/logger.js';
+import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
+import { getWeeklyComparisonFallback } from '../utils/aiFallbacks.js';
 import {
     weeklyComparisons,
     tr_daily_digests,
@@ -54,23 +55,29 @@ Lütfen şunları sağla:
 
 Sadece JSON formatında cevap ver.`;
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: 'Sen bir uluslararası haber analisti AI\'sısın. Haftalık ülkeler arası gündem karşılaştırması yapıyorsun. Sadece JSON formatında cevap ver.',
-                },
-                {
-                    role: 'user',
-                    content: prompt,
-                },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.5,
-        });
-
-        const result = JSON.parse(response.choices[0].message.content || '{}');
+        // Use AI wrapper with circuit breaker
+        const result = await aiChatCompletion<any>(
+            {
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'Sen bir uluslararası haber analisti AI\'sısın. Haftalık ülkeler arası gündem karşılaştırması yapıyorsun. Sadece JSON formatında cevap ver.',
+                    },
+                    {
+                        role: 'user',
+                        content: prompt,
+                    },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.5,
+            },
+            {
+                circuitName: 'openai:weekly',
+                useQuickClient: false, // Use standard timeout for weekly generation
+                fallback: () => getWeeklyComparisonFallback(true),
+            }
+        );
 
         return {
             countriesData: result.countries_data || {},
@@ -78,11 +85,7 @@ Sadece JSON formatında cevap ver.`;
         };
     } catch (error) {
         logger.error({ error }, 'Weekly AI generation failed');
-
-        return {
-            countriesData: {},
-            comparisonText: 'Bu haftanın karşılaştırması oluşturulamadı.',
-        };
+        return getWeeklyComparisonFallback(true);
     }
 }
 

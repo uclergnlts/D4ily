@@ -1,6 +1,7 @@
 import { db } from '../config/db.js';
-import { openai } from '../config/openai.js';
 import { logger } from '../config/logger.js';
+import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
+import { getDigestFallback } from '../utils/aiFallbacks.js';
 import {
     tr_articles,
     tr_daily_digests,
@@ -65,23 +66,29 @@ Lütfen şunları sağla:
 
 Sadece JSON formatında cevap ver.`;
 
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [
-                {
-                    role: 'system',
-                    content: 'Sen bir haber analisti AI\'sısın. Günlük haber özetleri oluşturuyorsun. Sadece JSON formatında cevap ver.',
-                },
-                {
-                    role: 'user',
-                    content: prompt,
-                },
-            ],
-            response_format: { type: 'json_object' },
-            temperature: 0.5,
-        });
-
-        const result = JSON.parse(response.choices[0].message.content || '{}');
+        // Use AI wrapper with circuit breaker
+        const result = await aiChatCompletion<any>(
+            {
+                model: 'gpt-4o-mini',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'Sen bir haber analisti AI\'sısın. Günlük haber özetleri oluşturuyorsun. Sadece JSON formatında cevap ver.',
+                    },
+                    {
+                        role: 'user',
+                        content: prompt,
+                    },
+                ],
+                response_format: { type: 'json_object' },
+                temperature: 0.5,
+            },
+            {
+                circuitName: 'openai:digest',
+                useQuickClient: false, // Use standard timeout for digest generation
+                fallback: () => getDigestFallback(articles.length, true),
+            }
+        );
 
         return {
             summaryText: result.summary || 'Günün özeti oluşturulamadı.',
@@ -90,13 +97,7 @@ Sadece JSON formatında cevap ver.`;
         };
     } catch (error) {
         logger.error({ error }, 'Digest AI generation failed');
-
-        // Fallback
-        return {
-            summaryText: `Bugün ${articles.length} haber işlendi. Önemli gelişmeler için haberleri inceleyiniz.`,
-            topTopics: [],
-            articleCount: articles.length,
-        };
+        return getDigestFallback(articles.length, true);
     }
 }
 

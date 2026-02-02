@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import { logger } from './config/logger';
 import { env } from './config/env';
 import { apiLimiter } from './middleware/rateLimit';
+import { feedTimeout, aiTimeout, defaultTimeout } from './middleware/timeout';
 import { startScraperCron } from './cron/scraperCron';
 import { startDigestCron } from './cron/digestCron';
 import { startWeeklyCron } from './cron/weeklyCron';
@@ -83,6 +84,18 @@ app.get('/health', (c) => {
         uptime: process.uptime(),
     });
 });
+
+// Apply timeout middleware to specific routes
+// Feed routes - 10 second timeout
+app.use('/feed/*', feedTimeout);
+
+// AI-heavy routes - 30 second timeout
+app.use('/digest/*', aiTimeout);
+app.use('/weekly/*', aiTimeout);
+
+// Default timeout for other API routes - 60 seconds
+app.use('/admin/*', defaultTimeout);
+app.use('/search/*', defaultTimeout);
 
 // API Routes
 app.route('/categories', categoriesRoute);
