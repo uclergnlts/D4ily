@@ -4,6 +4,7 @@ import { db } from '../config/db.js';
 import { users } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
+import { env } from '../config/env.js';
 import { z } from 'zod';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { authRateLimiter } from '../middleware/rateLimiter.js';
@@ -27,7 +28,7 @@ const loginSchema = z.object({
 });
 
 // Firebase REST API URL for sign in
-const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY || '';
+const FIREBASE_API_KEY = env.FIREBASE_API_KEY || '';
 const FIREBASE_SIGN_IN_URL = `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`;
 
 /**
