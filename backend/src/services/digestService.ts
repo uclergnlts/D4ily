@@ -37,9 +37,14 @@ const COUNTRY_TABLES = {
 type CountryCode = keyof typeof COUNTRY_TABLES;
 type Period = 'morning' | 'evening';
 
+interface TopicItem {
+    title: string;
+    description: string;
+}
+
 interface DigestResult {
     summaryText: string;
-    topTopics: string[];
+    topTopics: TopicItem[];
     articleCount: number;
 }
 
@@ -62,7 +67,18 @@ ${articleSummaries}
 
 Lütfen şunları sağla:
 1. summary: Günün önemli gelişmelerini özetleyen 2-3 paragraf (Türkçe, 150-200 kelime)
-2. top_topics: En çok konuşulan 3-5 konu (hashtag formatında, örn: ["#Ekonomi", "#Siyaset"])
+2. top_topics: En çok konuşulan 3-5 konu, her biri için:
+   - title: Konu başlığı (örn: "Ekonomi", "Siyaset", "Spor")
+   - description: Kısa açıklama (1-2 cümle)
+
+Örnek format:
+{
+  "summary": "...",
+  "top_topics": [
+    { "title": "Ekonomi", "description": "Dolar kuru ve enflasyon gelişmeleri gündemin başında" },
+    { "title": "Siyaset", "description": "Yerel seçimler öncesi partiler arası rekabet artıyor" }
+  ]
+}
 
 Sadece JSON formatında cevap ver.`;
 
@@ -90,9 +106,17 @@ Sadece JSON formatında cevap ver.`;
             }
         );
 
+        // Handle both old string[] format and new object format
+        const topTopics = (result.top_topics || []).map((topic: any) => {
+            if (typeof topic === 'string') {
+                return { title: topic, description: '' };
+            }
+            return { title: topic.title || '', description: topic.description || '' };
+        });
+
         return {
             summaryText: result.summary || 'Günün özeti oluşturulamadı.',
-            topTopics: result.top_topics || [],
+            topTopics,
             articleCount: articles.length,
         };
     } catch (error) {
@@ -136,7 +160,7 @@ export async function generateDailyDigest(
         }
 
         // Get articles in time range
-        const articles = await db
+        let articles = await db
             .select({
                 translatedTitle: tables.articles.translatedTitle,
                 summary: tables.articles.summary,
@@ -150,8 +174,29 @@ export async function generateDailyDigest(
             ))
             .limit(50);
 
+        // Fallback: if no articles in exact window, use most recent articles (last 7 days)
         if (articles.length === 0) {
-            logger.warn({ countryCode, period }, 'No articles found for digest');
+            logger.warn({ countryCode, period }, 'No articles in time window, falling back to recent articles');
+            const fallbackStart = new Date(targetDate);
+            fallbackStart.setDate(fallbackStart.getDate() - 7);
+
+            articles = await db
+                .select({
+                    translatedTitle: tables.articles.translatedTitle,
+                    summary: tables.articles.summary,
+                    categoryId: tables.articles.categoryId,
+                })
+                .from(tables.articles)
+                .where(and(
+                    gte(tables.articles.publishedAt, fallbackStart),
+                    eq(tables.articles.isFiltered, false)
+                ))
+                .orderBy(desc(tables.articles.publishedAt))
+                .limit(50);
+        }
+
+        if (articles.length === 0) {
+            logger.warn({ countryCode, period }, 'No articles found for digest (even with fallback)');
             return { id: '', success: false, error: 'No articles found' };
         }
 

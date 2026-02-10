@@ -48,7 +48,7 @@ export interface EntityFallback {
 
 export interface DigestFallback {
     summaryText: string;
-    topTopics: string[];
+    topTopics: { title: string; description: string }[];
     articleCount: number;
 }
 

@@ -1,26 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, Alert, useColorScheme } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Share, Alert, useColorScheme, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
-import { Bookmark, Send, Globe, ChevronLeft } from 'lucide-react-native';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { Bookmark, Send, ChevronLeft, Sparkles, ExternalLink } from 'lucide-react-native';
 import { Image } from 'expo-image';
-import { TimeAgo } from '../../src/components/ui/TimeAgo';
 import * as WebBrowser from 'expo-web-browser';
 
 import { feedService } from '../../src/api/services/feedService';
-import { usePerspectives } from '../../src/hooks/usePerspectives';
-import { useComments, useArticleReactionStatus, useToggleBookmark } from '../../src/hooks/useInteraction';
+import { useArticleReactionStatus, useToggleBookmark } from '../../src/hooks/useInteraction';
 import { useAuthStore } from '../../src/store/useAuthStore';
-import { MOCK_ARTICLE, MOCK_PERSPECTIVES } from '../../src/data/mock';
+import { MOCK_ARTICLE } from '../../src/data/mock';
 
-// Phase 2 Components
-import { PoliticalToneGauge } from '../../src/components/article/PoliticalToneGauge';
-import { EmotionalAnalysisCard } from '../../src/components/article/EmotionalAnalysisCard';
-import { PerspectivesSection } from '../../src/components/article/PerspectivesSection';
-import { CommentThread } from '../../src/components/interaction/CommentThread';
-
-
+// Components
+import { ArticleWebView } from '../../src/components/article/ArticleWebView';
+import { AISummaryModal, AISummaryData } from '../../src/components/article/AISummaryModal';
 
 export default function ArticleDetailScreen() {
     const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,6 +22,9 @@ export default function ArticleDetailScreen() {
     const { user } = useAuthStore();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+
+    // State
+    const [showAISummary, setShowAISummary] = useState(false);
 
     // DEMO MODE CHECK
     const isDemo = id === 'demo' || id === 'test';
@@ -42,19 +39,59 @@ export default function ArticleDetailScreen() {
         enabled: !!id,
     });
 
-    // Perspectives
-    const { data: perspectivesData } = usePerspectives('tr', id!, true);
-    const demoPerspectives = isDemo ? MOCK_PERSPECTIVES : null;
-    const finalPerspectives = isDemo ? demoPerspectives : perspectivesData;
-
-    // Comments
-    const { data: comments } = useComments('tr', id!);
-    const finalComments = comments;
-
     const { data: reactionStatus } = useArticleReactionStatus('tr', id!);
     const toggleBookmarkMutation = useToggleBookmark();
 
-    const handleOpenSource = async () => {
+    // AI Summary mutation
+    const summarizeMutation = useMutation({
+        mutationFn: async () => {
+            if (isDemo) {
+                // Simulate API delay for demo
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                return {
+                    articleId: id!,
+                    title: MOCK_ARTICLE.translatedTitle,
+                    summary: MOCK_ARTICLE.detailContent || MOCK_ARTICLE.summary,
+                    keyPoints: [
+                        "Ana gelişme ekonomi ile ilgili",
+                        "Sosyal etkiler değerlendiriliyor",
+                        "Uzmanlar farklı görüşler sunuyor"
+                    ],
+                    context: "Bu haber, gündemdeki önemli gelişmelerden birini ele alıyor.",
+                    analysis: {
+                        politicalTone: MOCK_ARTICLE.politicalTone || 0,
+                        politicalConfidence: MOCK_ARTICLE.politicalConfidence || 0.5,
+                        governmentMentioned: MOCK_ARTICLE.governmentMentioned || false,
+                        emotionalTone: MOCK_ARTICLE.emotionalTone || { anger: 0, fear: 0, joy: 0.5, sadness: 0, surprise: 0 },
+                        emotionalIntensity: MOCK_ARTICLE.emotionalIntensity || 0.5,
+                        dominantEmotion: 'joy',
+                        dominantEmotionLabel: 'Neşe',
+                        intensityLabel: 'Orta',
+                        loadedLanguageScore: 0.3,
+                        sensationalismScore: 0.2,
+                        sensationalismLabel: 'Düşük'
+                    }
+                } as AISummaryData;
+            }
+            return feedService.summarizeArticle('tr', id!);
+        },
+        onSuccess: () => {
+            setShowAISummary(true);
+        },
+        onError: (error) => {
+            Alert.alert('Hata', 'AI özeti oluşturulamadı. Lütfen tekrar deneyin.');
+        }
+    });
+
+    const handleOpenAISummary = () => {
+        if (summarizeMutation.data) {
+            setShowAISummary(true);
+        } else {
+            summarizeMutation.mutate();
+        }
+    };
+
+    const handleOpenExternal = async () => {
         if (!article?.sources?.[0]?.sourceUrl) return;
         try {
             await WebBrowser.openBrowserAsync(article.sources[0].sourceUrl);
@@ -65,9 +102,10 @@ export default function ArticleDetailScreen() {
 
     const handleShare = async () => {
         if (!article) return;
+        const sourceUrl = article.sources?.[0]?.sourceUrl || '';
         try {
             await Share.share({
-                message: `${article.translatedTitle}\n\n${article.summary}\n\nD4ily uygulamasında oku.`,
+                message: `${article.translatedTitle}\n\n${sourceUrl}\n\nD4ily uygulamasında oku.`,
             });
         } catch (error) {
             console.error(error);
@@ -91,6 +129,7 @@ export default function ArticleDetailScreen() {
     const primarySource = article.sources?.[0];
     const sourceName = primarySource?.sourceName || 'Kaynak';
     const sourceLogo = primarySource?.sourceLogoUrl;
+    const sourceUrl = primarySource?.sourceUrl;
 
     return (
         <View className="flex-1 bg-zinc-50 dark:bg-black">
@@ -104,122 +143,95 @@ export default function ArticleDetailScreen() {
                         <ChevronLeft size={28} color={isDark ? "#fff" : "#000"} />
                     </TouchableOpacity>
 
-                    <Text className="text-[20px] font-black text-[#006FFF] tracking-tighter">
-                        D4ily
-                    </Text>
+                    {/* Source Info */}
+                    <View className="flex-row items-center gap-2 flex-1 mx-4">
+                        {sourceLogo ? (
+                            <Image
+                                source={{ uri: sourceLogo }}
+                                style={{ width: 20, height: 20, borderRadius: 4 }}
+                                contentFit="contain"
+                            />
+                        ) : null}
+                        <Text
+                            className="text-[14px] font-semibold text-zinc-700 dark:text-zinc-300"
+                            numberOfLines={1}
+                        >
+                            {sourceName}
+                        </Text>
+                    </View>
 
+                    <View className="flex-row items-center gap-1">
+                        <TouchableOpacity
+                            onPress={handleOpenExternal}
+                            className="p-2"
+                        >
+                            <ExternalLink size={22} color={isDark ? "#fff" : "#000"} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={handleBookmark}
+                            className="p-2 -mr-2"
+                        >
+                            <Bookmark
+                                size={22}
+                                color={isDark ? "#fff" : "#000"}
+                                fill={reactionStatus?.isBookmarked ? (isDark ? "#fff" : "#000") : "none"}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </SafeAreaView>
+
+            {/* WebView Content */}
+            <View className="flex-1">
+                {sourceUrl ? (
+                    <ArticleWebView url={sourceUrl} />
+                ) : (
+                    <View className="flex-1 items-center justify-center px-6">
+                        <Text className="text-zinc-500 dark:text-zinc-400 text-center">
+                            Kaynak URL bulunamadı
+                        </Text>
+                    </View>
+                )}
+            </View>
+
+            {/* Bottom Action Bar */}
+            <SafeAreaView edges={['bottom']} className="bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800">
+                <View className="flex-row items-center justify-between px-4 py-3 gap-3">
+                    {/* AI Summary Button */}
                     <TouchableOpacity
-                        onPress={handleBookmark}
-                        className="p-2 -mr-2"
+                        onPress={handleOpenAISummary}
+                        disabled={summarizeMutation.isPending}
+                        className="flex-1 bg-[#006FFF] h-12 rounded-xl flex-row items-center justify-center gap-2"
+                        style={{ opacity: summarizeMutation.isPending ? 0.7 : 1 }}
                     >
-                        <Bookmark
-                            size={24}
-                            color={isDark ? "#fff" : "#000"}
-                            fill={reactionStatus?.isBookmarked ? (isDark ? "#fff" : "#000") : "none"}
-                        />
+                        {summarizeMutation.isPending ? (
+                            <ActivityIndicator color="white" size="small" />
+                        ) : (
+                            <Sparkles size={20} color="white" />
+                        )}
+                        <Text className="text-white font-bold text-[15px]">
+                            {summarizeMutation.isPending ? 'Özetleniyor...' : 'AI ile Özetle'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Share Button */}
+                    <TouchableOpacity
+                        onPress={handleShare}
+                        className="bg-zinc-100 dark:bg-zinc-800 h-12 px-5 rounded-xl flex-row items-center justify-center gap-2"
+                    >
+                        <Send size={18} color={isDark ? "#fff" : "#000"} />
                     </TouchableOpacity>
                 </View>
             </SafeAreaView>
 
-            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
-                {/* Content Container */}
-                <View className="px-5 pt-6 bg-zinc-50 dark:bg-black">
-
-                    {/* Source & Date */}
-                    <View className="flex-row items-center justify-between mb-4">
-                        <View className="flex-row items-center gap-2">
-                            {sourceLogo ? (
-                                <Image
-                                    source={{ uri: sourceLogo }}
-                                    style={{ width: 20, height: 20, borderRadius: 4 }}
-                                    contentFit="contain"
-                                />
-                            ) : null}
-                            <Text className="text-[14px] font-bold text-zinc-900 dark:text-white">
-                                {sourceName}
-                            </Text>
-                        </View>
-                        <TimeAgo date={article.publishedAt} className="text-[13px] text-zinc-500 font-medium" />
-                    </View>
-
-                    {/* Title */}
-                    <Text className="text-[22px] leading-[30px] font-bold text-zinc-900 dark:text-white mb-4 text-left">
-                        {article.translatedTitle}
-                    </Text>
-
-                    {/* Article Detail Content */}
-                    <Text className="text-[18px] leading-[28px] text-zinc-700 dark:text-zinc-300 font-normal mb-8 text-left tracking-wide">
-                        {article.detailContent || article.summary}
-                    </Text>
-
-                    {/* Primary Actions */}
-                    <View className="flex-row gap-3 mb-10">
-                        <TouchableOpacity
-                            onPress={handleOpenSource}
-                            className="flex-1 bg-[#006FFF] h-12 rounded-lg flex-row items-center justify-center gap-2"
-                        >
-                            <Text className="text-white font-bold text-[15px]">Kaynağa Git</Text>
-                            <Globe size={18} color="white" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            onPress={handleShare}
-                            className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 h-12 rounded-lg flex-row items-center justify-center gap-2"
-                        >
-                            <Send size={18} color="#006FFF" />
-                            <Text className="text-[#006FFF] font-bold text-[15px]">Paylaş</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* Benzer İçerikler (Similar Content) */}
-                    {finalPerspectives?.relatedPerspectives && finalPerspectives.relatedPerspectives.length > 0 && (
-                        <View className="mb-8">
-                            <Text className="text-[17px] font-bold text-zinc-900 dark:text-white mb-4">Benzer İçerikler</Text>
-                            <PerspectivesSection perspectives={finalPerspectives.relatedPerspectives} />
-                        </View>
-                    )}
-
-                    {/* Yorumlar */}
-                    <View className="mb-8">
-                        <Text className="text-[17px] font-bold text-zinc-900 dark:text-white mb-4">Yorumlar</Text>
-                        {/* Comments List Placeholder or Component */}
-                        <View className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                            {finalComments && finalComments.length > 0 ? (
-                                finalComments.map((comment: any) => (
-                                    <CommentThread
-                                        key={comment.id}
-                                        comment={comment}
-                                    />
-                                ))
-                            ) : (
-                                <Text className="text-zinc-500 text-center py-4">Henüz yorum yapılmamış.</Text>
-                            )}
-                        </View>
-                    </View>
-
-                    {/* Siyasi Analiz */}
-                    <View className="mb-8">
-                        <Text className="text-[17px] font-bold text-zinc-900 dark:text-white mb-4">Siyasi Analiz</Text>
-                        {article.politicalTone !== undefined && (
-                            <PoliticalToneGauge
-                                politicalTone={article.politicalTone}
-                                politicalConfidence={article.politicalConfidence || 0.7}
-                                governmentMentioned={article.governmentMentioned}
-                            />
-                        )}
-                    </View>
-
-                    {/* Duygu Analizi */}
-                    <View className="mb-8">
-                        <Text className="text-[17px] font-bold text-zinc-900 dark:text-white mb-4">Duygu Analizi</Text>
-                        <EmotionalAnalysisCard
-                            emotionalTone={article.emotionalTone || { joy: 0, anger: 0, sadness: 0, fear: 0, surprise: 0 }}
-                            emotionalIntensity={article.emotionalIntensity || 0.5}
-                        />
-                    </View>
-
-                </View>
-            </ScrollView>
+            {/* AI Summary Modal */}
+            <AISummaryModal
+                visible={showAISummary}
+                onClose={() => setShowAISummary(false)}
+                data={summarizeMutation.data || null}
+                isLoading={summarizeMutation.isPending}
+                error={summarizeMutation.error?.message || null}
+            />
         </View>
     );
 }

@@ -116,6 +116,33 @@ app.route('/premium', premiumRoute);
 app.route('/history', historyRoute);
 app.route('/webhooks', webhookRoute);
 
+// DEV-ONLY: Manual trigger endpoints (no auth required)
+if (env.NODE_ENV !== 'production') {
+    const { triggerDigestManually } = await import('./cron/digestCron');
+    const { runScraper } = await import('./cron/scraperCron');
+
+    app.post('/dev/scrape', async (c) => {
+        logger.info('DEV: Manual scraper trigger (background)');
+        // Run in background, don't block the response
+        runScraper().then(() => {
+            logger.info('DEV: Scraper completed in background');
+        }).catch((err) => {
+            logger.error({ error: err }, 'DEV: Scraper failed in background');
+        });
+        return c.json({ success: true, message: 'Scraper started in background' });
+    });
+
+    app.post('/dev/digest', async (c) => {
+        const body = await c.req.json().catch(() => ({}));
+        const period = body.period || 'evening';
+        logger.info({ period }, 'DEV: Manual digest trigger');
+        const result = await triggerDigestManually(period);
+        return c.json({ success: true, data: result });
+    });
+
+    logger.info('DEV endpoints enabled: POST /dev/scrape, POST /dev/digest');
+}
+
 // Start cron jobs
 if (env.NODE_ENV !== 'test') {
     startScraperCron();

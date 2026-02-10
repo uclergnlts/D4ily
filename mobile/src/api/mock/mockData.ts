@@ -1,4 +1,4 @@
-import { Article, FeedResponse, BalancedFeedResponse } from '../../types';
+import { Article, FeedResponse, BalancedFeedResponse, ArticleSummaryResponse } from '../../types';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
@@ -227,5 +227,39 @@ export const getMockPerspectives = (id: string): any => {
                 matchedEntities: []
             }
         ]
+    };
+};
+
+export const getMockSummary = (id: string): ArticleSummaryResponse => {
+    return {
+        articleId: id,
+        title: "Mock Haber Başlığı",
+        summary: "Bu mock bir AI özetidir. Gerçek API bağlantısı olmadığında kullanılır. Haberin ana noktaları şunlardır: Birinci önemli gelişme ekonomiyle ilgili. İkinci önemli konu sosyal etkiler. Üçüncü nokta ise gelecek beklentileri hakkında. Uzmanlar konunun farklı yönlerini değerlendiriyor ve çeşitli perspektifler sunuyor.",
+        keyPoints: [
+            "Ekonomik göstergeler iyileşme sinyalleri veriyor",
+            "Yeni düzenlemeler önümüzdeki ay yürürlüğe girecek",
+            "Sektör temsilcileri değişiklikleri olumlu karşılıyor",
+            "Uzmanlar uzun vadeli etkileri değerlendiriyor"
+        ],
+        context: "Bu gelişme, son dönemdeki politika değişikliklerinin bir devamı niteliğinde. Konuyla ilgili tartışmalar aylardır gündemde yer alıyor ve farklı kesimlerden çeşitli görüşler paylaşılıyor.",
+        analysis: {
+            politicalTone: -1.5,
+            politicalConfidence: 0.75,
+            governmentMentioned: true,
+            emotionalTone: {
+                anger: 0.15,
+                fear: 0.1,
+                joy: 0.3,
+                sadness: 0.1,
+                surprise: 0.2
+            },
+            emotionalIntensity: 0.45,
+            dominantEmotion: 'joy',
+            dominantEmotionLabel: 'Neşe',
+            intensityLabel: 'Orta',
+            loadedLanguageScore: 0.35,
+            sensationalismScore: 0.25,
+            sensationalismLabel: 'Düşük'
+        }
     };
 };

@@ -44,6 +44,43 @@ function safeJsonParse<T>(value: string | T, fallback: T): T {
     }
 }
 
+// Generate title from period and date
+function generateTitle(digest: { period: string; digestDate: string }): string {
+    const periodLabel = digest.period === 'morning' ? 'Sabah' : 'Akşam';
+    const date = new Date(digest.digestDate);
+    const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+    const formattedDate = date.toLocaleDateString('tr-TR', options);
+    return `${formattedDate} ${periodLabel} Özeti`;
+}
+
+// Transform topTopics from string[] to {title, description}[]
+function transformTopTopics(topics: any): { title: string; description: string; articleId?: string }[] {
+    if (!topics || !Array.isArray(topics)) return [];
+
+    // Check if already in object format
+    if (topics.length > 0 && typeof topics[0] === 'object' && topics[0].title) {
+        return topics;
+    }
+
+    // Convert string[] to object array
+    return topics.map((topic: string) => ({
+        title: topic,
+        description: '', // No description available from old format
+    }));
+}
+
+// Transform digest response for mobile compatibility
+function transformDigestResponse(digest: any) {
+    const topTopics = safeJsonParse(digest.topTopics, []);
+    return {
+        ...digest,
+        date: digest.digestDate,           // digestDate → date
+        summary: digest.summaryText,       // summaryText → summary
+        title: generateTitle(digest),      // Generate title
+        topTopics: transformTopTopics(topTopics), // string[] → {title, description}[]
+    };
+}
+
 /**
  * GET /digest/:country/latest
  * Get the latest daily digest
@@ -62,15 +99,9 @@ digestRoute.get('/:country/latest', async (c) => {
             }, 404);
         }
 
-        // Parse topTopics from JSON string
-        const topTopics = safeJsonParse(digest.topTopics, []);
-
         return c.json({
             success: true,
-            data: {
-                ...digest,
-                topTopics,
-            },
+            data: transformDigestResponse(digest),
         });
     } catch (error) {
         logger.error({ error }, 'Get latest digest failed');
@@ -105,10 +136,7 @@ digestRoute.get('/:country', async (c) => {
 
             return c.json({
                 success: true,
-                data: digests.map(d => ({
-                    ...d,
-                    topTopics: safeJsonParse(d.topTopics, []),
-                })),
+                data: digests.map(d => transformDigestResponse(d)),
             });
         }
 
@@ -122,14 +150,9 @@ digestRoute.get('/:country', async (c) => {
             }, 404);
         }
 
-        const topTopics = safeJsonParse(digest.topTopics, []);
-
         return c.json({
             success: true,
-            data: {
-                ...digest,
-                topTopics,
-            },
+            data: transformDigestResponse(digest),
         });
     } catch (error) {
         logger.error({ error }, 'Get digest failed');
@@ -175,13 +198,10 @@ digestRoute.get('/:country/:digestId', async (c) => {
             .orderBy(desc(comments.createdAt))
             .limit(20);
 
-        const topTopics = safeJsonParse(digest.topTopics, []);
-
         return c.json({
             success: true,
             data: {
-                ...digest,
-                topTopics,
+                ...transformDigestResponse(digest),
                 comments: digestComments,
             },
         });

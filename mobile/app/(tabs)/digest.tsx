@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDigests } from '../../src/hooks/useDigest';
@@ -12,8 +12,29 @@ export default function DigestScreen() {
     const router = useRouter();
     const { selectedCountry } = useAppStore();
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
     const { data: digests, isLoading, refetch, isRefetching } = useDigests(selectedCountry);
+
+    // Auto-select the latest available digest date when data loads
+    useEffect(() => {
+        if (digests && digests.length > 0 && !hasAutoSelected) {
+            // Find the most recent digest date
+            const latestDate = digests
+                .map(d => d.date)
+                .sort((a, b) => b.localeCompare(a))[0];
+
+            if (latestDate) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                // Only auto-navigate if today has no digests
+                const hasTodayDigest = digests.some(d => d.date === todayStr);
+                if (!hasTodayDigest) {
+                    setSelectedDate(new Date(latestDate + 'T12:00:00'));
+                }
+            }
+            setHasAutoSelected(true);
+        }
+    }, [digests, hasAutoSelected]);
 
     // Filter digests for selected date
     const dailyDigests = useMemo(() => {

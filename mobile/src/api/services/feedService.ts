@@ -1,6 +1,6 @@
 import { client } from '../client';
-import { ApiResponse, Article, FeedResponse, EmotionalAnalysisResponse, BalancedFeedResponse, PerspectivesResult } from '../../types';
-import { getMockFeed, getMockBalancedFeed, getMockArticle, getMockAnalysis, getMockPerspectives } from '../mock/mockData';
+import { ApiResponse, Article, FeedResponse, EmotionalAnalysisResponse, BalancedFeedResponse, PerspectivesResult, ArticleSummaryResponse } from '../../types';
+import { getMockFeed, getMockBalancedFeed, getMockArticle, getMockAnalysis, getMockPerspectives, getMockSummary } from '../mock/mockData';
 
 // Check if we're in development mode
 const isDevelopment = __DEV__;
@@ -108,6 +108,28 @@ export const feedService = {
         } catch {
             // Perspectives are optional, return mock in all cases
             return getMockPerspectives(articleId);
+        }
+    },
+
+    summarizeArticle: async (country: string, articleId: string): Promise<ArticleSummaryResponse> => {
+        try {
+            // Backend: POST /feed/:country/:articleId/summarize
+            const response = await client.post<ApiResponse<ArticleSummaryResponse>>(
+                `/feed/${country}/${articleId}/summarize`
+            );
+
+            if (!response.data.success) {
+                throw new Error(response.data.error || 'Özet oluşturulamadı');
+            }
+
+            return response.data.data;
+        } catch (error) {
+            if (isDevelopment) {
+                console.warn('[DEV] API connection failed, using mock data for Summary.');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                return getMockSummary(articleId);
+            }
+            throw new Error('Özet oluşturulamadı. Lütfen tekrar deneyin.');
         }
     }
 };

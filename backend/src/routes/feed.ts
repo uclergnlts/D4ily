@@ -37,6 +37,7 @@ import {
     getIntensityLabelTr,
     getSensationalismLabelTr,
 } from '../services/ai/emotionalAnalysisService.js';
+import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
 
 // Stale-while-revalidate cache settings
 const CACHE_TTL = 1800;           // 30 minutes fresh cache
@@ -637,6 +638,166 @@ app.get('/:country/:articleId/analysis', async (c) => {
         });
     } catch (error) {
         return handleError(c, error, 'Failed to fetch article analysis');
+    }
+});
+
+// POST /feed/:country/:articleId/summarize - On-demand AI summarization
+app.post('/:country/:articleId/summarize', async (c) => {
+    try {
+        const countryParam = c.req.param('country');
+        const articleId = c.req.param('articleId');
+
+        // Validate country
+        const countryValidation = countrySchema.safeParse(countryParam);
+        if (!countryValidation.success) {
+            return c.json({
+                success: false,
+                error: 'Invalid country code',
+            }, 400);
+        }
+
+        const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
+
+        // Check cache first
+        const cacheKey = `summary:${country}:${articleId}`;
+        const cached = await cacheGet<any>(cacheKey);
+
+        if (cached) {
+            return c.json({
+                success: true,
+                data: cached,
+                cached: true,
+            });
+        }
+
+        // Get article
+        const tables = COUNTRY_TABLES[country];
+        const articles = await db
+            .select({
+                id: tables.articles.id,
+                translatedTitle: tables.articles.translatedTitle,
+                originalContent: tables.articles.originalContent,
+                summary: tables.articles.summary,
+                detailContent: tables.articles.detailContent,
+                politicalTone: tables.articles.politicalTone,
+                politicalConfidence: tables.articles.politicalConfidence,
+                governmentMentioned: tables.articles.governmentMentioned,
+                emotionalTone: tables.articles.emotionalTone,
+                emotionalIntensity: tables.articles.emotionalIntensity,
+                loadedLanguageScore: tables.articles.loadedLanguageScore,
+                sensationalismScore: tables.articles.sensationalismScore,
+            })
+            .from(tables.articles)
+            .where(eq(tables.articles.id, articleId))
+            .limit(1);
+
+        if (articles.length === 0) {
+            return c.json({
+                success: false,
+                error: 'Article not found',
+            }, 404);
+        }
+
+        const article = articles[0];
+        const content = article.originalContent || article.detailContent || article.summary || '';
+
+        // Generate AI summary
+        const prompt = `Aşağıdaki haberi analiz et ve kapsamlı bir özet oluştur:
+
+Başlık: ${article.translatedTitle}
+
+İçerik:
+${content}
+
+Lütfen şunları sağla:
+1. summary: Haberin ana noktalarını kapsayan 3-4 paragraf özet (Türkçe, 200-300 kelime)
+2. key_points: 3-5 adet ana nokta (bullet point listesi)
+3. context: Haberin bağlamı ve önemi hakkında kısa bir açıklama
+
+JSON formatında cevap ver.`;
+
+        let aiSummary;
+        try {
+            aiSummary = await aiChatCompletion<any>(
+                {
+                    model: 'gpt-4o-mini',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: 'Sen bir haber analisti AI\'sısın. Haberleri objektif ve kapsamlı şekilde özetliyorsun. Sadece JSON formatında cevap ver.',
+                        },
+                        {
+                            role: 'user',
+                            content: prompt,
+                        },
+                    ],
+                    response_format: { type: 'json_object' },
+                    temperature: 0.5,
+                },
+                {
+                    circuitName: 'openai:summarize',
+                    useQuickClient: false,
+                }
+            );
+        } catch (error) {
+            logger.error({ error, articleId }, 'AI summarization failed');
+            // Fallback to existing content
+            aiSummary = {
+                summary: article.detailContent || article.summary,
+                key_points: [],
+                context: 'AI özeti oluşturulamadı.',
+            };
+        }
+
+        // Build response with analysis data
+        const emotionalTone = article.emotionalTone as any;
+        let dominantEmotion = 'neutral';
+        if (emotionalTone) {
+            const emotions = [
+                { name: 'anger', value: emotionalTone.anger || 0 },
+                { name: 'fear', value: emotionalTone.fear || 0 },
+                { name: 'joy', value: emotionalTone.joy || 0 },
+                { name: 'sadness', value: emotionalTone.sadness || 0 },
+                { name: 'surprise', value: emotionalTone.surprise || 0 },
+            ];
+            const maxEmotion = emotions.reduce((max, curr) =>
+                curr.value > max.value ? curr : max
+            );
+            if (maxEmotion.value >= 0.2) {
+                dominantEmotion = maxEmotion.name;
+            }
+        }
+
+        const response = {
+            articleId: article.id,
+            title: article.translatedTitle,
+            summary: aiSummary.summary || article.detailContent || article.summary,
+            keyPoints: aiSummary.key_points || [],
+            context: aiSummary.context || '',
+            analysis: {
+                politicalTone: article.politicalTone ?? 0,
+                politicalConfidence: article.politicalConfidence ?? 0,
+                governmentMentioned: article.governmentMentioned ?? false,
+                emotionalTone: emotionalTone || { anger: 0, fear: 0, joy: 0, sadness: 0, surprise: 0 },
+                emotionalIntensity: article.emotionalIntensity ?? 0,
+                dominantEmotion,
+                dominantEmotionLabel: getEmotionLabelTr(dominantEmotion),
+                intensityLabel: getIntensityLabelTr(article.emotionalIntensity ?? 0),
+                loadedLanguageScore: article.loadedLanguageScore ?? 0,
+                sensationalismScore: article.sensationalismScore ?? 0,
+                sensationalismLabel: getSensationalismLabelTr(article.sensationalismScore ?? 0),
+            },
+        };
+
+        // Cache for 24 hours
+        await cacheSet(cacheKey, response, 86400);
+
+        return c.json({
+            success: true,
+            data: response,
+        });
+    } catch (error) {
+        return handleError(c, error, 'Failed to summarize article');
     }
 });
 

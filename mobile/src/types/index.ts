@@ -199,3 +199,24 @@ export interface PerspectivesResult {
     };
     relatedPerspectives: PerspectiveMatch[];
 }
+
+export interface ArticleSummaryResponse {
+    articleId: string;
+    title: string;
+    summary: string;
+    keyPoints: string[];
+    context: string;
+    analysis: {
+        politicalTone: number;
+        politicalConfidence: number;
+        governmentMentioned: boolean;
+        emotionalTone: EmotionalTone;
+        emotionalIntensity: number;
+        dominantEmotion: string;
+        dominantEmotionLabel: string;
+        intensityLabel: string;
+        loadedLanguageScore: number;
+        sensationalismScore: number;
+        sensationalismLabel: string;
+    };
+}
