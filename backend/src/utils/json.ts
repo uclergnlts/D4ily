@@ -4,8 +4,8 @@ import { logger } from '../config/logger.js';
  * Safely parse a JSON string with a fallback value.
  * If the value is already the expected type (not a string), returns it as-is.
  */
-export function safeJsonParse<T>(value: string | T, fallback: T): T {
-    if (typeof value !== 'string') return value;
+export function safeJsonParse<T>(value: unknown, fallback: T): T {
+    if (typeof value !== 'string') return value as T;
     try {
         return JSON.parse(value) as T;
     } catch {
