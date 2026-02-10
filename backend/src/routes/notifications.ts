@@ -4,10 +4,9 @@ import {
     notifications,
     userDevices,
     userNotificationPreferences,
-    users,
 } from '../db/schema/index.js';
-import { authMiddleware, AuthUser } from '../middleware/auth.js';
-import { eq, and, desc } from 'drizzle-orm';
+import { authMiddleware, adminMiddleware, AuthUser } from '../middleware/auth.js';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,9 +17,6 @@ type Variables = {
 };
 
 const notificationsRoute = new Hono<{ Variables: Variables }>();
-
-// Apply auth middleware to all routes
-notificationsRoute.use('*', authMiddleware);
 
 // Schemas
 const registerDeviceSchema = z.object({
@@ -45,7 +41,7 @@ const updatePreferencesSchema = z.object({
  * POST /notifications/register-device
  * Register a device for push notifications
  */
-notificationsRoute.post('/register-device', async (c) => {
+notificationsRoute.post('/register-device', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const body = await c.req.json();
@@ -113,7 +109,7 @@ notificationsRoute.post('/register-device', async (c) => {
  * GET /notifications/devices
  * Get user's registered devices
  */
-notificationsRoute.get('/devices', async (c) => {
+notificationsRoute.get('/devices', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
 
@@ -138,7 +134,7 @@ notificationsRoute.get('/devices', async (c) => {
  * DELETE /notifications/device/:deviceId
  * Remove a device
  */
-notificationsRoute.delete('/device/:deviceId', async (c) => {
+notificationsRoute.delete('/device/:deviceId', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const { deviceId } = c.req.param();
@@ -182,7 +178,7 @@ notificationsRoute.delete('/device/:deviceId', async (c) => {
  * GET /notifications/preferences
  * Get user's notification preferences
  */
-notificationsRoute.get('/preferences', async (c) => {
+notificationsRoute.get('/preferences', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
 
@@ -234,7 +230,7 @@ notificationsRoute.get('/preferences', async (c) => {
  * PUT /notifications/preferences
  * Update notification preferences
  */
-notificationsRoute.put('/preferences', async (c) => {
+notificationsRoute.put('/preferences', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const body = await c.req.json();
@@ -292,11 +288,11 @@ notificationsRoute.put('/preferences', async (c) => {
  * GET /notifications/history
  * Get user's notification history
  */
-notificationsRoute.get('/history', async (c) => {
+notificationsRoute.get('/history', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '20'), 100);
         const offset = (page - 1) * limit;
 
         const userNotifications = await db
@@ -307,13 +303,14 @@ notificationsRoute.get('/history', async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Count unread
-        const allNotifications = await db
-            .select()
+        // Count unread with efficient COUNT query
+        const unreadResult = await db
+            .select({ count: sql<number>`count(*)` })
             .from(notifications)
-            .where(eq(notifications.userId, user.uid));
+            .where(and(eq(notifications.userId, user.uid), eq(notifications.isRead, false)))
+            .get();
 
-        const unreadCount = allNotifications.filter(n => !n.isRead).length;
+        const unreadCount = unreadResult?.count || 0;
 
         return c.json({
             success: true,
@@ -340,7 +337,7 @@ notificationsRoute.get('/history', async (c) => {
  * PUT /notifications/:id/read
  * Mark notification as read
  */
-notificationsRoute.put('/:notificationId/read', async (c) => {
+notificationsRoute.put('/:notificationId/read', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const { notificationId } = c.req.param();
@@ -379,7 +376,7 @@ notificationsRoute.put('/:notificationId/read', async (c) => {
  * PUT /notifications/read-all
  * Mark all notifications as read
  */
-notificationsRoute.put('/read-all', async (c) => {
+notificationsRoute.put('/read-all', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
 
@@ -407,24 +404,8 @@ notificationsRoute.put('/read-all', async (c) => {
  * POST /notifications/send
  * Send push notification to user (admin only)
  */
-notificationsRoute.post('/send', async (c) => {
+notificationsRoute.post('/send', adminMiddleware, async (c) => {
     try {
-        const authUser = c.get('user') as AuthUser;
-        
-        // Check if user is admin
-        const user = await db
-            .select()
-            .from(users)
-            .where(eq(users.id, authUser.uid))
-            .get();
-
-        if (!user || user.userRole !== 'admin') {
-            return c.json({
-                success: false,
-                error: 'Unauthorized',
-            }, 403);
-        }
-
         const body = await c.req.json();
         const schema = z.object({
             userId: z.string().min(1),

@@ -1,9 +1,21 @@
 import { client } from '../client';
-import { ApiResponse } from '../../types';
+import { ApiResponse, Source } from '../../types';
 
 export const sourceService = {
+    getSources: async (country?: string): Promise<Source[]> => {
+        const params: any = {};
+        if (country) params.country = country;
+        try {
+            const response = await client.get<ApiResponse<Source[]>>('/sources', { params });
+            if (!response.data.success) throw new Error(response.data.error || 'Failed to fetch sources');
+            return response.data.data;
+        } catch (error) {
+            console.warn('API connection failed for sources', error);
+            return [];
+        }
+    },
+
     voteSource: async (sourceId: number, score: number) => {
-        // Backend API: POST /sources/:id/vote
         const response = await client.post<ApiResponse<any>>(`/sources/${sourceId}/vote`, { score });
 
         if (!response.data.success) {

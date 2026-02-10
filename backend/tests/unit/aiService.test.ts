@@ -17,8 +17,33 @@ vi.mock('@/config/logger.js', () => ({
         info: vi.fn(),
         error: vi.fn(),
         warn: vi.fn(),
+        debug: vi.fn(),
     },
 }));
+
+// Mock CircuitBreaker so openAICircuitBreaker.execute() passes through to the fn
+vi.mock('@/utils/circuitBreaker.js', () => {
+    class MockCircuitBreaker {
+        async execute<T>(_name: string, fn: () => Promise<T>, fallback?: () => T): Promise<T> {
+            try {
+                return await fn();
+            } catch (error) {
+                if (fallback) return fallback();
+                throw error;
+            }
+        }
+        getState() { return 'CLOSED'; }
+        reset() {}
+        getAllMetrics() { return {}; }
+    }
+
+    return {
+        CircuitBreaker: MockCircuitBreaker,
+        circuitBreaker: new MockCircuitBreaker(),
+        redisCircuitBreaker: new MockCircuitBreaker(),
+        openAICircuitBreaker: new MockCircuitBreaker(),
+    };
+});
 
 import { processArticleWithAI } from '@/services/ai/aiService.js';
 import { openai } from '@/config/openai.js';
@@ -36,6 +61,7 @@ describe('AI Service', () => {
                         content: JSON.stringify({
                             translated_title: 'Translated Title',
                             summary: 'Test summary',
+                            detail_content: 'This is a much longer detail content that provides comprehensive coverage of the story with additional context and analysis.',
                             is_clickbait: false,
                             is_ad: false,
                             category: 'Teknoloji',
@@ -49,7 +75,7 @@ describe('AI Service', () => {
                 }],
             } as any);
 
-            const result = await processArticleWithAI('Test Title', 'Test Content', 'en');
+            const result = await processArticleWithAI('Test Title', 'Test Content that is long enough to pass the 50 character minimum threshold for AI processing', 'en');
 
             expect(result.translatedTitle).toBe('Translated Title');
             expect(result.summary).toBe('Test summary');
@@ -66,11 +92,12 @@ describe('AI Service', () => {
                 new Error('API Error')
             );
 
-            const result = await processArticleWithAI('Original Title', 'Original Content', 'en');
+            const content = 'Original Content that is long enough to pass the 50 character minimum threshold for processing';
+            const result = await processArticleWithAI('Original Title', content, 'en');
 
             // Should return fallback data
             expect(result.translatedTitle).toBe('Original Title');
-            expect(result.summary).toBe('Original Content'.substring(0, 200));
+            expect(result.summary).toBe(content.substring(0, 200));
             expect(result.isClickbait).toBe(false);
             expect(result.isAd).toBe(false);
             expect(result.category).toBe('Dünya');
@@ -84,7 +111,7 @@ describe('AI Service', () => {
                 }],
             } as any);
 
-            const result = await processArticleWithAI('Test', 'Content', 'en');
+            const result = await processArticleWithAI('Test', 'Content that is long enough to pass the 50 character minimum threshold', 'en');
 
             expect(result.translatedTitle).toBe('Test'); // Uses original
             expect(result.summary).toBe('');
@@ -98,8 +125,17 @@ describe('AI Service', () => {
                 }],
             } as any);
 
-            const result = await processArticleWithAI('Test', 'Content', 'en');
+            const result = await processArticleWithAI('Test', 'Content that is long enough to pass the 50 character minimum threshold', 'en');
             expect(result.translatedTitle).toBe('Test');
+        });
+
+        it('should return short content fallback without calling AI', async () => {
+            const result = await processArticleWithAI('Test', 'Short', 'en');
+
+            expect(result.translatedTitle).toBe('Test');
+            expect(result.category).toBe('Dünya');
+            // OpenAI should not be called for short content
+            expect(openai.chat.completions.create).not.toHaveBeenCalled();
         });
     });
 });

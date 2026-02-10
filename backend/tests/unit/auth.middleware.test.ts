@@ -105,7 +105,7 @@ describe('Auth Middleware Unit Tests', () => {
             expect(body.user.emailVerified).toBe(true);
         });
 
-        it('should skip auth when Firebase is disabled', async () => {
+        it('should return 503 when Firebase is disabled', async () => {
             mockState.isFirebaseEnabled = false;
 
             const app = new Hono();
@@ -113,10 +113,11 @@ describe('Auth Middleware Unit Tests', () => {
             app.get('/test', (c) => c.json({ success: true }));
 
             const res = await app.request('/test');
-            expect(res.status).toBe(200);
+            expect(res.status).toBe(503);
 
             const body = await res.json();
-            expect(body.success).toBe(true);
+            expect(body.success).toBe(false);
+            expect(body.error).toContain('Authentication service unavailable');
         });
     });
 

@@ -1,163 +1,172 @@
-import React, { useState } from 'react';
-import { View, Text, ActivityIndicator, RefreshControl, TouchableOpacity, useColorScheme } from 'react-native';
+import React, { useState, useMemo, useEffect } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FlashList } from '@shopify/flash-list';
+import { useDigests } from '../../src/hooks/useDigest';
+import { BookOpen, ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Menu, BellRing } from 'lucide-react-native';
-
-import { useFeed } from '../../src/hooks/useFeed';
-import { useBalancedFeed } from '../../src/hooks/useBalancedFeed';
-import { ArticleCard } from '../../src/components/article/ArticleCard';
-import { FeaturedCarousel } from '../../src/components/feed/FeaturedCarousel';
-
-
-import { Article } from '../../src/types';
-
-// Components
-import { BalancedFeedScreen } from '../../src/components/feed/BalancedFeedScreen';
-import { FeedFilterBar } from '../../src/components/feed/FeedFilterBar';
-import { SideMenu } from '../../src/components/navigation/SideMenu';
+import { DigestCard } from '../../src/components/digest/DigestCard';
+import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { useAppStore } from '../../src/store/useAppStore';
-import { useFeedStore } from '../../src/store/useFeedStore';
 
+export default function HomeScreen() {
+    const router = useRouter();
+    const { selectedCountry } = useAppStore();
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
+    const { data: digests, isLoading, refetch, isRefetching } = useDigests(selectedCountry);
 
-export default function FeedScreen() {
-  const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  // Global State
-  const { isBalanced } = useFeedStore();
-  const [selectedCategory, setSelectedCategory] = useState({ id: 'all', name: 'Senin Akışın' });
+    // Auto-select the latest available digest date when data loads
+    useEffect(() => {
+        if (digests && digests.length > 0 && !hasAutoSelected) {
+            const latestDate = digests
+                .map(d => d.date)
+                .sort((a, b) => b.localeCompare(a))[0];
 
-  const { toggleSideMenu, selectedCountry } = useAppStore();
+            if (latestDate) {
+                const todayStr = new Date().toISOString().split('T')[0];
+                const hasTodayDigest = digests.some(d => d.date === todayStr);
+                if (!hasTodayDigest) {
+                    setSelectedDate(new Date(latestDate + 'T12:00:00'));
+                }
+            }
+            setHasAutoSelected(true);
+        }
+    }, [digests, hasAutoSelected]);
 
-  // Normal Feed
-  const feedQuery = useFeed(selectedCountry);
-  const feedArticles = React.useMemo(() => {
-    return feedQuery.data?.pages.flatMap(page => page.articles) || [];
-  }, [feedQuery.data]);
+    // Filter digests for selected date
+    const dailyDigests = useMemo(() => {
+        if (!digests) return { morning: null, evening: null };
 
-  // Featured Articles (Mock split for now, later can be from API)
-  const featuredArticles = React.useMemo(() => {
-    return feedArticles.slice(0, 5);
-  }, [feedArticles]);
+        const dateStr = selectedDate.toISOString().split('T')[0];
 
-  const listArticles = React.useMemo(() => {
-    return feedArticles.slice(5);
-  }, [feedArticles]);
+        return {
+            morning: digests.find(d => d.date === dateStr && d.period === 'morning'),
+            evening: digests.find(d => d.date === dateStr && d.period === 'evening')
+        };
+    }, [digests, selectedDate]);
 
-  // Balanced Feed
-  const balancedQuery = useBalancedFeed(selectedCountry);
+    const changeDate = (days: number) => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(selectedDate.getDate() + days);
+        if (newDate > new Date()) return;
+        setSelectedDate(newDate);
+    };
 
-  // Render Item for Normal Feed
-  const renderItem = React.useCallback(({ item }: { item: Article }) => (
-    <ArticleCard article={item} />
-  ), []);
+    const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
 
-  const renderFooter = React.useCallback(() => {
-    if (!feedQuery.isFetchingNextPage) return <View className="h-4" />;
-    return (
-      <View className="py-4 items-center">
-        <ActivityIndicator color="#006FFF" />
-      </View>
-    );
-  }, [feedQuery.isFetchingNextPage]);
+    const formatDateDisplay = (date: Date) => {
+        return date.toLocaleDateString('tr-TR', {
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
 
-  // Header Component for FlashList to scroll together
-  const ListHeader = React.useCallback(() => (
-    <View>
-      <FeaturedCarousel articles={featuredArticles} />
-
-      <View className="h-6" />
-
-      <FeedFilterBar
-        selectedCategory={selectedCategory.id}
-        onSelectCategory={(id) => setSelectedCategory({ id, name: '' })}
-        className="mb-4 pb-2"
-      />
-    </View>
-  ), [selectedCategory.id, featuredArticles]);
-
-  return (
-    <View className="flex-1 bg-zinc-50 dark:bg-black">
-      {/* Side Menu Overlay */}
-      {/* Side Menu moved to bottom */}
-
-      <SafeAreaView className="flex-1" edges={['top']}>
-        {/* Header */}
-        <View className="px-4 py-3 bg-zinc-50 dark:bg-black z-10 flex-row items-center justify-between relative">
-
-          {/* Left: Hamburger */}
-          <TouchableOpacity
-            onPress={toggleSideMenu}
-            className="p-1 -ml-1 z-20"
-          >
-            <Menu size={24} color={isDark ? "#ffffff" : "#18181b"} />
-          </TouchableOpacity>
-
-          {/* Center: Logo */}
-          <View className="absolute left-0 right-0 top-0 bottom-0 items-center justify-center flex-row pointer-events-none">
-            <View className="flex-row items-center">
-              <Text className="text-[24px] font-black text-zinc-900 dark:text-white tracking-tighter">
-                D<Text className="text-[#006FFF]">4</Text>ILY
-              </Text>
-            </View>
-          </View>
-
-          {/* Right: Notifications */}
-          <View className="flex-row items-center gap-4">
-            <TouchableOpacity onPress={() => router.push('/notifications')}>
-              <BellRing size={24} color={isDark ? "#ffffff" : "#18181b"} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Content */}
-        {isBalanced ? (
-          <BalancedFeedScreen
-            isLoading={balancedQuery.isLoading}
-            proGovArticles={balancedQuery.data?.proGov || []}
-            mixedArticles={balancedQuery.data?.mixed || []}
-            antiGovArticles={balancedQuery.data?.antiGov || []}
-            onRefresh={() => balancedQuery.refetch()}
-          />
-        ) : (
-          <View className="flex-1">
-            {feedQuery.isLoading && !feedArticles.length ? (
-              <View className="flex-1 items-center justify-center">
+    if (isLoading) {
+        return (
+            <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black items-center justify-center">
                 <ActivityIndicator size="large" color="#006FFF" />
-              </View>
-            ) : (
-              <View className="flex-1 px-0">
-                {/* @ts-ignore: FlashList types issue with estimatedItemSize */}
-                <FlashList<Article>
-                  data={listArticles || []}
-                  renderItem={renderItem}
-                  estimatedItemSize={200}
-                  onEndReached={() => {
-                    if (feedQuery.hasNextPage) feedQuery.fetchNextPage();
-                  }}
-                  onEndReachedThreshold={0.5}
-                  ListHeaderComponent={ListHeader}
-                  ListFooterComponent={renderFooter}
-                  refreshControl={
-                    <RefreshControl
-                      refreshing={feedQuery.isRefetching}
-                      onRefresh={() => feedQuery.refetch()}
-                      tintColor="#006FFF"
-                    />
-                  }
-                  contentContainerStyle={{ paddingVertical: 12 }}
-                />
-              </View>
-            )}
-          </View>
-        )}
-      </SafeAreaView>
+            </SafeAreaView>
+        );
+    }
 
-      {/* Side Menu Overlay - Rendered last to stay on top */}
-      <SideMenu />
-    </View>
-  );
+    return (
+        <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
+            {/* Header: Country & Date Selector */}
+            <View className="px-5 py-4 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-black z-10">
+                <CountrySelector />
+
+                <View className="flex-row items-center bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 shadow-sm">
+                    <TouchableOpacity onPress={() => changeDate(-1)} className="p-1">
+                        <ChevronLeft size={20} color="#71717a" />
+                    </TouchableOpacity>
+
+                    <View className="flex-row items-center mx-2 gap-2">
+                        <Calendar size={14} color="#71717a" />
+                        <Text className="text-[14px] font-bold text-zinc-700 dark:text-zinc-300">
+                            {formatDateDisplay(selectedDate)}
+                        </Text>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={() => changeDate(1)}
+                        disabled={isToday}
+                        className="p-1"
+                        style={{ opacity: isToday ? 0.3 : 1 }}
+                    >
+                        <ChevronRight size={20} color="#71717a" />
+                    </TouchableOpacity>
+                </View>
+            </View>
+
+            <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ padding: 20 }}
+                refreshControl={
+                    <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#006FFF" />
+                }
+            >
+                {/* Date Title */}
+                <View className="mb-6 items-center">
+                    <Text className="text-[28px] font-black text-zinc-900 dark:text-white mb-1">
+                        {selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                    </Text>
+                    <Text className="text-[16px] font-medium text-zinc-500 dark:text-zinc-400">
+                        {selectedDate.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric' })}
+                    </Text>
+                </View>
+
+                {/* Digests Row */}
+                <View className="flex-row gap-4">
+                    {/* Morning Card */}
+                    {dailyDigests.morning ? (
+                        <DigestCard
+                            type="morning"
+                            title={dailyDigests.morning.title}
+                            summary={dailyDigests.morning.summary}
+                            // @ts-ignore
+                            onPress={() => router.push({
+                                pathname: '/digest/[id]',
+                                params: { id: dailyDigests.morning!.id }
+                            })}
+                        />
+                    ) : (
+                        <View className="flex-1 rounded-2xl p-4 border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 min-h-[180px] items-center justify-center opacity-60">
+                            <Text className="text-zinc-400 text-center font-medium">Gündüz özeti yok</Text>
+                        </View>
+                    )}
+
+                    {/* Evening Card */}
+                    {dailyDigests.evening ? (
+                        <DigestCard
+                            type="evening"
+                            title={dailyDigests.evening.title}
+                            summary={dailyDigests.evening.summary}
+                            // @ts-ignore
+                            onPress={() => router.push({
+                                pathname: '/digest/[id]',
+                                params: { id: dailyDigests.evening!.id }
+                            })}
+                        />
+                    ) : (
+                        <View className="flex-1 rounded-2xl p-4 border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 min-h-[180px] items-center justify-center opacity-60">
+                            <Text className="text-zinc-400 text-center font-medium">Akşam özeti yok</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Helper / Status */}
+                {!dailyDigests.morning && !dailyDigests.evening && (
+                    <View className="mt-12 items-center">
+                        <BookOpen size={48} color="#e4e4e7" strokeWidth={1.5} />
+                        <Text className="text-zinc-400 text-center mt-4">
+                            Bu tarih için henüz bülten oluşturulmamış.
+                        </Text>
+                    </View>
+                )}
+
+            </ScrollView>
+        </SafeAreaView>
+    );
 }

@@ -16,6 +16,7 @@ import { eq, and } from 'drizzle-orm';
 import { logger } from '../config/logger';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
+import { safeJsonParse } from '../utils/json';
 
 type Variables = {
     user: AuthUser;
@@ -40,17 +41,6 @@ const COUNTRY_POLL_TABLES = {
     it: it_article_polls,
     ru: ru_article_polls,
 } as const;
-
-// Safe JSON parse helper
-function safeJsonParse<T>(value: unknown, fallback: T): T {
-    if (typeof value !== 'string') return value as T;
-    try {
-        return JSON.parse(value) as T;
-    } catch {
-        logger.warn({ value }, 'Failed to parse JSON, using fallback');
-        return fallback;
-    }
-}
 
 /**
  * GET /polls/:country/:pollId

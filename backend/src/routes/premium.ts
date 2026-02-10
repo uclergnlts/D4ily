@@ -4,8 +4,6 @@ import { users, subscriptions, payments } from '../db/schema/index.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { eq, desc } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
-import { z } from 'zod';
-import { createId } from '@paralleldrive/cuid2';
 
 type Variables = {
     user: AuthUser;
@@ -92,89 +90,6 @@ premiumRoute.get('/', async (c) => {
             success: false,
             error: 'Failed to get premium status',
         }, 500);
-    }
-});
-
-/**
- * POST /premium/subscribe
- * Subscribe to premium via RevenueCat (mobile IAP)
- */
-premiumRoute.post('/subscribe', async (c) => {
-    try {
-        const authUser = c.get('user') as AuthUser;
-        const body = await c.req.json();
-
-        const schema = z.object({
-            planId: z.enum(['monthly', 'yearly']),
-            provider: z.enum(['stripe', 'iyzico', 'apple', 'google']),
-            providerSubscriptionId: z.string(),
-            currentPeriodStart: z.number(), // Unix timestamp in ms
-            currentPeriodEnd: z.number().optional(), // Unix timestamp in ms
-        });
-
-        const { planId, provider, providerSubscriptionId, currentPeriodStart, currentPeriodEnd } = schema.parse(body);
-
-        // Check if subscription already exists
-        const existingSubscription = await db
-            .select()
-            .from(subscriptions)
-            .where(eq(subscriptions.providerSubscriptionId, providerSubscriptionId))
-            .get();
-
-        if (existingSubscription) {
-            // Update existing subscription
-            await db
-                .update(subscriptions)
-                .set({
-                    status: 'active',
-                    currentPeriodStart: new Date(currentPeriodStart),
-                    currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
-                    cancelAtPeriodEnd: false,
-                    updatedAt: new Date(),
-                })
-                .where(eq(subscriptions.id, existingSubscription.id));
-        } else {
-            // Create new subscription
-            await db.insert(subscriptions).values({
-                id: createId(),
-                userId: authUser.uid,
-                planId,
-                status: 'active',
-                provider,
-                providerSubscriptionId,
-                currentPeriodStart: new Date(currentPeriodStart),
-                currentPeriodEnd: currentPeriodEnd ? new Date(currentPeriodEnd) : null,
-                cancelAtPeriodEnd: false,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-            });
-        }
-
-        // Update user status
-        await db
-            .update(users)
-            .set({
-                subscriptionStatus: 'premium',
-                updatedAt: new Date(),
-            })
-            .where(eq(users.id, authUser.uid));
-
-        logger.info({ userId: authUser.uid, planId, provider }, 'User subscribed to premium');
-
-        return c.json({
-            success: true,
-            message: 'Premium aboneliği başarılı',
-            data: {
-                planId,
-                status: 'active',
-            },
-        }, 201);
-    } catch (error) {
-        logger.error({ error }, 'Subscribe to premium failed');
-        return c.json({
-            success: false,
-            error: 'Failed to subscribe to premium',
-        }, 400);
     }
 });
 

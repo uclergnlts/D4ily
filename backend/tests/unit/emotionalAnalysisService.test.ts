@@ -1,14 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock OpenAI
-vi.mock('@/config/openai.js', () => ({
-    openai: {
-        chat: {
-            completions: {
-                create: vi.fn(),
-            },
-        },
-    },
+const { mockAiChatCompletion } = vi.hoisted(() => ({
+    mockAiChatCompletion: vi.fn(),
+}));
+
+// Mock the AI request wrapper (which wraps OpenAI with circuit breaker)
+vi.mock('@/utils/aiRequestWrapper.js', () => ({
+    aiChatCompletion: mockAiChatCompletion,
+}));
+
+// Mock aiFallbacks
+vi.mock('@/utils/aiFallbacks.js', () => ({
+    shouldSkipAI: vi.fn().mockReturnValue(false),
+    getEmotionalAnalysisFallback: vi.fn().mockImplementation((isTurkish: boolean) => ({
+        emotionalTone: { anger: 0, fear: 0, joy: 0, sadness: 0, surprise: 0 },
+        emotionalIntensity: 0,
+        loadedLanguageScore: 0,
+        sensationalismScore: 0,
+        dominantEmotion: 'neutral',
+        analysisNotes: isTurkish ? 'Analiz yapılamadı' : 'Analysis unavailable',
+    })),
 }));
 
 // Mock Logger
@@ -27,7 +38,6 @@ import {
     getIntensityLabelTr,
     getSensationalismLabelTr,
 } from '@/services/ai/emotionalAnalysisService.js';
-import { openai } from '@/config/openai.js';
 
 describe('Emotional Analysis Service', () => {
     beforeEach(() => {
@@ -36,26 +46,20 @@ describe('Emotional Analysis Service', () => {
 
     describe('analyzeArticleEmotions', () => {
         it('should analyze article emotions successfully', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: {
-                        content: JSON.stringify({
-                            emotional_tone: {
-                                anger: 0.3,
-                                fear: 0.2,
-                                joy: 0.1,
-                                sadness: 0.5,
-                                surprise: 0.1,
-                            },
-                            emotional_intensity: 0.6,
-                            loaded_language_score: 0.4,
-                            sensationalism_score: 0.3,
-                            dominant_emotion: 'sadness',
-                            analysis_notes: 'Bu haber huzunlu bir ton tasiyor',
-                        }),
-                    },
-                }],
-            } as any);
+            mockAiChatCompletion.mockResolvedValue({
+                emotional_tone: {
+                    anger: 0.3,
+                    fear: 0.2,
+                    joy: 0.1,
+                    sadness: 0.5,
+                    surprise: 0.1,
+                },
+                emotional_intensity: 0.6,
+                loaded_language_score: 0.4,
+                sensationalism_score: 0.3,
+                dominant_emotion: 'sadness',
+                analysis_notes: 'Bu haber huzunlu bir ton tasiyor',
+            });
 
             const result = await analyzeArticleEmotions(
                 'Ekonomi haberi',
@@ -76,26 +80,20 @@ describe('Emotional Analysis Service', () => {
         });
 
         it('should clamp scores to 0-1 range', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: {
-                        content: JSON.stringify({
-                            emotional_tone: {
-                                anger: 1.5,  // Over 1
-                                fear: -0.3,  // Under 0
-                                joy: 0.5,
-                                sadness: 0.2,
-                                surprise: 2.0,  // Over 1
-                            },
-                            emotional_intensity: 1.2,  // Over 1
-                            loaded_language_score: -0.1,  // Under 0
-                            sensationalism_score: 0.5,
-                            dominant_emotion: 'anger',
-                            analysis_notes: 'Test',
-                        }),
-                    },
-                }],
-            } as any);
+            mockAiChatCompletion.mockResolvedValue({
+                emotional_tone: {
+                    anger: 1.5,  // Over 1
+                    fear: -0.3,  // Under 0
+                    joy: 0.5,
+                    sadness: 0.2,
+                    surprise: 2.0,  // Over 1
+                },
+                emotional_intensity: 1.2,  // Over 1
+                loaded_language_score: -0.1,  // Under 0
+                sensationalism_score: 0.5,
+                dominant_emotion: 'anger',
+                analysis_notes: 'Test',
+            });
 
             const result = await analyzeArticleEmotions('Title', 'Content', 'en');
 
@@ -106,10 +104,8 @@ describe('Emotional Analysis Service', () => {
             expect(result.loadedLanguageScore).toBe(0);  // Clamped to 0
         });
 
-        it('should return fallback values on OpenAI error', async () => {
-            vi.mocked(openai.chat.completions.create).mockRejectedValue(
-                new Error('API Error')
-            );
+        it('should return fallback values on AI error', async () => {
+            mockAiChatCompletion.mockRejectedValue(new Error('API Error'));
 
             const result = await analyzeArticleEmotions(
                 'Test Title',
@@ -126,15 +122,11 @@ describe('Emotional Analysis Service', () => {
             expect(result.loadedLanguageScore).toBe(0);
             expect(result.sensationalismScore).toBe(0);
             expect(result.dominantEmotion).toBe('neutral');
-            expect(result.analysisNotes).toBe('Analiz yapılamadı');
+            expect(result.analysisNotes).toBe('Analysis unavailable');
         });
 
-        it('should handle empty OpenAI response', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: { content: '{}' },
-                }],
-            } as any);
+        it('should handle empty AI response', async () => {
+            mockAiChatCompletion.mockResolvedValue({});
 
             const result = await analyzeArticleEmotions('Title', 'Content', 'en');
 
@@ -145,11 +137,10 @@ describe('Emotional Analysis Service', () => {
         });
 
         it('should handle null content response', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: { content: null },
-                }],
-            } as any);
+            mockAiChatCompletion.mockResolvedValue({
+                emotional_tone: null,
+                emotional_intensity: undefined,
+            });
 
             const result = await analyzeArticleEmotions('Title', 'Content', 'en');
 
@@ -158,25 +149,19 @@ describe('Emotional Analysis Service', () => {
         });
 
         it('should determine dominant emotion from tone scores when not provided', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: {
-                        content: JSON.stringify({
-                            emotional_tone: {
-                                anger: 0.8,
-                                fear: 0.2,
-                                joy: 0.1,
-                                sadness: 0.3,
-                                surprise: 0.1,
-                            },
-                            emotional_intensity: 0.7,
-                            loaded_language_score: 0.5,
-                            sensationalism_score: 0.4,
-                            // dominant_emotion not provided
-                        }),
-                    },
-                }],
-            } as any);
+            mockAiChatCompletion.mockResolvedValue({
+                emotional_tone: {
+                    anger: 0.8,
+                    fear: 0.2,
+                    joy: 0.1,
+                    sadness: 0.3,
+                    surprise: 0.1,
+                },
+                emotional_intensity: 0.7,
+                loaded_language_score: 0.5,
+                sensationalism_score: 0.4,
+                // dominant_emotion not provided
+            });
 
             const result = await analyzeArticleEmotions('Title', 'Content', 'en');
 
@@ -184,25 +169,19 @@ describe('Emotional Analysis Service', () => {
         });
 
         it('should return neutral when all emotions are very low', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: {
-                        content: JSON.stringify({
-                            emotional_tone: {
-                                anger: 0.1,
-                                fear: 0.1,
-                                joy: 0.05,
-                                sadness: 0.15,
-                                surprise: 0.08,
-                            },
-                            emotional_intensity: 0.2,
-                            loaded_language_score: 0.1,
-                            sensationalism_score: 0.1,
-                            // dominant_emotion not provided
-                        }),
-                    },
-                }],
-            } as any);
+            mockAiChatCompletion.mockResolvedValue({
+                emotional_tone: {
+                    anger: 0.1,
+                    fear: 0.1,
+                    joy: 0.05,
+                    sadness: 0.15,
+                    surprise: 0.08,
+                },
+                emotional_intensity: 0.2,
+                loaded_language_score: 0.1,
+                sensationalism_score: 0.1,
+                // dominant_emotion not provided
+            });
 
             const result = await analyzeArticleEmotions('Title', 'Content', 'en');
 
@@ -211,17 +190,11 @@ describe('Emotional Analysis Service', () => {
         });
 
         it('should handle missing emotional_tone object', async () => {
-            vi.mocked(openai.chat.completions.create).mockResolvedValue({
-                choices: [{
-                    message: {
-                        content: JSON.stringify({
-                            emotional_intensity: 0.5,
-                            loaded_language_score: 0.3,
-                            sensationalism_score: 0.2,
-                        }),
-                    },
-                }],
-            } as any);
+            mockAiChatCompletion.mockResolvedValue({
+                emotional_intensity: 0.5,
+                loaded_language_score: 0.3,
+                sensationalism_score: 0.2,
+            });
 
             const result = await analyzeArticleEmotions('Title', 'Content', 'en');
 

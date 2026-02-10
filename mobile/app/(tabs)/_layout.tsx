@@ -1,7 +1,7 @@
  
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Search, LineChart, Newspaper } from 'lucide-react-native';
+import { Search, LineChart, Newspaper, Scale } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 
 export default function TabLayout() {
@@ -29,8 +29,8 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Akış',
-          tabBarIcon: ({ color }) => <Home size={24} color={color} strokeWidth={2.5} />,
+          title: 'Özetler',
+          tabBarIcon: ({ color }) => <Newspaper size={24} color={color} strokeWidth={2.5} />,
         }}
       />
       <Tabs.Screen
@@ -41,10 +41,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="digest"
+        name="compare"
         options={{
-          title: 'Özetler',
-          tabBarIcon: ({ color }) => <Newspaper size={24} color={color} strokeWidth={2.5} />,
+          title: 'Karşılaştır',
+          tabBarIcon: ({ color }) => <Scale size={24} color={color} strokeWidth={2.5} />,
         }}
       />
       <Tabs.Screen

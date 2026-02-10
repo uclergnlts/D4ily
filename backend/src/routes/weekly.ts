@@ -4,19 +4,9 @@ import { weeklyComparisons, comments } from '../db/schema/index.js';
 import { eq, and, desc, isNull } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { getLatestWeeklyComparison, getWeeklyComparisonByWeek } from '../services/weeklyService.js';
+import { safeJsonParse } from '../utils/json.js';
 
 const weeklyRoute = new Hono();
-
-// Safe JSON parse helper
-function safeJsonParse<T>(value: string | T, fallback: T): T {
-    if (typeof value !== 'string') return value;
-    try {
-        return JSON.parse(value) as T;
-    } catch {
-        logger.warn({ value }, 'Failed to parse JSON, using fallback');
-        return fallback;
-    }
-}
 
 /**
  * GET /weekly/latest

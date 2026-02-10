@@ -172,7 +172,7 @@ app.get('/:sourceId/stance', async (c) => {
 });
 
 // PUT /sources/:sourceId/stance - Update source editorial stance (admin only)
-app.put('/:sourceId/stance', authMiddleware, adminMiddleware, async (c) => {
+app.put('/:sourceId/stance', adminMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const sourceId = parseInt(c.req.param('sourceId'), 10);

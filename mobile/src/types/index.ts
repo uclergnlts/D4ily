@@ -1,3 +1,18 @@
+export interface Source {
+    id: number;
+    sourceName: string;
+    sourceLogoUrl: string;
+    countryCode: string;
+    biasScoreSystem: number;
+    biasScoreUser: number;
+    biasVoteCount: number;
+    govAlignmentScore: number;
+    govAlignmentLabel: string;
+    govAlignmentConfidence: number;
+    govAlignmentNotes: string;
+    govAlignmentLastUpdated: string;
+}
+
 // API Response Types
 export type ApiResponse<T> = {
     success: true;

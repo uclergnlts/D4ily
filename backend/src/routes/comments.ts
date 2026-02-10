@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
 import { comments, commentLikes } from '../db/schema/index.js';
-import { eq, and, desc, isNull, inArray } from 'drizzle-orm';
+import { eq, and, desc, isNull, inArray, sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
@@ -36,7 +36,7 @@ commentsRoute.get('/:country/:articleId', async (c) => {
         const validatedCountry = countrySchema.parse(country);
 
         const page = parseInt(c.req.query('page') ?? '1', 10);
-        const limit = parseInt(c.req.query('limit') ?? '20', 10);
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100);
         const offset = (page - 1) * limit;
 
         // Get top-level comments (no parent)
@@ -53,16 +53,18 @@ commentsRoute.get('/:country/:articleId', async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Get total count for pagination
-        const totalComments = await db
-            .select()
+        // Get total count with efficient COUNT query
+        const countResult = await db
+            .select({ count: sql<number>`count(*)` })
             .from(comments)
             .where(and(
                 eq(comments.targetId, articleId),
                 eq(comments.targetType, 'article'),
                 eq(comments.countryCode, validatedCountry),
                 isNull(comments.parentCommentId)
-            ));
+            ))
+            .get();
+        const totalComments = countResult?.count || 0;
 
         // Get all replies for top-level comments in a single query (N+1 fix)
         const parentIds = topLevelComments.map(c => c.id);
@@ -102,8 +104,8 @@ commentsRoute.get('/:country/:articleId', async (c) => {
                 pagination: {
                     page,
                     limit,
-                    total: totalComments.length,
-                    hasMore: offset + limit < totalComments.length,
+                    total: totalComments,
+                    hasMore: offset + limit < totalComments,
                 },
             },
         });

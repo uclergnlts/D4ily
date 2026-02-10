@@ -15,6 +15,7 @@ import { eq, and, desc, isNull } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getLatestDigest, getDigestByDateAndPeriod } from '../services/digestService.js';
+import { safeJsonParse } from '../utils/json.js';
 
 const digestRoute = new Hono();
 
@@ -32,17 +33,6 @@ const COUNTRY_TABLES = {
     it: it_daily_digests,
     ru: ru_daily_digests,
 } as const;
-
-// Safe JSON parse helper
-function safeJsonParse<T>(value: string | T, fallback: T): T {
-    if (typeof value !== 'string') return value;
-    try {
-        return JSON.parse(value) as T;
-    } catch {
-        logger.warn({ value }, 'Failed to parse JSON, using fallback');
-        return fallback;
-    }
-}
 
 // Generate title from period and date
 function generateTitle(digest: { period: string; digestDate: string }): string {

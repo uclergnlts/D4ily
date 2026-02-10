@@ -23,7 +23,7 @@ historyRoute.get('/', async (c) => {
     try {
         const authUser = c.get('user') as AuthUser;
         const page = parseInt(c.req.query('page') ?? '1');
-        const limit = parseInt(c.req.query('limit') ?? '20');
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '20'), 100);
         const offset = (page - 1) * limit;
 
         const history = await db

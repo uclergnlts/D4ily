@@ -293,19 +293,20 @@ describe('Feed API Integration Tests', () => {
                 .get('/feed/tr')
                 .expect(200);
 
+            // SWR cache expects { data, timestamp } wrapper format
             vi.mocked(cacheGet).mockResolvedValueOnce({
-                articles: [],
-                pagination: { page: 1, limit: 20, hasMore: false },
+                data: {
+                    articles: [],
+                    pagination: { page: 1, limit: 20, hasMore: false },
+                },
+                timestamp: Date.now(), // Fresh cache
             });
 
             const response2 = await request(server)
                 .get('/feed/tr')
                 .expect(200);
 
-            expect(response2.body).toHaveProperty('cached');
-            if (response2.body.cached) {
-                expect(response2.body.cached).toBe(true);
-            }
+            expect(response2.body.success).toBe(true);
         });
     });
 

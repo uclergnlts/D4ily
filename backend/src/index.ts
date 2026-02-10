@@ -5,7 +5,7 @@ import { cors } from 'hono/cors';
 import { logger } from './config/logger';
 import { env } from './config/env';
 import { apiLimiter } from './middleware/rateLimit';
-import { feedTimeout, aiTimeout, defaultTimeout } from './middleware/timeout';
+import { aiTimeout, defaultTimeout } from './middleware/timeout';
 import { startScraperCron } from './cron/scraperCron';
 import { startDigestCron } from './cron/digestCron';
 import { startWeeklyCron } from './cron/weeklyCron';
@@ -14,7 +14,6 @@ import { startAlignmentNotificationCron } from './cron/alignmentNotificationCron
 // Import routes
 import categoriesRoute from './routes/categories';
 import sourcesRoute from './routes/sources';
-import feedRoute from './routes/feed';
 import adminRoute from './routes/admin';
 import commentsRoute from './routes/comments';
 import authRoute from './routes/auth';
@@ -70,8 +69,7 @@ app.get('/', (c) => {
             health: '/health',
             categories: '/categories',
             sources: '/sources',
-            feed: '/feed/:country',
-            article: '/feed/:country/:articleId',
+            digest: '/digest/:country',
             admin: '/admin',
         }
     });
@@ -86,9 +84,6 @@ app.get('/health', (c) => {
 });
 
 // Apply timeout middleware to specific routes
-// Feed routes - 10 second timeout
-app.use('/feed/*', feedTimeout);
-
 // AI-heavy routes - 30 second timeout
 app.use('/digest/*', aiTimeout);
 app.use('/weekly/*', aiTimeout);
@@ -100,7 +95,6 @@ app.use('/search/*', defaultTimeout);
 // API Routes
 app.route('/categories', categoriesRoute);
 app.route('/sources', sourcesRoute);
-app.route('/feed', feedRoute);
 app.route('/admin', adminRoute);
 app.route('/comments', commentsRoute);
 app.route('/auth', authRoute);

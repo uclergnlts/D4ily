@@ -34,14 +34,16 @@ interface RevenueCatEvent {
  */
 webhookRoute.post('/revenuecat', async (c) => {
     try {
-        const body = await c.req.json() as RevenueCatEvent;
+        // Read raw body for HMAC verification, then parse JSON
+        const rawBody = await c.req.text();
+        const body = JSON.parse(rawBody) as RevenueCatEvent;
         const { event } = body;
 
         logger.info({ eventType: event.type, userId: event.app_user_id }, 'RevenueCat webhook received');
 
-        // Verify webhook signature (optional but recommended)
+        // Verify webhook signature using raw body bytes
         const signature = c.req.header('X-RevenueCat-Signature');
-        if (!verifyWebhookSignature(body, signature)) {
+        if (!verifyWebhookSignature(rawBody, signature)) {
             logger.warn('Invalid RevenueCat webhook signature');
             return c.json({ success: false, error: 'Invalid signature' }, 401);
         }
@@ -80,23 +82,23 @@ webhookRoute.post('/revenuecat', async (c) => {
 /**
  * Verify RevenueCat webhook signature
  */
-function verifyWebhookSignature(body: any, signature: string | undefined): boolean {
+function verifyWebhookSignature(rawBody: string, signature: string | undefined): boolean {
     const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET;
-    
+
     // In development, allow missing signature if secret is not set
     if (process.env.NODE_ENV === 'development' && !webhookSecret) {
         logger.warn('RevenueCat webhook verification skipped in development');
         return true;
     }
-    
+
     if (!signature || !webhookSecret) {
         logger.error('Missing webhook signature or secret');
         return false;
     }
-    
+
     try {
         const hmac = crypto.createHmac('sha256', webhookSecret);
-        hmac.update(JSON.stringify(body));
+        hmac.update(rawBody);
         const expectedSignature = hmac.digest('hex');
         return crypto.timingSafeEqual(
             Buffer.from(signature, 'hex'),

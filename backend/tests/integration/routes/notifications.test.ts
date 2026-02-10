@@ -36,6 +36,15 @@ vi.mock('@/middleware/auth.js', () => ({
         });
         return next();
     }),
+    adminMiddleware: vi.fn((c: any, next: any) => {
+        c.set('user', {
+            uid: 'test-user-id',
+            email: 'test@example.com',
+            emailVerified: true,
+            userRole: 'admin',
+        });
+        return next();
+    }),
     AuthUser: {},
 }));
 

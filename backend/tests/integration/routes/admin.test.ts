@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterAll } from 'vitest';
+import { describe, it, expect, vi, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
@@ -47,47 +47,25 @@ vi.mock('@/config/firebase.js', () => ({
     isFirebaseEnabled: true,
 }));
 
+const { mockGet } = vi.hoisted(() => ({
+    mockGet: vi.fn(),
+}));
+
 vi.mock('@/config/db.js', () => {
-    const createMockQueryBuilder = () => {
-        let callCount = 0;
-        
-        return {
-            from: vi.fn().mockReturnThis(),
-            where: vi.fn().mockReturnThis(),
-            get: vi.fn().mockImplementation(() => {
-                callCount++;
-                // Odd calls are for admin user check, even calls are for source
-                if (callCount % 2 === 1) {
-                    return Promise.resolve({
-                        id: 'test-admin-uid',
-                        email: 'admin@test.com',
-                        name: 'Test Admin',
-                        userRole: 'admin',
-                        subscriptionStatus: 'free',
-                    });
-                }
-                return Promise.resolve({
-                    id: 123,
-                    sourceName: 'Test Source',
-                    rssUrl: 'https://test.com/rss.xml',
-                    countryCode: 'tr',
-                    isActive: true,
-                    sourceLogoUrl: 'https://test.com/logo.png',
-                });
-            }),
-            orderBy: vi.fn().mockReturnThis(),
-            limit: vi.fn().mockReturnThis(),
-            offset: vi.fn().mockReturnThis(),
-            then: (resolve: (value: unknown[]) => void) => resolve([]),
-            all: vi.fn().mockResolvedValue([]),
-            values: vi.fn().mockReturnThis(),
-            returning: vi.fn().mockReturnThis(),
-            set: vi.fn().mockReturnThis(),
-        };
+    const mockQueryBuilder = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        get: mockGet,
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        offset: vi.fn().mockReturnThis(),
+        then: (resolve: (value: unknown[]) => void) => resolve([]),
+        all: vi.fn().mockResolvedValue([]),
+        values: vi.fn().mockReturnThis(),
+        returning: vi.fn().mockReturnThis(),
+        set: vi.fn().mockReturnThis(),
     };
-    
-    const mockQueryBuilder = createMockQueryBuilder();
-    
+
     return {
         db: {
             select: vi.fn().mockReturnValue(mockQueryBuilder),
@@ -121,9 +99,21 @@ vi.mock('@/middleware/rateLimiter.js', () => ({
     authRateLimiter: vi.fn().mockImplementation(async (_c: unknown, next: () => Promise<void>) => next()),
 }));
 
+// Mock cron triggers
+vi.mock('@/cron/digestCron.js', () => ({
+    triggerDigestManually: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+vi.mock('@/cron/weeklyCron.js', () => ({
+    triggerWeeklyManually: vi.fn().mockResolvedValue({ success: true }),
+}));
+
+vi.mock('@/cron/scraperCron.js', () => ({
+    runScraper: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Import after mocks
 import adminRoute from '@/routes/admin.js';
-import { db } from '@/config/db.js';
 
 const app = new Hono();
 app.route('/admin', adminRoute);
@@ -136,6 +126,11 @@ const server = serve({
 const TEST_AUTH_TOKEN = 'Bearer test-firebase-token';
 
 describe('Admin API Integration Tests', () => {
+    beforeEach(() => {
+        // By default, get() always returns admin user (for adminMiddleware check)
+        mockGet.mockResolvedValue(TEST_ADMIN_USER);
+    });
+
     afterAll(async () => {
         await new Promise<void>((resolve) => {
             server.close(() => resolve());
@@ -200,6 +195,11 @@ describe('Admin API Integration Tests', () => {
 
     describe('POST /admin/scrape/:sourceId', () => {
         it('should trigger manual scrape', async () => {
+            // First call: admin user check, second call: source lookup
+            mockGet
+                .mockResolvedValueOnce(TEST_ADMIN_USER)
+                .mockResolvedValueOnce(TEST_SOURCE_DATA);
+
             const response = await request(server)
                 .post('/admin/scrape/123')
                 .set('Authorization', TEST_AUTH_TOKEN)
@@ -213,12 +213,10 @@ describe('Admin API Integration Tests', () => {
         });
 
         it('should return 404 for invalid source', async () => {
-            // Mock get returns null for source (second call)
-            const mockGet = vi.fn()
-                .mockResolvedValueOnce(TEST_ADMIN_USER) // First call: admin user check
-                .mockResolvedValueOnce(null); // Second call: source not found
-            
-            (db.select() as any).get = mockGet;
+            // First call: admin user check, second call: source not found
+            mockGet
+                .mockResolvedValueOnce(TEST_ADMIN_USER)
+                .mockResolvedValueOnce(null);
 
             const response = await request(server)
                 .post('/admin/scrape/999')

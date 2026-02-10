@@ -14,7 +14,7 @@ import {
     ru_articles,
 } from '../db/schema/index.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { logger } from '../config/logger.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -266,7 +266,7 @@ reactionRoute.get('/bookmarks', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const page = parseInt(c.req.query('page') ?? '1', 10);
-        const limit = parseInt(c.req.query('limit') ?? '20', 10);
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100);
         const offset = (page - 1) * limit;
 
         const userBookmarks = await db.select()
@@ -276,24 +276,24 @@ reactionRoute.get('/bookmarks', authMiddleware, async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Fetch article details for each bookmark
-        const bookmarksWithArticles = await Promise.all(
-            userBookmarks.map(async (bookmark) => {
-                const table = COUNTRY_TABLES[bookmark.countryCode as keyof typeof COUNTRY_TABLES];
-                if (!table) return { ...bookmark, article: null };
-
-                const article = await db
-                    .select()
-                    .from(table)
-                    .where(eq(table.id, bookmark.articleId))
-                    .get();
-
-                return {
-                    ...bookmark,
-                    article: article || null,
-                };
-            })
-        );
+        // Batch fetch article details grouped by country
+        const articleMap = new Map<string, any>();
+        const grouped: Record<string, string[]> = {};
+        for (const bookmark of userBookmarks) {
+            const cc = bookmark.countryCode as keyof typeof COUNTRY_TABLES;
+            if (!COUNTRY_TABLES[cc]) continue;
+            if (!grouped[cc]) grouped[cc] = [];
+            grouped[cc].push(bookmark.articleId);
+        }
+        for (const [cc, ids] of Object.entries(grouped)) {
+            const table = COUNTRY_TABLES[cc as keyof typeof COUNTRY_TABLES];
+            const articles = await db.select().from(table).where(inArray(table.id, ids));
+            for (const article of articles) articleMap.set(article.id, article);
+        }
+        const bookmarksWithArticles = userBookmarks.map(bookmark => ({
+            ...bookmark,
+            article: articleMap.get(bookmark.articleId) || null,
+        }));
 
         return c.json({
             success: true,
@@ -344,7 +344,7 @@ reactionRoute.get('/history', authMiddleware, async (c) => {
     try {
         const user = c.get('user') as AuthUser;
         const page = parseInt(c.req.query('page') ?? '1', 10);
-        const limit = parseInt(c.req.query('limit') ?? '20', 10);
+        const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100);
         const offset = (page - 1) * limit;
 
         const history = await db.select()
@@ -354,24 +354,24 @@ reactionRoute.get('/history', authMiddleware, async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Fetch article details
-        const historyWithArticles = await Promise.all(
-            history.map(async (item) => {
-                const table = COUNTRY_TABLES[item.countryCode as keyof typeof COUNTRY_TABLES];
-                if (!table) return { ...item, article: null };
-
-                const article = await db
-                    .select()
-                    .from(table)
-                    .where(eq(table.id, item.articleId))
-                    .get();
-
-                return {
-                    ...item,
-                    article: article || null,
-                };
-            })
-        );
+        // Batch fetch article details grouped by country
+        const articleMap = new Map<string, any>();
+        const grouped: Record<string, string[]> = {};
+        for (const item of history) {
+            const cc = item.countryCode as keyof typeof COUNTRY_TABLES;
+            if (!COUNTRY_TABLES[cc]) continue;
+            if (!grouped[cc]) grouped[cc] = [];
+            grouped[cc].push(item.articleId);
+        }
+        for (const [cc, ids] of Object.entries(grouped)) {
+            const table = COUNTRY_TABLES[cc as keyof typeof COUNTRY_TABLES];
+            const articles = await db.select().from(table).where(inArray(table.id, ids));
+            for (const article of articles) articleMap.set(article.id, article);
+        }
+        const historyWithArticles = history.map(item => ({
+            ...item,
+            article: articleMap.get(item.articleId) || null,
+        }));
 
         return c.json({
             success: true,

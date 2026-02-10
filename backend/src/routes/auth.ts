@@ -316,12 +316,6 @@ authRoute.get('/me', authMiddleware, async (c) => {
             }, 404);
         }
 
-        // Update last access
-        await db
-            .update(users)
-            .set({ updatedAt: new Date() })
-            .where(eq(users.id, authUser.uid));
-
         return c.json({
             success: true,
             data: {

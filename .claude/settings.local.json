@@ -41,7 +41,26 @@
       "Bash(npx expo install:*)",
       "Bash(python -m json.tool:*)",
       "Bash(python:*)",
-      "Bash(ping:*)"
+      "Bash(ping:*)",
+      "Bash(npx vitest:*)",
+      "Bash(npm run test:coverage:*)",
+      "Bash(npx --no-install vitest run:*)",
+      "Bash(node node_modules/.bin/vitest:*)",
+      "Bash(npm install:*)",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\ucler\\\\Desktop\\\\D4ily\\\\backend && npx vitest run --coverage 2>&1\")",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\ucler\\\\Desktop\\\\D4ily\\\\backend && npx vitest run --coverage\")",
+      "Bash(Out-Null)",
+      "Bash(Get-Content 'C:\\\\Users\\\\ucler\\\\Desktop\\\\coverage_noansi.txt')",
+      "Bash(Measure-Object -Line)",
+      "Bash(\")",
+      "Bash(powershell -File:*)",
+      "Bash(cmd /c:*)",
+      "Bash(echo:*)",
+      "Bash(Set-Location 'C:\\\\Users\\\\ucler\\\\Desktop\\\\D4ily\\\\backend')",
+      "Bash(Select-Object -Last 80)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"
     ]
   }
 }

@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
-import { rss_sources, categories, users, tr_articles, de_articles, us_articles, tr_article_sources, de_article_sources, us_article_sources } from '../db/schema/index.js';
-import { eq, desc, sql, and, gte, lte } from 'drizzle-orm';
+import { rss_sources, categories, users, tr_articles, de_articles, us_articles, uk_articles, fr_articles, es_articles, it_articles, ru_articles, tr_article_sources, de_article_sources, us_article_sources } from '../db/schema/index.js';
+import { eq, desc, sql, and, gte, lte, inArray } from 'drizzle-orm';
 import { scrapeSource } from '../services/scraper/scraperService.js';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
@@ -15,6 +15,11 @@ const articleTables = {
     tr: tr_articles,
     de: de_articles,
     us: us_articles,
+    uk: uk_articles,
+    fr: fr_articles,
+    es: es_articles,
+    it: it_articles,
+    ru: ru_articles,
 };
 
 const articleSourceTables = {
@@ -517,18 +522,14 @@ admin.get('/stats', async (c) => {
             .get();
 
         // Get article counts per country
-        const trArticleCount = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(tr_articles)
-            .get();
-        const deArticleCount = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(de_articles)
-            .get();
-        const usArticleCount = await db
-            .select({ count: sql<number>`count(*)` })
-            .from(us_articles)
-            .get();
+        const articleCounts: Record<string, number> = {};
+        for (const [cc, table] of Object.entries(articleTables)) {
+            const result = await db
+                .select({ count: sql<number>`count(*)` })
+                .from(table)
+                .get();
+            articleCounts[cc] = result?.count || 0;
+        }
 
         return c.json({
             success: true,
@@ -544,10 +545,8 @@ admin.get('/stats', async (c) => {
                     total: categoryCount?.count || 0,
                 },
                 articles: {
-                    tr: trArticleCount?.count || 0,
-                    de: deArticleCount?.count || 0,
-                    us: usArticleCount?.count || 0,
-                    total: (trArticleCount?.count || 0) + (deArticleCount?.count || 0) + (usArticleCount?.count || 0),
+                    ...articleCounts,
+                    total: Object.values(articleCounts).reduce((sum, c) => sum + c, 0),
                 },
                 serverUptime: process.uptime(),
             },
@@ -754,16 +753,21 @@ admin.get('/articles', async (c) => {
             .limit(limit)
             .offset(offset);
 
-        // Get sources for each article
-        const articlesWithSources = await Promise.all(
-            articles.map(async (article) => {
-                const sources = await db
-                    .select()
-                    .from(sourcesTable)
-                    .where(eq(sourcesTable.articleId, article.id));
-                return { ...article, sources };
-            })
-        );
+        // Batch fetch sources for all articles
+        const articleIds = articles.map(a => a.id);
+        const allSources = articleIds.length > 0
+            ? await db.select().from(sourcesTable).where(inArray(sourcesTable.articleId, articleIds))
+            : [];
+        const sourcesMap = new Map<string, typeof allSources>();
+        for (const source of allSources) {
+            const existing = sourcesMap.get(source.articleId) || [];
+            existing.push(source);
+            sourcesMap.set(source.articleId, existing);
+        }
+        const articlesWithSources = articles.map(article => ({
+            ...article,
+            sources: sourcesMap.get(article.id) || [],
+        }));
 
         return c.json({
             success: true,

@@ -29,7 +29,7 @@ describe('Rate Limiter', () => {
             const mockHeader = vi.fn();
             const mockContext = {
                 req: {
-                    header: vi.fn().mockReturnValue('127.0.0.1'),
+                    header: vi.fn().mockReturnValue('10.0.0.99'),
                 },
                 get: vi.fn().mockReturnValue(undefined),
                 header: mockHeader,
