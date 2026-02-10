@@ -295,7 +295,7 @@ export async function getDigestByDateAndPeriod(
  * Generate digests for all countries
  */
 export async function generateAllDigests(period: Period) {
-    const countries: CountryCode[] = ['tr', 'de', 'us'];
+    const countries = Object.keys(COUNTRY_TABLES) as CountryCode[];
     const results = [];
 
     for (const country of countries) {
