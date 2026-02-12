@@ -1,20 +1,25 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDigests } from '../../src/hooks/useDigest';
-import { BookOpen, ChevronLeft, ChevronRight, Calendar } from 'lucide-react-native';
+import { BookOpen, ChevronLeft, ChevronRight, Calendar, Menu } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { DigestCard } from '../../src/components/digest/DigestCard';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { useAppStore } from '../../src/store/useAppStore';
+import { useCII } from '../../src/hooks/useCII';
+import { CIIBadge } from '../../src/components/ui/CIIBadge';
 
 export default function HomeScreen() {
     const router = useRouter();
-    const { selectedCountry } = useAppStore();
+    const colorScheme = useColorScheme();
+    const isDark = colorScheme === 'dark';
+    const { selectedCountry, toggleSideMenu } = useAppStore();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [hasAutoSelected, setHasAutoSelected] = useState(false);
 
     const { data: digests, isLoading, refetch, isRefetching } = useDigests(selectedCountry);
+    const { data: ciiData } = useCII(selectedCountry);
 
     // Auto-select the latest available digest date when data loads
     useEffect(() => {
@@ -75,7 +80,13 @@ export default function HomeScreen() {
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             {/* Header: Country & Date Selector */}
             <View className="px-5 py-4 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-black z-10">
-                <CountrySelector />
+                <View className="flex-row items-center gap-3">
+                    <TouchableOpacity onPress={toggleSideMenu} className="p-1 -ml-1">
+                        <Menu size={24} color={isDark ? "#ffffff" : "#18181b"} />
+                    </TouchableOpacity>
+                    <CountrySelector />
+                    <CIIBadge data={ciiData} compact />
+                </View>
 
                 <View className="flex-row items-center bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 shadow-sm">
                     <TouchableOpacity onPress={() => changeDate(-1)} className="p-1">

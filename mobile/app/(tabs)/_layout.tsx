@@ -1,7 +1,7 @@
  
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Search, LineChart, Newspaper, Scale } from 'lucide-react-native';
+import { Search, LineChart, Newspaper, Scale, Map } from 'lucide-react-native';
 import { useColorScheme } from 'react-native';
 
 export default function TabLayout() {
@@ -45,6 +45,13 @@ export default function TabLayout() {
         options={{
           title: 'Karşılaştır',
           tabBarIcon: ({ color }) => <Scale size={24} color={color} strokeWidth={2.5} />,
+        }}
+      />
+      <Tabs.Screen
+        name="map"
+        options={{
+          title: 'Harita',
+          tabBarIcon: ({ color }) => <Map size={24} color={color} strokeWidth={2.5} />,
         }}
       />
       <Tabs.Screen

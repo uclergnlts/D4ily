@@ -57,7 +57,9 @@
       "Bash(cmd /c:*)",
       "Bash(echo:*)",
       "Bash(Set-Location 'C:\\\\Users\\\\ucler\\\\Desktop\\\\D4ily\\\\backend')",
-      "Bash(Select-Object -Last 80)"
+      "Bash(Select-Object -Last 80)",
+      "Bash(gh repo view:*)",
+      "WebFetch(domain:github.com)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"
