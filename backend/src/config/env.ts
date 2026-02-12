@@ -4,13 +4,13 @@ const envSchema = z.object({
     NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
     PORT: z.string().default('3000'),
 
-    // Database
-    TURSO_DATABASE_URL: z.string().url(),
-    TURSO_AUTH_TOKEN: z.string(),
+    // Database (optional in dev — defaults to local SQLite file)
+    TURSO_DATABASE_URL: z.string().default('file:local.db'),
+    TURSO_AUTH_TOKEN: z.string().default(''),
 
-    // Cache
-    UPSTASH_REDIS_REST_URL: z.string().url(),
-    UPSTASH_REDIS_REST_TOKEN: z.string(),
+    // Cache (optional in dev — app works without Redis)
+    UPSTASH_REDIS_REST_URL: z.string().default(''),
+    UPSTASH_REDIS_REST_TOKEN: z.string().default(''),
 
     // All other fields are optional
     ELASTICSEARCH_URL: z.string().optional(),

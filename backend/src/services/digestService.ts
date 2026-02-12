@@ -1,4 +1,5 @@
 import { db } from '../config/db.js';
+import { sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
 import { getDigestFallback } from '../utils/aiFallbacks.js';
@@ -82,7 +83,7 @@ Lütfen şunları sağla:
 
 Sadece JSON formatında cevap ver.`;
 
-        // Use AI wrapper with circuit breaker
+        // Use AI wrapper — skip circuit breaker for digest generation to avoid cascading failures from scraper
         const result = await aiChatCompletion<any>(
             {
                 model: 'gpt-4o-mini',
@@ -101,8 +102,10 @@ Sadece JSON formatında cevap ver.`;
             },
             {
                 circuitName: 'openai:digest',
-                useQuickClient: false, // Use standard timeout for digest generation
+                useQuickClient: false,
+                skipCircuitBreaker: true, // Don't let scraper failures block digest generation
                 fallback: () => getDigestFallback(articles.length, true),
+                maxContentLength: 30000, // Digest prompts need the full article list
             }
         );
 
@@ -114,8 +117,14 @@ Sadece JSON formatında cevap ver.`;
             return { title: topic.title || '', description: topic.description || '' };
         });
 
+        // Ensure summary is always a string (AI sometimes returns objects)
+        let summaryText = result.summary;
+        if (typeof summaryText !== 'string') {
+            summaryText = summaryText ? JSON.stringify(summaryText) : 'Günün özeti oluşturulamadı.';
+        }
+
         return {
-            summaryText: result.summary || 'Günün özeti oluşturulamadı.',
+            summaryText: summaryText || 'Günün özeti oluşturulamadı.',
             topTopics,
             articleCount: articles.length,
         };
@@ -159,7 +168,7 @@ export async function generateDailyDigest(
             endTime.setHours(19, 0, 0, 0);
         }
 
-        // Get articles in time range
+        // Use raw SQL for date comparisons to avoid libsql type binding issues
         let articles = await db
             .select({
                 translatedTitle: tables.articles.translatedTitle,
@@ -216,40 +225,31 @@ export async function generateDailyDigest(
             ))
             .get();
 
+        // Ensure all values are primitives for libsql local driver compatibility
+        const safeTopics = JSON.stringify(Array.isArray(digestResult.topTopics) ? digestResult.topTopics : []);
+        const safeSummary = String(digestResult.summaryText || 'Günün özeti oluşturulamadı.');
+        const safeCount = Number(digestResult.articleCount) || 0;
+
+        // Use raw SQL for writes to bypass drizzle json mode serialization issues with local libsql
+        const tableName = `${countryCode}_daily_digests`;
+
         if (existing) {
-            // Update existing
-            await db
-                .update(tables.digests)
-                .set({
-                    summaryText: digestResult.summaryText,
-                    topTopics: JSON.stringify(digestResult.topTopics),
-                    articleCount: digestResult.articleCount,
-                })
-                .where(eq(tables.digests.id, existing.id));
+            await db.run(sql`UPDATE ${sql.raw(tableName)} SET summary_text = ${safeSummary}, top_topics = ${safeTopics}, article_count = ${safeCount} WHERE id = ${existing.id}`);
 
             logger.info({ countryCode, period, digestId: existing.id }, 'Digest updated');
             return { id: existing.id, success: true };
         }
 
-        // Create new digest
         const digestId = uuidv4();
-        await db.insert(tables.digests).values({
-            id: digestId,
-            countryCode,
-            period,
-            digestDate,
-            summaryText: digestResult.summaryText,
-            topTopics: JSON.stringify(digestResult.topTopics),
-            articleCount: digestResult.articleCount,
-            commentCount: 0,
-            createdAt: new Date(),
-        });
+        await db.run(sql`INSERT INTO ${sql.raw(tableName)} (id, country_code, period, digest_date, summary_text, top_topics, article_count, comment_count, created_at) VALUES (${digestId}, ${countryCode}, ${period}, ${digestDate}, ${safeSummary}, ${safeTopics}, ${safeCount}, 0, unixepoch())`);
 
         logger.info({ countryCode, period, digestId, articleCount: digestResult.articleCount }, 'Digest created');
         return { id: digestId, success: true };
     } catch (error) {
-        logger.error({ error, countryCode, period }, 'Generate digest failed');
-        return { id: '', success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const errStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ error: errMsg, stack: errStack, countryCode, period }, 'Generate digest failed');
+        return { id: '', success: false, error: errMsg };
     }
 }
 

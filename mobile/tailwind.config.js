@@ -3,6 +3,15 @@ module.exports = {
   content: ["./app/**/*.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['DMSans_400Regular'],
+        'sans-medium': ['DMSans_500Medium'],
+        'sans-semibold': ['DMSans_600SemiBold'],
+        'sans-bold': ['DMSans_700Bold'],
+        'sans-black': ['DMSans_900Black'],
+        display: ['Syne_700Bold'],
+        'display-extrabold': ['Syne_800ExtraBold'],
+      },
       colors: {
         primary: {
           DEFAULT: '#006FFF', // User requested color

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.*
+local.db
+local.db-*
+*.log
+coverage/
+.turso/
+trigger-digest.ps1
+railway-login.ps1

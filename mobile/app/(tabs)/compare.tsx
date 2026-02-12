@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueries } from '@tanstack/react-query';
 import { Sun, Moon, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { digestService } from '../../src/api/services/digestService';
 import { DailyDigest } from '../../src/types';
+import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 
 const COUNTRIES: { code: string; name: string; flag: string }[] = [
     { code: 'tr', name: 'Türkiye', flag: '🇹🇷' },
@@ -29,13 +31,25 @@ function CountryDigestCard({
     isLoading: boolean;
 }) {
     return (
-        <View className="bg-white dark:bg-zinc-900 rounded-3xl p-5 border border-zinc-100 dark:border-zinc-800 mb-4">
-            {/* Country Header */}
+        <View
+            className="bg-white dark:bg-zinc-900 rounded-3xl p-5 border border-zinc-100 dark:border-zinc-800 mb-4"
+            accessibilityLabel={`${country.name} özeti`}
+        >
             <View className="flex-row items-center gap-3 mb-3">
                 <Text style={{ fontSize: 28 }}>{country.flag}</Text>
                 <View>
-                    <Text className="font-black text-zinc-900 dark:text-white text-base">{country.name}</Text>
-                    <Text className="text-xs text-zinc-400 font-medium uppercase tracking-wider">{country.code.toUpperCase()}</Text>
+                    <Text
+                        className="text-zinc-900 dark:text-white text-base"
+                        style={{ fontFamily: 'DMSans_900Black' }}
+                    >
+                        {country.name}
+                    </Text>
+                    <Text
+                        className="text-xs text-zinc-400 uppercase tracking-wider"
+                        style={{ fontFamily: 'DMSans_500Medium' }}
+                    >
+                        {country.code.toUpperCase()}
+                    </Text>
                 </View>
             </View>
 
@@ -45,7 +59,11 @@ function CountryDigestCard({
                 </View>
             ) : digest ? (
                 <>
-                    <Text className="text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed mb-3" numberOfLines={4}>
+                    <Text
+                        className="text-zinc-700 dark:text-zinc-300 text-sm mb-3"
+                        style={{ fontFamily: 'DMSans_400Regular', lineHeight: 22 }}
+                        numberOfLines={4}
+                    >
                         {digest.summary}
                     </Text>
                     {digest.topTopics && digest.topTopics.length > 0 && (
@@ -54,8 +72,17 @@ function CountryDigestCard({
                                 <View key={i} className="flex-row items-start gap-2">
                                     <View className="w-1.5 h-1.5 rounded-full bg-[#006FFF] mt-1.5 shrink-0" />
                                     <View className="flex-1">
-                                        <Text className="text-xs font-bold text-zinc-800 dark:text-zinc-200">{topic.title}</Text>
-                                        <Text className="text-[11px] text-zinc-400 leading-tight mt-0.5" numberOfLines={2}>
+                                        <Text
+                                            className="text-xs text-zinc-800 dark:text-zinc-200"
+                                            style={{ fontFamily: 'DMSans_700Bold' }}
+                                        >
+                                            {topic.title}
+                                        </Text>
+                                        <Text
+                                            className="text-[11px] text-zinc-400 mt-0.5"
+                                            style={{ fontFamily: 'DMSans_400Regular', lineHeight: 16 }}
+                                            numberOfLines={2}
+                                        >
                                             {topic.description}
                                         </Text>
                                     </View>
@@ -64,14 +91,22 @@ function CountryDigestCard({
                         </View>
                     )}
                     <View className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-                        <Text className="text-[11px] text-zinc-400">
+                        <Text
+                            className="text-[11px] text-zinc-400"
+                            style={{ fontFamily: 'DMSans_400Regular' }}
+                        >
                             {digest.articleCount} haber analiz edildi
                         </Text>
                     </View>
                 </>
             ) : (
                 <View className="py-4 items-center">
-                    <Text className="text-zinc-400 text-sm text-center">Bu tarih için özet bulunamadı.</Text>
+                    <Text
+                        className="text-zinc-400 text-sm text-center"
+                        style={{ fontFamily: 'DMSans_400Regular' }}
+                    >
+                        Bu tarih için özet bulunamadı.
+                    </Text>
                 </View>
             )}
         </View>
@@ -81,6 +116,7 @@ function CountryDigestCard({
 export default function CompareScreen() {
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [period, setPeriod] = useState<Period>('morning');
+    const { getEntryAnimation } = useStaggeredEntry();
 
     const dateStr = selectedDate.toISOString().split('T')[0];
     const isToday = dateStr === new Date().toISOString().split('T')[0];
@@ -107,26 +143,34 @@ export default function CompareScreen() {
         })),
     });
 
-    const isAnyLoading = results.some(r => r.isLoading);
-
     const refetchAll = () => results.forEach(r => r.refetch());
 
     return (
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
-            {/* Header */}
             <View className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-black">
-                <Text className="text-2xl font-black text-zinc-900 dark:text-white mb-3">Karşılaştır</Text>
+                <Text
+                    className="text-2xl text-zinc-900 dark:text-white mb-3"
+                    style={{ fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}
+                    accessibilityRole="header"
+                >
+                    Karşılaştır
+                </Text>
 
-                {/* Date Navigation */}
                 <View className="flex-row items-center justify-between mb-3">
                     <TouchableOpacity
                         onPress={() => changeDate(-1)}
                         className="p-2 bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800"
+                        accessibilityLabel="Önceki gün"
+                        accessibilityRole="button"
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                         <ChevronLeft size={18} color="#71717a" />
                     </TouchableOpacity>
 
-                    <Text className="font-bold text-zinc-800 dark:text-zinc-200 text-base">
+                    <Text
+                        className="text-zinc-800 dark:text-zinc-200 text-base"
+                        style={{ fontFamily: 'DMSans_700Bold' }}
+                    >
                         {selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </Text>
 
@@ -135,35 +179,50 @@ export default function CompareScreen() {
                         disabled={isToday}
                         className="p-2 bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800"
                         style={{ opacity: isToday ? 0.3 : 1 }}
+                        accessibilityLabel="Sonraki gün"
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: isToday }}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
                         <ChevronRight size={18} color="#71717a" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Period Toggle */}
                 <View className="flex-row gap-2">
                     <TouchableOpacity
                         onPress={() => setPeriod('morning')}
+                        accessibilityLabel="Sabah özetleri"
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: period === 'morning' }}
                         className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full border ${period === 'morning'
                             ? 'bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700'
                             : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
                             }`}
                     >
                         <Sun size={16} color={period === 'morning' ? '#f59e0b' : '#71717a'} />
-                        <Text className={`text-sm font-semibold ${period === 'morning' ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}>
+                        <Text
+                            className={`text-sm ${period === 'morning' ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}
+                            style={{ fontFamily: 'DMSans_600SemiBold' }}
+                        >
                             Sabah
                         </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                         onPress={() => setPeriod('evening')}
+                        accessibilityLabel="Akşam özetleri"
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: period === 'evening' }}
                         className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full border ${period === 'evening'
                             ? 'bg-indigo-50 border-indigo-300 dark:bg-indigo-900/20 dark:border-indigo-700'
                             : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
                             }`}
                     >
                         <Moon size={16} color={period === 'evening' ? '#6366f1' : '#71717a'} />
-                        <Text className={`text-sm font-semibold ${period === 'evening' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-500'}`}>
+                        <Text
+                            className={`text-sm ${period === 'evening' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-500'}`}
+                            style={{ fontFamily: 'DMSans_600SemiBold' }}
+                        >
                             Akşam
                         </Text>
                     </TouchableOpacity>
@@ -177,17 +236,21 @@ export default function CompareScreen() {
                     <RefreshControl refreshing={false} onRefresh={refetchAll} tintColor="#006FFF" />
                 }
             >
-                <Text className="text-xs text-zinc-400 font-semibold uppercase tracking-wider mb-4">
+                <Text
+                    className="text-xs text-zinc-400 uppercase tracking-wider mb-4"
+                    style={{ fontFamily: 'DMSans_600SemiBold' }}
+                >
                     {COUNTRIES.length} ülkenin gündemi
                 </Text>
 
                 {COUNTRIES.map((country, i) => (
-                    <CountryDigestCard
-                        key={country.code}
-                        country={country}
-                        digest={results[i]?.data ?? null}
-                        isLoading={results[i]?.isLoading ?? false}
-                    />
+                    <Animated.View key={country.code} entering={getEntryAnimation(i)}>
+                        <CountryDigestCard
+                            country={country}
+                            digest={results[i]?.data ?? null}
+                            isLoading={results[i]?.isLoading ?? false}
+                        />
+                    </Animated.View>
                 ))}
             </ScrollView>
         </SafeAreaView>

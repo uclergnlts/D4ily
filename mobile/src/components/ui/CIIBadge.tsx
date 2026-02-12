@@ -8,6 +8,7 @@ import Animated, {
     withSequence,
 } from 'react-native-reanimated';
 import type { CIIData } from '../../hooks/useCII';
+import { useReducedMotion } from '../../hooks/useReducedMotion';
 
 interface CIIBadgeProps {
     data: CIIData | undefined;
@@ -34,11 +35,12 @@ function getAnomalyLabel(level: string) {
 
 export const CIIBadge: React.FC<CIIBadgeProps> = ({ data, compact = false }) => {
     const pulseOpacity = useSharedValue(1);
+    const reducedMotion = useReducedMotion();
 
     const hasAnomaly = data?.anomaly && data.anomaly.level !== 'NORMAL';
 
     useEffect(() => {
-        if (hasAnomaly) {
+        if (hasAnomaly && !reducedMotion) {
             pulseOpacity.value = withRepeat(
                 withSequence(
                     withTiming(0.4, { duration: 800 }),
@@ -50,7 +52,7 @@ export const CIIBadge: React.FC<CIIBadgeProps> = ({ data, compact = false }) => 
         } else {
             pulseOpacity.value = 1;
         }
-    }, [hasAnomaly, pulseOpacity]);
+    }, [hasAnomaly, reducedMotion, pulseOpacity]);
 
     const pulseStyle = useAnimatedStyle(() => ({
         opacity: pulseOpacity.value,
@@ -60,28 +62,46 @@ export const CIIBadge: React.FC<CIIBadgeProps> = ({ data, compact = false }) => 
 
     const colors = getLevelColor(data.level);
     const anomalyLabel = data.anomaly ? getAnomalyLabel(data.anomaly.level) : null;
+    const levelLabel = data.level === 'low' ? 'düşük' : data.level === 'medium' ? 'orta' : 'yüksek';
 
     if (compact) {
         return (
-            <Animated.View style={hasAnomaly ? pulseStyle : undefined}>
+            <Animated.View
+                style={hasAnomaly && !reducedMotion ? pulseStyle : undefined}
+                accessibilityLabel={`Risk skoru ${data.score}, ${levelLabel} risk`}
+            >
                 <View className={`flex-row items-center px-2 py-1 rounded-full ${colors.bg}`}>
                     <View className="w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: colors.dot }} />
-                    <Text className={`text-[11px] font-bold ${colors.text}`}>{data.score}</Text>
+                    <Text
+                        className={`text-[11px] ${colors.text}`}
+                        style={{ fontFamily: 'DMSans_700Bold' }}
+                    >
+                        {data.score}
+                    </Text>
                 </View>
             </Animated.View>
         );
     }
 
     return (
-        <Animated.View style={hasAnomaly ? pulseStyle : undefined}>
+        <Animated.View
+            style={hasAnomaly && !reducedMotion ? pulseStyle : undefined}
+            accessibilityLabel={`Risk skoru ${data.score} üzerinden 100, ${levelLabel} risk${anomalyLabel ? `, anomali: ${anomalyLabel}` : ''}`}
+        >
             <View className={`flex-row items-center px-2.5 py-1.5 rounded-xl ${colors.bg} gap-2`}>
                 <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.dot }} />
                 <View>
-                    <Text className={`text-[12px] font-bold ${colors.text}`}>
+                    <Text
+                        className={`text-[12px] ${colors.text}`}
+                        style={{ fontFamily: 'DMSans_700Bold' }}
+                    >
                         Risk: {data.score}/100
                     </Text>
                     {anomalyLabel && (
-                        <Text className={`text-[10px] font-semibold ${colors.text}`}>
+                        <Text
+                            className={`text-[10px] ${colors.text}`}
+                            style={{ fontFamily: 'DMSans_600SemiBold' }}
+                        >
                             {anomalyLabel} ({data.anomaly.zScore}x)
                         </Text>
                     )}

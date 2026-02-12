@@ -11,6 +11,11 @@ export const rateLimitMiddleware = (options: {
         const key = `${options.keyPrefix || 'rate-limit'}:${ip}`;
 
         try {
+            if (!redis) {
+                await next();
+                return;
+            }
+
             const current = await redis.incr(key);
 
             if (current === 1) {

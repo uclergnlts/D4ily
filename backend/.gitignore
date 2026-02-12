@@ -6,3 +6,6 @@ dist/
 *.log
 coverage/
 .turso/
+local.db
+local.db-*
+*.ps1

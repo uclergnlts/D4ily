@@ -27,15 +27,21 @@ export const CountrySelector = () => {
 
     return (
         <View className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
-            {/* Header / Trigger */}
             <TouchableOpacity
                 onPress={() => setIsExpanded(!isExpanded)}
                 className="flex-row items-center justify-between p-3"
                 activeOpacity={0.7}
+                accessibilityLabel={`Ülke seçici: ${activeCountry.name}`}
+                accessibilityRole="button"
+                accessibilityHint="Ülke listesini aç"
+                accessibilityState={{ expanded: isExpanded }}
             >
                 <View className="flex-row items-center">
                     <Text className="text-2xl mr-3">{activeCountry.flag}</Text>
-                    <Text className="text-base font-bold text-zinc-900 dark:text-white">
+                    <Text
+                        className="text-base text-zinc-900 dark:text-white"
+                        style={{ fontFamily: 'DMSans_700Bold' }}
+                    >
                         {activeCountry.name}
                     </Text>
                 </View>
@@ -46,19 +52,23 @@ export const CountrySelector = () => {
                 />
             </TouchableOpacity>
 
-            {/* Expanded List */}
             {isExpanded && (
                 <View className="border-t border-zinc-200 dark:border-zinc-700">
                     {COUNTRIES.map((country) => {
-                        if (country.code === selectedCountry) return null; // Skip active
+                        if (country.code === selectedCountry) return null;
                         return (
                             <TouchableOpacity
                                 key={country.code}
                                 onPress={() => handleSelect(country.code)}
                                 className="flex-row items-center p-3 pl-4 active:bg-zinc-100 dark:active:bg-zinc-700/50"
+                                accessibilityLabel={`${country.name} seç`}
+                                accessibilityRole="button"
                             >
                                 <Text className="text-xl mr-3">{country.flag}</Text>
-                                <Text className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                                <Text
+                                    className="text-sm text-zinc-600 dark:text-zinc-400"
+                                    style={{ fontFamily: 'DMSans_500Medium' }}
+                                >
                                     {country.name}
                                 </Text>
                             </TouchableOpacity>
