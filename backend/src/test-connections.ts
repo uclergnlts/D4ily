@@ -17,12 +17,16 @@ async function testConnections() {
 
     // Test 2: Redis (Upstash)
     try {
-        await redis.set('test-key', 'test-value', { ex: 10 });
-        const value = await redis.get('test-key');
-        if (value === 'test-value') {
-            console.log('✅ Redis (Upstash): Connected - Read/Write OK');
+        if (!redis) {
+            console.log('⚠️ Redis (Upstash): Not configured (skipped)');
         } else {
-            console.error('❌ Redis: Write/Read mismatch');
+            await redis.set('test-key', 'test-value', { ex: 10 });
+            const value = await redis.get('test-key');
+            if (value === 'test-value') {
+                console.log('✅ Redis (Upstash): Connected - Read/Write OK');
+            } else {
+                console.error('❌ Redis: Write/Read mismatch');
+            }
         }
     } catch (error) {
         console.error('❌ Redis (Upstash): Failed', error);
