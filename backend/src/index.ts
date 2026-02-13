@@ -202,6 +202,31 @@ app.get('/debug/db', async (c) => {
     return c.json({ debug: results, libsql_url: env.TURSO_DATABASE_URL.substring(0, 30) + '...' });
 });
 
+// Temporary: manual triggers (will remove after debugging)
+app.post('/debug/scrape', async (c) => {
+    const { runScraper } = await import('./cron/scraperCron.js');
+    logger.info('DEBUG: Manual scraper trigger');
+    runScraper().then(() => {
+        logger.info('DEBUG: Scraper completed');
+    }).catch((err) => {
+        logger.error({ error: err }, 'DEBUG: Scraper failed');
+    });
+    return c.json({ success: true, message: 'Scraper started in background' });
+});
+
+app.post('/debug/digest', async (c) => {
+    const { triggerDigestManually } = await import('./cron/digestCron.js');
+    const body = await c.req.json().catch(() => ({}));
+    const period = (body as any).period || 'evening';
+    logger.info({ period }, 'DEBUG: Manual digest trigger');
+    triggerDigestManually(period).then((result) => {
+        logger.info({ result }, 'DEBUG: Digest completed');
+    }).catch((err) => {
+        logger.error({ error: err }, 'DEBUG: Digest failed');
+    });
+    return c.json({ success: true, message: `Digest (${period}) started in background` });
+});
+
 // Start cron jobs
 if (env.NODE_ENV !== 'test') {
     startScraperCron();
