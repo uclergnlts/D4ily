@@ -315,6 +315,36 @@ app.get('/ops/tweet-stats', async (c) => {
     return c.json({ hasApiKey: hasKey, tweetCounts: stats });
 });
 
+app.get('/ops/tweet-test', async (c) => {
+    const apiKey = process.env.TWITTER_API_KEY;
+    if (!apiKey) return c.json({ error: 'No API key' }, 500);
+    const userName = c.req.query('user') || 'Reuters';
+    try {
+        const url = `https://api.twitterapi.io/twitter/user/last_tweets?userName=${encodeURIComponent(userName)}`;
+        const response = await fetch(url, {
+            headers: { 'X-API-Key': apiKey },
+        });
+        const status = response.status;
+        const text = await response.text();
+        let parsed;
+        try { parsed = JSON.parse(text); } catch { parsed = null; }
+        return c.json({
+            httpStatus: status,
+            responsePreview: text.substring(0, 2000),
+            tweetCount: parsed?.tweets?.length ?? 0,
+            apiStatus: parsed?.status ?? 'unknown',
+            firstTweet: parsed?.tweets?.[0] ? {
+                id: parsed.tweets[0].id,
+                text: parsed.tweets[0].text?.substring(0, 200),
+                createdAt: parsed.tweets[0].createdAt,
+                author: parsed.tweets[0].author,
+            } : null,
+        });
+    } catch (error) {
+        return c.json({ error: String(error) }, 500);
+    }
+});
+
 app.post('/ops/tweets', async (c) => {
     const { scrapeAllTwitterAccounts } = await import('./services/scraper/tweetScraperService.js');
     logger.info('OPS: Manual tweet scraper trigger');
