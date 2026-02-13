@@ -199,6 +199,63 @@ app.get('/debug/db', async (c) => {
         results.country_digests_count = { error: e?.message || String(e) };
     }
 
+    // Test 6: Raw SQL INSERT into tr_articles
+    const testId = 'test_' + Date.now();
+    try {
+        const t0 = Date.now();
+        await rawClient.execute({
+            sql: `INSERT INTO tr_articles (id, original_title, original_content, original_language, translated_title, summary, detail_content, image_url, is_clickbait, is_ad, is_filtered, source_count, sentiment, political_tone, political_confidence, government_mentioned, emotional_tone, emotional_intensity, loaded_language_score, sensationalism_score, category_id, published_at, scraped_at, view_count, like_count, dislike_count, comment_count)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, 0, 0, 1, 'neutral', 0, 0.0, 0, NULL, 0.0, 0.0, 0.0, 8, ?, ?, 0, 0, 0, 0)`,
+            args: [testId, 'Test Article', 'Test content', 'tr', 'Test Article', 'Test summary', 'Test detail', Math.floor(Date.now() / 1000), Math.floor(Date.now() / 1000)],
+        });
+        results.raw_insert = { success: true, ms: Date.now() - t0 };
+        // Clean up
+        await rawClient.execute({ sql: 'DELETE FROM tr_articles WHERE id = ?', args: [testId] });
+    } catch (e: any) {
+        results.raw_insert = { error: e?.message || String(e), code: e?.code };
+    }
+
+    // Test 7: Drizzle INSERT into tr_articles
+    const testId2 = 'test2_' + Date.now();
+    try {
+        const { db } = await import('./config/db.js');
+        const { tr_articles } = await import('./db/schema/index.js');
+        const t0 = Date.now();
+        await db.insert(tr_articles).values({
+            id: testId2,
+            originalTitle: 'Test Article Drizzle',
+            originalContent: 'Test content',
+            originalLanguage: 'tr',
+            translatedTitle: 'Test Article Drizzle',
+            summary: 'Test summary',
+            detailContent: 'Test detail',
+            isClickbait: false,
+            isAd: false,
+            isFiltered: false,
+            sourceCount: 1,
+            sentiment: 'neutral',
+            politicalTone: 0,
+            politicalConfidence: 0,
+            governmentMentioned: false,
+            emotionalTone: null,
+            emotionalIntensity: 0,
+            loadedLanguageScore: 0,
+            sensationalismScore: 0,
+            categoryId: 8,
+            publishedAt: new Date(),
+            scrapedAt: new Date(),
+            viewCount: 0,
+            likeCount: 0,
+            dislikeCount: 0,
+            commentCount: 0,
+        });
+        results.drizzle_insert = { success: true, ms: Date.now() - t0 };
+        // Clean up
+        await rawClient.execute({ sql: 'DELETE FROM tr_articles WHERE id = ?', args: [testId2] });
+    } catch (e: any) {
+        results.drizzle_insert = { error: e?.message || String(e), code: e?.code };
+    }
+
     return c.json({ debug: results, libsql_url: env.TURSO_DATABASE_URL.substring(0, 30) + '...' });
 });
 
