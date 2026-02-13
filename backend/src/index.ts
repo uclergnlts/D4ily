@@ -300,6 +300,21 @@ app.post('/ops/seed-twitter', async (c) => {
     }
 });
 
+app.get('/ops/tweet-stats', async (c) => {
+    const { db: database } = await import('./config/db.js');
+    const { sql: rawSql } = await import('drizzle-orm');
+    const countries = ['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru'];
+    const stats: Record<string, number> = {};
+    for (const cc of countries) {
+        try {
+            const r = await database.get<{ cnt: number }>(rawSql.raw(`SELECT COUNT(*) as cnt FROM ${cc}_tweets`));
+            stats[cc] = r?.cnt ?? 0;
+        } catch { stats[cc] = -1; }
+    }
+    const hasKey = !!process.env.TWITTER_API_KEY;
+    return c.json({ hasApiKey: hasKey, tweetCounts: stats });
+});
+
 app.post('/ops/tweets', async (c) => {
     const { scrapeAllTwitterAccounts } = await import('./services/scraper/tweetScraperService.js');
     logger.info('OPS: Manual tweet scraper trigger');
