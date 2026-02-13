@@ -229,6 +229,77 @@ app.post('/ops/migrate-tweets', async (c) => {
     }
 });
 
+app.post('/ops/seed-twitter', async (c) => {
+    const { db: database } = await import('./config/db.js');
+    const { sql: rawSql } = await import('drizzle-orm');
+    const accounts = [
+        // Turkey
+        { id: 1, cc: 'tr', un: 'RTErdogan', dn: 'Recep Tayyip Erdogan', at: 'government', desc: 'Cumhurbaskani' },
+        { id: 2, cc: 'tr', un: 'tcbaskanlik', dn: 'T.C. Cumhurbaskanligi', at: 'government', desc: 'Cumhurbaskanligi resmi hesabi' },
+        { id: 3, cc: 'tr', un: 'TC_Disisleri', dn: 'TC Disisleri Bakanligi', at: 'government', desc: 'Disisleri Bakanligi' },
+        { id: 4, cc: 'tr', un: 'iaborakisim', dn: 'Iletisim Baskanligi', at: 'government', desc: 'Cumhurbaskanligi Iletisim Baskanligi' },
+        { id: 5, cc: 'tr', un: 'aaborakans', dn: 'Anadolu Ajansi', at: 'news_agency', desc: 'Resmi haber ajansi' },
+        { id: 6, cc: 'tr', un: 'AnadoluAgency', dn: 'Anadolu Agency', at: 'news_agency', desc: 'Anadolu Agency EN' },
+        { id: 7, cc: 'tr', un: 'trthaber', dn: 'TRT Haber', at: 'news_agency', desc: 'TRT devlet yayin kurumu' },
+        // Germany
+        { id: 8, cc: 'de', un: 'Bundeskanzler', dn: 'Bundeskanzler', at: 'government', desc: 'Federal Chancellor' },
+        { id: 9, cc: 'de', un: 'AusijirtigesAmt', dn: 'Auswaertiges Amt', at: 'government', desc: 'Federal Foreign Office' },
+        { id: 10, cc: 'de', un: 'RegSprecher', dn: 'Regierungssprecher', at: 'government', desc: 'Government Spokesperson' },
+        { id: 11, cc: 'de', un: 'taborakesschau', dn: 'tagesschau', at: 'news_agency', desc: 'ARD public news' },
+        { id: 12, cc: 'de', un: 'ZDFheute', dn: 'ZDFheute', at: 'news_agency', desc: 'ZDF public broadcaster' },
+        { id: 13, cc: 'de', un: 'dpa', dn: 'dpa', at: 'news_agency', desc: 'Deutsche Presse-Agentur' },
+        // US
+        { id: 14, cc: 'us', un: 'POTUS', dn: 'President of the United States', at: 'government', desc: 'US President official' },
+        { id: 15, cc: 'us', un: 'WhiteHouse', dn: 'The White House', at: 'government', desc: 'White House official' },
+        { id: 16, cc: 'us', un: 'StateDept', dn: 'Department of State', at: 'government', desc: 'US State Department' },
+        { id: 17, cc: 'us', un: 'AP', dn: 'The Associated Press', at: 'news_agency', desc: 'AP wire service' },
+        { id: 18, cc: 'us', un: 'Reuters', dn: 'Reuters', at: 'news_agency', desc: 'Reuters news wire' },
+        { id: 19, cc: 'us', un: 'ABC', dn: 'ABC News', at: 'news_agency', desc: 'ABC News' },
+        // UK
+        { id: 20, cc: 'uk', un: 'UKPrimeMinister', dn: 'UK Prime Minister', at: 'government', desc: 'PM official' },
+        { id: 21, cc: 'uk', un: '10DowningStreet', dn: '10 Downing Street', at: 'government', desc: 'PM office' },
+        { id: 22, cc: 'uk', un: 'FCDOGovUK', dn: 'FCDO', at: 'government', desc: 'Foreign Commonwealth & Development Office' },
+        { id: 23, cc: 'uk', un: 'BBCNews', dn: 'BBC News', at: 'news_agency', desc: 'BBC News' },
+        { id: 24, cc: 'uk', un: 'SkyNews', dn: 'Sky News', at: 'news_agency', desc: 'Sky News' },
+        // France
+        { id: 25, cc: 'fr', un: 'EmmanuelMacron', dn: 'Emmanuel Macron', at: 'government', desc: 'President of France' },
+        { id: 26, cc: 'fr', un: 'Elysee', dn: 'Elysee', at: 'government', desc: 'French Presidency' },
+        { id: 27, cc: 'fr', un: 'francediplo', dn: 'France Diplomatie', at: 'government', desc: 'Ministry of Foreign Affairs' },
+        { id: 28, cc: 'fr', un: 'gouvernementFR', dn: 'Gouvernement', at: 'government', desc: 'French Government' },
+        { id: 29, cc: 'fr', un: 'AFP', dn: 'AFP', at: 'news_agency', desc: 'Agence France-Presse' },
+        { id: 30, cc: 'fr', un: 'lemondefr', dn: 'Le Monde', at: 'news_agency', desc: 'Le Monde newspaper' },
+        // Spain
+        { id: 31, cc: 'es', un: 'saboraknchezcastejon', dn: 'Pedro Sanchez', at: 'government', desc: 'President of the Government' },
+        { id: 32, cc: 'es', un: 'lamoncloa', dn: 'La Moncloa', at: 'government', desc: 'Spanish Government' },
+        { id: 33, cc: 'es', un: 'MAECgob', dn: 'MAEC', at: 'government', desc: 'Ministry of Foreign Affairs' },
+        { id: 34, cc: 'es', un: 'EFEnoticias', dn: 'Agencia EFE', at: 'news_agency', desc: 'EFE national news agency' },
+        { id: 35, cc: 'es', un: 'el_pais', dn: 'El Pais', at: 'news_agency', desc: 'El Pais newspaper' },
+        // Italy
+        { id: 36, cc: 'it', un: 'GiorgiaMeloni', dn: 'Giorgia Meloni', at: 'government', desc: 'Prime Minister of Italy' },
+        { id: 37, cc: 'it', un: 'PalazzoChigi', dn: 'Palazzo Chigi', at: 'government', desc: 'Italian Government' },
+        { id: 38, cc: 'it', un: 'ItalyMFA', dn: 'Italy MFA', at: 'government', desc: 'Ministry of Foreign Affairs' },
+        { id: 39, cc: 'it', un: 'Agenzia_Ansa', dn: 'ANSA', at: 'news_agency', desc: 'ANSA news agency' },
+        { id: 40, cc: 'it', un: 'repubblica', dn: 'la Repubblica', at: 'news_agency', desc: 'la Repubblica newspaper' },
+        // Russia
+        { id: 41, cc: 'ru', un: 'KremlinRussia_E', dn: 'President of Russia', at: 'government', desc: 'Kremlin English-language' },
+        { id: 42, cc: 'ru', un: 'mfa_russia', dn: 'MFA Russia', at: 'government', desc: 'Ministry of Foreign Affairs EN' },
+        { id: 43, cc: 'ru', un: 'tass_agency', dn: 'TASS', at: 'news_agency', desc: 'TASS Russian News Agency' },
+    ];
+    const results: string[] = [];
+    try {
+        for (const a of accounts) {
+            await database.run(rawSql`INSERT OR IGNORE INTO twitter_accounts (id, country_code, user_name, display_name, account_type, is_active, description, gov_alignment_score) VALUES (${a.id}, ${a.cc}, ${a.un}, ${a.dn}, ${a.at}, 1, ${a.desc}, 0)`);
+        }
+        results.push(`${accounts.length} accounts inserted (or already exist)`);
+        // Count
+        const count = await database.get<{ cnt: number }>(rawSql`SELECT COUNT(*) as cnt FROM twitter_accounts`);
+        results.push(`Total accounts in DB: ${count?.cnt ?? 'unknown'}`);
+        return c.json({ success: true, results });
+    } catch (error) {
+        return c.json({ success: false, error: String(error), results }, 500);
+    }
+});
+
 app.post('/ops/tweets', async (c) => {
     const { scrapeAllTwitterAccounts } = await import('./services/scraper/tweetScraperService.js');
     logger.info('OPS: Manual tweet scraper trigger');
