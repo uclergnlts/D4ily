@@ -139,130 +139,27 @@ if (env.NODE_ENV !== 'production') {
     logger.info('DEV endpoints enabled: POST /dev/scrape, POST /dev/digest');
 }
 
-// One-time migration: add missing columns to production Turso
-app.post('/debug/migrate', async (c) => {
-    const { createClient } = await import('@libsql/client');
-    const rawClient = createClient({
-        url: env.TURSO_DATABASE_URL,
-        ...(env.TURSO_DATABASE_URL.startsWith('file:') ? {} : { authToken: env.TURSO_AUTH_TOKEN }),
-    });
-
-    const countries = ['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru'];
-    const migrationResults: Record<string, unknown> = {};
-
-    for (const cc of countries) {
-        try {
-            // Check if detail_content column exists
-            const schema = await rawClient.execute(`PRAGMA table_info(${cc}_articles)`);
-            const columns = schema.rows.map(r => r.name);
-
-            if (!columns.includes('detail_content')) {
-                await rawClient.execute(`ALTER TABLE ${cc}_articles ADD COLUMN detail_content TEXT`);
-                migrationResults[`${cc}_articles`] = 'added detail_content';
-            } else {
-                migrationResults[`${cc}_articles`] = 'already has detail_content';
-            }
-        } catch (e: any) {
-            migrationResults[`${cc}_articles`] = { error: e?.message || String(e) };
-        }
-    }
-
-    return c.json({ migration: migrationResults });
-});
-
-// Temporary debug endpoint — diagnose rss_sources query hang
-app.get('/debug/db', async (c) => {
-    const { createClient } = await import('@libsql/client');
-    const results: Record<string, unknown> = {};
-    const rawClient = createClient({
-        url: env.TURSO_DATABASE_URL,
-        ...(env.TURSO_DATABASE_URL.startsWith('file:') ? {} : { authToken: env.TURSO_AUTH_TOKEN }),
-    });
-
-    // Test 1: List tables
-    try {
-        const t0 = Date.now();
-        const tables = await rawClient.execute("SELECT name FROM sqlite_master WHERE type='table'");
-        results.tables = { data: tables.rows.map(r => r.name), ms: Date.now() - t0 };
-    } catch (e: any) {
-        results.tables = { error: e?.message || String(e) };
-    }
-
-    // Test 2: Raw SQL count on rss_sources
-    try {
-        const t0 = Date.now();
-        const count = await rawClient.execute('SELECT count(*) as cnt FROM rss_sources');
-        results.rss_sources_count = { data: count.rows[0], ms: Date.now() - t0 };
-    } catch (e: any) {
-        results.rss_sources_count = { error: e?.message || String(e) };
-    }
-
-    // Test 3: Raw SQL select rows
-    try {
-        const t0 = Date.now();
-        const row = await rawClient.execute('SELECT id, source_name, country_code, is_active FROM rss_sources LIMIT 3');
-        results.rss_sources_sample = { data: row.rows, ms: Date.now() - t0 };
-    } catch (e: any) {
-        results.rss_sources_sample = { error: e?.message || String(e) };
-    }
-
-    // Test 4: Drizzle ORM query (with 5s timeout)
-    try {
-        const { db } = await import('./config/db.js');
-        const { rss_sources } = await import('./db/schema/index.js');
-        const { eq } = await import('drizzle-orm');
-        const t0 = Date.now();
-        const drizzleResult = await Promise.race([
-            db.select({ id: rss_sources.id, name: rss_sources.sourceName }).from(rss_sources).where(eq(rss_sources.isActive, true)).limit(3),
-            new Promise<'TIMEOUT'>((resolve) => setTimeout(() => resolve('TIMEOUT'), 5000)),
-        ]);
-        results.drizzle_query = { data: drizzleResult, ms: Date.now() - t0 };
-    } catch (e: any) {
-        results.drizzle_query = { error: e?.message || String(e) };
-    }
-
-    // Test 5: country_digests count (working reference)
-    try {
-        const t0 = Date.now();
-        const count = await rawClient.execute('SELECT count(*) as cnt FROM country_digests');
-        results.country_digests_count = { data: count.rows[0], ms: Date.now() - t0 };
-    } catch (e: any) {
-        results.country_digests_count = { error: e?.message || String(e) };
-    }
-
-    // Test 6: Check tr_articles schema
-    try {
-        const t0 = Date.now();
-        const schema = await rawClient.execute("PRAGMA table_info(tr_articles)");
-        results.tr_articles_schema = { data: schema.rows.map(r => ({ name: r.name, type: r.type })), ms: Date.now() - t0 };
-    } catch (e: any) {
-        results.tr_articles_schema = { error: e?.message || String(e) };
-    }
-
-    return c.json({ debug: results, libsql_url: env.TURSO_DATABASE_URL.substring(0, 30) + '...' });
-});
-
-// Temporary: manual triggers (will remove after debugging)
-app.post('/debug/scrape', async (c) => {
+// Ops: manual scraper/digest triggers
+app.post('/ops/scrape', async (c) => {
     const { runScraper } = await import('./cron/scraperCron.js');
-    logger.info('DEBUG: Manual scraper trigger');
+    logger.info('OPS: Manual scraper trigger');
     runScraper().then(() => {
-        logger.info('DEBUG: Scraper completed');
+        logger.info('OPS: Scraper completed');
     }).catch((err) => {
-        logger.error({ error: err }, 'DEBUG: Scraper failed');
+        logger.error({ error: err }, 'OPS: Scraper failed');
     });
     return c.json({ success: true, message: 'Scraper started in background' });
 });
 
-app.post('/debug/digest', async (c) => {
+app.post('/ops/digest', async (c) => {
     const { triggerDigestManually } = await import('./cron/digestCron.js');
     const body = await c.req.json().catch(() => ({}));
     const period = (body as any).period || 'evening';
-    logger.info({ period }, 'DEBUG: Manual digest trigger');
+    logger.info({ period }, 'OPS: Manual digest trigger');
     triggerDigestManually(period).then((result) => {
-        logger.info({ result }, 'DEBUG: Digest completed');
+        logger.info({ result }, 'OPS: Digest completed');
     }).catch((err) => {
-        logger.error({ error: err }, 'DEBUG: Digest failed');
+        logger.error({ error: err }, 'OPS: Digest failed');
     });
     return c.json({ success: true, message: `Digest (${period}) started in background` });
 });
