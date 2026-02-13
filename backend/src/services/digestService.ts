@@ -4,35 +4,27 @@ import { logger } from '../config/logger.js';
 import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
 import { getDigestFallback } from '../utils/aiFallbacks.js';
 import {
-    tr_articles,
-    tr_daily_digests,
-    de_articles,
-    de_daily_digests,
-    us_articles,
-    us_daily_digests,
-    uk_articles,
-    uk_daily_digests,
-    fr_articles,
-    fr_daily_digests,
-    es_articles,
-    es_daily_digests,
-    it_articles,
-    it_daily_digests,
-    ru_articles,
-    ru_daily_digests,
+    tr_articles, tr_daily_digests, tr_tweets,
+    de_articles, de_daily_digests, de_tweets,
+    us_articles, us_daily_digests, us_tweets,
+    uk_articles, uk_daily_digests, uk_tweets,
+    fr_articles, fr_daily_digests, fr_tweets,
+    es_articles, es_daily_digests, es_tweets,
+    it_articles, it_daily_digests, it_tweets,
+    ru_articles, ru_daily_digests, ru_tweets,
 } from '../db/schema/index.js';
 import { gte, lte, eq, desc, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 const COUNTRY_TABLES = {
-    tr: { articles: tr_articles, digests: tr_daily_digests },
-    de: { articles: de_articles, digests: de_daily_digests },
-    us: { articles: us_articles, digests: us_daily_digests },
-    uk: { articles: uk_articles, digests: uk_daily_digests },
-    fr: { articles: fr_articles, digests: fr_daily_digests },
-    es: { articles: es_articles, digests: es_daily_digests },
-    it: { articles: it_articles, digests: it_daily_digests },
-    ru: { articles: ru_articles, digests: ru_daily_digests },
+    tr: { articles: tr_articles, digests: tr_daily_digests, tweets: tr_tweets },
+    de: { articles: de_articles, digests: de_daily_digests, tweets: de_tweets },
+    us: { articles: us_articles, digests: us_daily_digests, tweets: us_tweets },
+    uk: { articles: uk_articles, digests: uk_daily_digests, tweets: uk_tweets },
+    fr: { articles: fr_articles, digests: fr_daily_digests, tweets: fr_tweets },
+    es: { articles: es_articles, digests: es_daily_digests, tweets: es_tweets },
+    it: { articles: it_articles, digests: it_daily_digests, tweets: it_tweets },
+    ru: { articles: ru_articles, digests: ru_daily_digests, tweets: ru_tweets },
 } as const;
 
 type CountryCode = keyof typeof COUNTRY_TABLES;
@@ -43,10 +35,19 @@ interface TopicItem {
     description: string;
 }
 
+interface TweetInput {
+    text: string;
+    userName: string;
+    displayName: string;
+    likeCount: number;
+    retweetCount: number;
+}
+
 interface DigestResult {
     summaryText: string;
     topTopics: TopicItem[];
     articleCount: number;
+    tweetCount: number;
 }
 
 /**
@@ -54,6 +55,7 @@ interface DigestResult {
  */
 async function generateDigestWithAI(
     articles: { translatedTitle: string; summary: string; categoryId: number | null }[],
+    tweets: TweetInput[],
     period: Period,
     countryCode: CountryCode
 ): Promise<DigestResult> {
@@ -62,12 +64,27 @@ async function generateDigestWithAI(
             .map((a, i) => `${i + 1}. ${a.translatedTitle}: ${a.summary}`)
             .join('\n');
 
-        const prompt = `Aşağıdaki ${articles.length} haberi analiz et ve ${period === 'morning' ? 'sabah' : 'akşam'} özeti oluştur:
+        const tweetSection = tweets.length > 0
+            ? `\n\n--- ÖNEMLİ TWEETLER ---\n${tweets.map((t, i) =>
+                `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" (❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)})`
+            ).join('\n')}`
+            : '';
 
-${articleSummaries}
+        const sourceDescription = tweets.length > 0
+            ? `${articles.length} haberi ve ${tweets.length} önemli tweeti`
+            : `${articles.length} haberi`;
+
+        const tweetInstruction = tweets.length > 0
+            ? `\n   Hem haber kaynaklarından hem de resmi/kurumsal Twitter hesaplarından gelen bilgileri sentezle. Tweetlerdeki açıklamalar haberlere ek bağlam sağlıyorsa bunu belirt.`
+            : '';
+
+        const prompt = `Aşağıdaki ${sourceDescription} analiz et ve ${period === 'morning' ? 'sabah' : 'akşam'} özeti oluştur:
+
+--- HABERLER ---
+${articleSummaries}${tweetSection}
 
 Lütfen şunları sağla:
-1. summary: Günün önemli gelişmelerini özetleyen 2-3 paragraf (Türkçe, 150-200 kelime)
+1. summary: Günün önemli gelişmelerini özetleyen 2-3 paragraf (Türkçe, 150-200 kelime)${tweetInstruction}
 2. top_topics: En çok konuşulan 3-5 konu, her biri için:
    - title: Konu başlığı (örn: "Ekonomi", "Siyaset", "Spor")
    - description: Kısa açıklama (1-2 cümle)
@@ -127,11 +144,18 @@ Sadece JSON formatında cevap ver.`;
             summaryText: summaryText || 'Günün özeti oluşturulamadı.',
             topTopics,
             articleCount: articles.length,
+            tweetCount: tweets.length,
         };
     } catch (error) {
         logger.error({ error }, 'Digest AI generation failed');
-        return getDigestFallback(articles.length, true);
+        return { ...getDigestFallback(articles.length, true), tweetCount: 0 };
     }
+}
+
+function formatCount(n: number): string {
+    if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return String(n);
 }
 
 /**
@@ -209,8 +233,34 @@ export async function generateDailyDigest(
             return { id: '', success: false, error: 'No articles found' };
         }
 
+        // Fetch tweets from the same time window (sorted by engagement)
+        let tweets: TweetInput[] = [];
+        try {
+            const tweetTableName = `${countryCode}_tweets`;
+            const startEpoch = Math.floor(startTime.getTime() / 1000);
+            const endEpoch = Math.floor(endTime.getTime() / 1000);
+            const rawTweets = await db.all<{ text: string; user_name: string; display_name: string; like_count: number; retweet_count: number }>(
+                sql`SELECT text, user_name, display_name, like_count, retweet_count
+                    FROM ${sql.raw(tweetTableName)}
+                    WHERE tweeted_at >= ${startEpoch} AND tweeted_at <= ${endEpoch}
+                    ORDER BY like_count DESC
+                    LIMIT 30`
+            );
+            tweets = rawTweets.map(t => ({
+                text: t.text,
+                userName: t.user_name,
+                displayName: t.display_name,
+                likeCount: t.like_count,
+                retweetCount: t.retweet_count,
+            }));
+            logger.info({ countryCode, tweetCount: tweets.length }, 'Tweets fetched for digest');
+        } catch (error) {
+            // Tweet table might not exist yet — graceful fallback
+            logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'Failed to fetch tweets for digest, continuing without');
+        }
+
         // Generate digest with AI
-        const digestResult = await generateDigestWithAI(articles, period, countryCode);
+        const digestResult = await generateDigestWithAI(articles, tweets, period, countryCode);
 
         // Format date string
         const digestDate = targetDate.toISOString().split('T')[0];
@@ -229,21 +279,22 @@ export async function generateDailyDigest(
         const safeTopics = JSON.stringify(Array.isArray(digestResult.topTopics) ? digestResult.topTopics : []);
         const safeSummary = String(digestResult.summaryText || 'Günün özeti oluşturulamadı.');
         const safeCount = Number(digestResult.articleCount) || 0;
+        const safeTweetCount = Number(digestResult.tweetCount) || 0;
 
         // Use raw SQL for writes to bypass drizzle json mode serialization issues with local libsql
         const tableName = `${countryCode}_daily_digests`;
 
         if (existing) {
-            await db.run(sql`UPDATE ${sql.raw(tableName)} SET summary_text = ${safeSummary}, top_topics = ${safeTopics}, article_count = ${safeCount} WHERE id = ${existing.id}`);
+            await db.run(sql`UPDATE ${sql.raw(tableName)} SET summary_text = ${safeSummary}, top_topics = ${safeTopics}, article_count = ${safeCount}, tweet_count = ${safeTweetCount} WHERE id = ${existing.id}`);
 
-            logger.info({ countryCode, period, digestId: existing.id }, 'Digest updated');
+            logger.info({ countryCode, period, digestId: existing.id, tweetCount: safeTweetCount }, 'Digest updated');
             return { id: existing.id, success: true };
         }
 
         const digestId = uuidv4();
-        await db.run(sql`INSERT INTO ${sql.raw(tableName)} (id, country_code, period, digest_date, summary_text, top_topics, article_count, comment_count, created_at) VALUES (${digestId}, ${countryCode}, ${period}, ${digestDate}, ${safeSummary}, ${safeTopics}, ${safeCount}, 0, unixepoch())`);
+        await db.run(sql`INSERT INTO ${sql.raw(tableName)} (id, country_code, period, digest_date, summary_text, top_topics, article_count, tweet_count, comment_count, created_at) VALUES (${digestId}, ${countryCode}, ${period}, ${digestDate}, ${safeSummary}, ${safeTopics}, ${safeCount}, ${safeTweetCount}, 0, unixepoch())`);
 
-        logger.info({ countryCode, period, digestId, articleCount: digestResult.articleCount }, 'Digest created');
+        logger.info({ countryCode, period, digestId, articleCount: digestResult.articleCount, tweetCount: safeTweetCount }, 'Digest created');
         return { id: digestId, success: true };
     } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);

@@ -10,6 +10,7 @@ import { startScraperCron } from './cron/scraperCron';
 import { startDigestCron } from './cron/digestCron';
 import { startWeeklyCron } from './cron/weeklyCron';
 import { startAlignmentNotificationCron } from './cron/alignmentNotificationCron';
+import { startTweetCron } from './cron/tweetCron';
 
 // Import routes
 import categoriesRoute from './routes/categories';
@@ -164,10 +165,86 @@ app.post('/ops/digest', async (c) => {
     return c.json({ success: true, message: `Digest (${period}) started in background` });
 });
 
+// Temporary migration endpoint — remove after running once in production
+app.post('/ops/migrate-tweets', async (c) => {
+    const { db: database } = await import('./config/db.js');
+    const { sql: rawSql } = await import('drizzle-orm');
+    const results: string[] = [];
+    try {
+        // Create twitter_accounts table
+        await database.run(rawSql`CREATE TABLE IF NOT EXISTS twitter_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            country_code TEXT NOT NULL,
+            user_name TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            account_type TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            description TEXT,
+            gov_alignment_score INTEGER NOT NULL DEFAULT 0,
+            last_fetched_at INTEGER
+        )`);
+        results.push('twitter_accounts created');
+
+        // Create indexes for twitter_accounts
+        await database.run(rawSql`CREATE INDEX IF NOT EXISTS twitter_accounts_country_idx ON twitter_accounts(country_code)`);
+        await database.run(rawSql`CREATE INDEX IF NOT EXISTS twitter_accounts_active_idx ON twitter_accounts(is_active)`);
+        results.push('twitter_accounts indexes created');
+
+        // Create tweet tables for each country
+        const countries = ['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru'];
+        for (const cc of countries) {
+            await database.run(rawSql.raw(`CREATE TABLE IF NOT EXISTS ${cc}_tweets (
+                id TEXT PRIMARY KEY,
+                account_id INTEGER NOT NULL,
+                user_name TEXT NOT NULL,
+                display_name TEXT NOT NULL,
+                text TEXT NOT NULL,
+                lang TEXT,
+                like_count INTEGER NOT NULL DEFAULT 0,
+                retweet_count INTEGER NOT NULL DEFAULT 0,
+                reply_count INTEGER NOT NULL DEFAULT 0,
+                view_count INTEGER NOT NULL DEFAULT 0,
+                tweeted_at INTEGER NOT NULL,
+                fetched_at INTEGER NOT NULL DEFAULT (unixepoch()),
+                used_in_digest INTEGER NOT NULL DEFAULT 0
+            )`));
+            results.push(`${cc}_tweets created`);
+
+            await database.run(rawSql.raw(`CREATE INDEX IF NOT EXISTS ${cc}_tweets_tweeted_idx ON ${cc}_tweets(tweeted_at)`));
+            await database.run(rawSql.raw(`CREATE INDEX IF NOT EXISTS ${cc}_tweets_account_idx ON ${cc}_tweets(account_id)`));
+            results.push(`${cc}_tweets indexes created`);
+
+            // Add tweet_count column to digest tables
+            try {
+                await database.run(rawSql.raw(`ALTER TABLE ${cc}_daily_digests ADD COLUMN tweet_count INTEGER NOT NULL DEFAULT 0`));
+                results.push(`${cc}_daily_digests.tweet_count added`);
+            } catch {
+                results.push(`${cc}_daily_digests.tweet_count already exists`);
+            }
+        }
+
+        return c.json({ success: true, results });
+    } catch (error) {
+        return c.json({ success: false, error: String(error), results }, 500);
+    }
+});
+
+app.post('/ops/tweets', async (c) => {
+    const { scrapeAllTwitterAccounts } = await import('./services/scraper/tweetScraperService.js');
+    logger.info('OPS: Manual tweet scraper trigger');
+    scrapeAllTwitterAccounts().then(() => {
+        logger.info('OPS: Tweet scraping completed');
+    }).catch((err) => {
+        logger.error({ error: err }, 'OPS: Tweet scraping failed');
+    });
+    return c.json({ success: true, message: 'Tweet scraper started in background' });
+});
+
 // Start cron jobs
 if (env.NODE_ENV !== 'test') {
     startScraperCron();
     startDigestCron();
+    startTweetCron();
     startWeeklyCron();
     startAlignmentNotificationCron();
 }

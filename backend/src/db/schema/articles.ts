@@ -99,9 +99,34 @@ export function createDailyDigestsTable(countryCode: string) {
         summaryText: text('summary_text').notNull(),
         topTopics: text('top_topics', { mode: 'json' }).notNull(),
         articleCount: integer('article_count').notNull(),
+        tweetCount: integer('tweet_count').notNull().default(0),
         createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
         commentCount: integer('comment_count').notNull().default(0),
     });
+}
+
+// Helper for country-specific tweets table (from Twitter/X accounts)
+export function createTweetsTable(countryCode: string) {
+    const tableName = `${countryCode}_tweets`;
+
+    return sqliteTable(tableName, {
+        id: text('id').primaryKey(), // Tweet ID from Twitter API
+        accountId: integer('account_id').notNull(),
+        userName: text('user_name').notNull(),
+        displayName: text('display_name').notNull(),
+        text: text('text').notNull(),
+        lang: text('lang'),
+        likeCount: integer('like_count').notNull().default(0),
+        retweetCount: integer('retweet_count').notNull().default(0),
+        replyCount: integer('reply_count').notNull().default(0),
+        viewCount: integer('view_count').notNull().default(0),
+        tweetedAt: integer('tweeted_at', { mode: 'timestamp' }).notNull(),
+        fetchedAt: integer('fetched_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+        usedInDigest: integer('used_in_digest', { mode: 'boolean' }).notNull().default(false),
+    }, (table) => ({
+        tweetedIdx: index(`${countryCode}_tweets_tweeted_idx`).on(table.tweetedAt),
+        accountIdx: index(`${countryCode}_tweets_account_idx`).on(table.accountId),
+    }));
 }
 
 // Create tables for initial countries
@@ -152,3 +177,13 @@ export const ru_article_sources = createArticleSourcesTable('ru');
 export const ru_article_topics = createArticleTopicsTable('ru');
 export const ru_article_polls = createArticlePollsTable('ru');
 export const ru_daily_digests = createDailyDigestsTable('ru');
+
+// Tweet tables per country
+export const tr_tweets = createTweetsTable('tr');
+export const de_tweets = createTweetsTable('de');
+export const us_tweets = createTweetsTable('us');
+export const uk_tweets = createTweetsTable('uk');
+export const fr_tweets = createTweetsTable('fr');
+export const es_tweets = createTweetsTable('es');
+export const it_tweets = createTweetsTable('it');
+export const ru_tweets = createTweetsTable('ru');

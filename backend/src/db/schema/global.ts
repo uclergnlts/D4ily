@@ -55,6 +55,24 @@ export const rss_sources = sqliteTable('rss_sources', {
     activeIdx: index('rss_sources_active_idx').on(table.isActive),
 }));
 
+// Twitter accounts to track for digest enrichment
+export const twitter_accounts = sqliteTable('twitter_accounts', {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    countryCode: text('country_code').notNull(),
+    userName: text('user_name').notNull(),
+    displayName: text('display_name').notNull(),
+    accountType: text('account_type', {
+        enum: ['government', 'news_agency', 'journalist', 'institution', 'political_party']
+    }).notNull(),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    description: text('description'),
+    govAlignmentScore: integer('gov_alignment_score').notNull().default(0),
+    lastFetchedAt: integer('last_fetched_at', { mode: 'timestamp' }),
+}, (table) => ({
+    countryIdx: index('twitter_accounts_country_idx').on(table.countryCode),
+    activeIdx: index('twitter_accounts_active_idx').on(table.isActive),
+}));
+
 // Source alignment history for audit trail
 export const sourceAlignmentHistory = sqliteTable('source_alignment_history', {
     id: text('id').primaryKey(),

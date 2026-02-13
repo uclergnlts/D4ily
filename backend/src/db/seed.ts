@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { db } from '../config/db.js';
-import { categories, rss_sources } from '../db/schema/index.js';
+import { categories, rss_sources, twitter_accounts } from '../db/schema/index.js';
 
 async function seed() {
     console.log('🌱 Seeding database...');
@@ -696,6 +696,69 @@ async function seed() {
         },
     ]).onConflictDoNothing();
     console.log('✅ RSS sources seeded (or already exist)');
+
+    // Insert Twitter accounts for digest enrichment
+    await db.insert(twitter_accounts).values([
+        // Turkey
+        { id: 1, countryCode: 'tr', userName: 'RTErdogan', displayName: 'Recep Tayyip Erdogan', accountType: 'government' as const, description: 'Cumhurbaskani' },
+        { id: 2, countryCode: 'tr', userName: 'tcbaskanlik', displayName: 'T.C. Cumhurbaskanligi', accountType: 'government' as const, description: 'Cumhurbaskanligi resmi hesabi' },
+        { id: 3, countryCode: 'tr', userName: 'TC_Disisleri', displayName: 'TC Disisleri Bakanligi', accountType: 'government' as const, description: 'Disisleri Bakanligi' },
+        { id: 4, countryCode: 'tr', userName: 'iaborakisim', displayName: 'Iletisim Baskanligi', accountType: 'government' as const, description: 'Cumhurbaskanligi Iletisim Baskanligi' },
+        { id: 5, countryCode: 'tr', userName: 'aaborakans', displayName: 'Anadolu Ajansi', accountType: 'news_agency' as const, description: 'Resmi haber ajansi (Turkce)' },
+        { id: 6, countryCode: 'tr', userName: 'AnadoluAgency', displayName: 'Anadolu Agency', accountType: 'news_agency' as const, description: 'Anadolu Agency (English)' },
+        { id: 7, countryCode: 'tr', userName: 'trthaber', displayName: 'TRT Haber', accountType: 'news_agency' as const, description: 'TRT devlet yayin kurumu' },
+
+        // Germany
+        { id: 8, countryCode: 'de', userName: 'Bundeskanzler', displayName: 'Bundeskanzler', accountType: 'government' as const, description: 'Federal Chancellor' },
+        { id: 9, countryCode: 'de', userName: 'AusijirtigesAmt', displayName: 'Auswaertiges Amt', accountType: 'government' as const, description: 'Federal Foreign Office' },
+        { id: 10, countryCode: 'de', userName: 'RegSprecher', displayName: 'Regierungssprecher', accountType: 'government' as const, description: 'Government Spokesperson' },
+        { id: 11, countryCode: 'de', userName: 'taborakesschau', displayName: 'tagesschau', accountType: 'news_agency' as const, description: 'ARD public news' },
+        { id: 12, countryCode: 'de', userName: 'ZDFheute', displayName: 'ZDFheute', accountType: 'news_agency' as const, description: 'ZDF public broadcaster' },
+        { id: 13, countryCode: 'de', userName: 'dpa', displayName: 'dpa', accountType: 'news_agency' as const, description: 'Deutsche Presse-Agentur' },
+
+        // United States
+        { id: 14, countryCode: 'us', userName: 'POTUS', displayName: 'President of the United States', accountType: 'government' as const, description: 'US President official' },
+        { id: 15, countryCode: 'us', userName: 'WhiteHouse', displayName: 'The White House', accountType: 'government' as const, description: 'White House official' },
+        { id: 16, countryCode: 'us', userName: 'StateDept', displayName: 'Department of State', accountType: 'government' as const, description: 'US State Department' },
+        { id: 17, countryCode: 'us', userName: 'AP', displayName: 'The Associated Press', accountType: 'news_agency' as const, description: 'AP wire service' },
+        { id: 18, countryCode: 'us', userName: 'Reuters', displayName: 'Reuters', accountType: 'news_agency' as const, description: 'Reuters news wire' },
+        { id: 19, countryCode: 'us', userName: 'ABC', displayName: 'ABC News', accountType: 'news_agency' as const, description: 'ABC News' },
+
+        // United Kingdom
+        { id: 20, countryCode: 'uk', userName: 'UKPrimeMinister', displayName: 'UK Prime Minister', accountType: 'government' as const, description: 'PM official' },
+        { id: 21, countryCode: 'uk', userName: '10DowningStreet', displayName: '10 Downing Street', accountType: 'government' as const, description: 'PM office' },
+        { id: 22, countryCode: 'uk', userName: 'FCDOGovUK', displayName: 'FCDO', accountType: 'government' as const, description: 'Foreign Commonwealth & Development Office' },
+        { id: 23, countryCode: 'uk', userName: 'BBCNews', displayName: 'BBC News', accountType: 'news_agency' as const, description: 'BBC News (World)' },
+        { id: 24, countryCode: 'uk', userName: 'SkyNews', displayName: 'Sky News', accountType: 'news_agency' as const, description: 'Sky News' },
+
+        // France
+        { id: 25, countryCode: 'fr', userName: 'EmmanuelMacron', displayName: 'Emmanuel Macron', accountType: 'government' as const, description: 'President of France' },
+        { id: 26, countryCode: 'fr', userName: 'Elysee', displayName: 'Elysee', accountType: 'government' as const, description: 'French Presidency' },
+        { id: 27, countryCode: 'fr', userName: 'francediplo', displayName: 'France Diplomatie', accountType: 'government' as const, description: 'Ministry of Foreign Affairs' },
+        { id: 28, countryCode: 'fr', userName: 'gouvernementFR', displayName: 'Gouvernement', accountType: 'government' as const, description: 'French Government' },
+        { id: 29, countryCode: 'fr', userName: 'AFP', displayName: 'AFP', accountType: 'news_agency' as const, description: 'Agence France-Presse' },
+        { id: 30, countryCode: 'fr', userName: 'lemondefr', displayName: 'Le Monde', accountType: 'news_agency' as const, description: 'Le Monde newspaper' },
+
+        // Spain
+        { id: 31, countryCode: 'es', userName: 'saboraknchezcastejon', displayName: 'Pedro Sanchez', accountType: 'government' as const, description: 'President of the Government' },
+        { id: 32, countryCode: 'es', userName: 'lamoncloa', displayName: 'La Moncloa', accountType: 'government' as const, description: 'Spanish Government' },
+        { id: 33, countryCode: 'es', userName: 'MAECgob', displayName: 'MAEC', accountType: 'government' as const, description: 'Ministry of Foreign Affairs' },
+        { id: 34, countryCode: 'es', userName: 'EFEnoticias', displayName: 'Agencia EFE', accountType: 'news_agency' as const, description: 'EFE national news agency' },
+        { id: 35, countryCode: 'es', userName: 'el_pais', displayName: 'El Pais', accountType: 'news_agency' as const, description: 'El Pais newspaper' },
+
+        // Italy
+        { id: 36, countryCode: 'it', userName: 'GiorgiaMeloni', displayName: 'Giorgia Meloni', accountType: 'government' as const, description: 'Prime Minister of Italy' },
+        { id: 37, countryCode: 'it', userName: 'PalazzoChigi', displayName: 'Palazzo Chigi', accountType: 'government' as const, description: 'Italian Government' },
+        { id: 38, countryCode: 'it', userName: 'ItalyMFA', displayName: 'Italy MFA', accountType: 'government' as const, description: 'Ministry of Foreign Affairs' },
+        { id: 39, countryCode: 'it', userName: 'Agenzia_Ansa', displayName: 'ANSA', accountType: 'news_agency' as const, description: 'ANSA news agency' },
+        { id: 40, countryCode: 'it', userName: 'repubblica', displayName: 'la Repubblica', accountType: 'news_agency' as const, description: 'la Repubblica newspaper' },
+
+        // Russia
+        { id: 41, countryCode: 'ru', userName: 'KremlinRussia_E', displayName: 'President of Russia', accountType: 'government' as const, description: 'Kremlin English-language' },
+        { id: 42, countryCode: 'ru', userName: 'mfa_russia', displayName: 'MFA Russia', accountType: 'government' as const, description: 'Ministry of Foreign Affairs (EN)' },
+        { id: 43, countryCode: 'ru', userName: 'tass_agency', displayName: 'TASS', accountType: 'news_agency' as const, description: 'TASS Russian News Agency' },
+    ]).onConflictDoNothing();
+    console.log('✅ Twitter accounts seeded (or already exist)');
 
     console.log('🎉 Seeding completed!');
 }
