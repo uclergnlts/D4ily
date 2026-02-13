@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, useColorScheme } from 'react-native';
+import { View, Text, useColorScheme, useWindowDimensions } from 'react-native';
 import Svg from 'react-native-svg';
 import { useAllCII } from '../../hooks/useCII';
 import { COUNTRIES, MAP_VIEWBOX, THEME } from './mapConstants';
@@ -11,6 +11,7 @@ export const WorldMap: React.FC = () => {
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
     const theme = isDark ? THEME.dark : THEME.light;
+    const { width: screenWidth } = useWindowDimensions();
 
     const { data: allCII, isLoading } = useAllCII();
     const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
@@ -25,32 +26,39 @@ export const WorldMap: React.FC = () => {
 
     const selectedMeta = COUNTRIES.find((c) => c.code === selectedCountry);
 
+    // Calculate SVG dimensions from viewBox aspect ratio
+    const svgWidth = screenWidth;
+    const aspectRatio = MAP_VIEWBOX.width / MAP_VIEWBOX.height;
+    const svgHeight = svgWidth / aspectRatio;
+
     return (
         <View className="flex-1" style={{ backgroundColor: theme.bg }}>
-            <Svg
-                width="100%"
-                height="100%"
-                viewBox={`${MAP_VIEWBOX.x} ${MAP_VIEWBOX.y} ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
-                preserveAspectRatio="xMidYMid meet"
-            >
-                {COUNTRIES.map((country) => {
-                    const pathData = COUNTRY_PATHS[country.code];
-                    if (!pathData) return null;
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <Svg
+                    width={svgWidth}
+                    height={svgHeight}
+                    viewBox={`${MAP_VIEWBOX.x} ${MAP_VIEWBOX.y} ${MAP_VIEWBOX.width} ${MAP_VIEWBOX.height}`}
+                    preserveAspectRatio="xMidYMid meet"
+                >
+                    {COUNTRIES.map((country) => {
+                        const pathData = COUNTRY_PATHS[country.code];
+                        if (!pathData) return null;
 
-                    return (
-                        <CountryShape
-                            key={country.code}
-                            country={country}
-                            pathData={pathData}
-                            cii={allCII?.[country.code]}
-                            isDark={isDark}
-                            isSelected={selectedCountry === country.code}
-                            strokeColor={theme.countryStroke}
-                            onPress={handleCountryPress}
-                        />
-                    );
-                })}
-            </Svg>
+                        return (
+                            <CountryShape
+                                key={country.code}
+                                country={country}
+                                pathData={pathData}
+                                cii={allCII?.[country.code]}
+                                isDark={isDark}
+                                isSelected={selectedCountry === country.code}
+                                strokeColor={theme.countryStroke}
+                                onPress={handleCountryPress}
+                            />
+                        );
+                    })}
+                </Svg>
+            </View>
 
             {selectedMeta && (
                 <CountryTooltip
