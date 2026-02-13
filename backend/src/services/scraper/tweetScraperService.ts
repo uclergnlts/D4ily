@@ -41,10 +41,12 @@ interface TwitterApiTweet {
 }
 
 interface TwitterApiResponse {
-    tweets: TwitterApiTweet[];
-    has_next_page: boolean;
-    next_cursor: string;
     status: string;
+    data?: {
+        tweets: TwitterApiTweet[];
+        has_next_page: boolean;
+        next_cursor: string;
+    };
 }
 
 async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Response> {
@@ -70,14 +72,21 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Respo
 async function fetchUserTweets(userName: string): Promise<TwitterApiTweet[]> {
     const url = `${TWITTER_API_BASE}/twitter/user/last_tweets?userName=${encodeURIComponent(userName)}`;
     const response = await fetchWithRetry(url);
-    const data: TwitterApiResponse = await response.json();
+    const raw: TwitterApiResponse = await response.json();
 
-    if (data.status !== 'success' || !data.tweets) {
-        logger.warn({ userName, status: data.status }, 'Twitter API returned non-success');
+    if (raw.status !== 'success') {
+        logger.warn({ userName, status: raw.status }, 'Twitter API returned non-success');
         return [];
     }
 
-    return data.tweets;
+    // API wraps tweets inside data.tweets
+    const tweets = raw.data?.tweets;
+    if (!tweets || !Array.isArray(tweets)) {
+        logger.warn({ userName }, 'Twitter API returned no tweets array');
+        return [];
+    }
+
+    return tweets;
 }
 
 async function scrapeTwitterAccount(
