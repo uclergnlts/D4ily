@@ -139,6 +139,37 @@ if (env.NODE_ENV !== 'production') {
     logger.info('DEV endpoints enabled: POST /dev/scrape, POST /dev/digest');
 }
 
+// One-time migration: add missing columns to production Turso
+app.post('/debug/migrate', async (c) => {
+    const { createClient } = await import('@libsql/client');
+    const rawClient = createClient({
+        url: env.TURSO_DATABASE_URL,
+        ...(env.TURSO_DATABASE_URL.startsWith('file:') ? {} : { authToken: env.TURSO_AUTH_TOKEN }),
+    });
+
+    const countries = ['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru'];
+    const migrationResults: Record<string, unknown> = {};
+
+    for (const cc of countries) {
+        try {
+            // Check if detail_content column exists
+            const schema = await rawClient.execute(`PRAGMA table_info(${cc}_articles)`);
+            const columns = schema.rows.map(r => r.name);
+
+            if (!columns.includes('detail_content')) {
+                await rawClient.execute(`ALTER TABLE ${cc}_articles ADD COLUMN detail_content TEXT`);
+                migrationResults[`${cc}_articles`] = 'added detail_content';
+            } else {
+                migrationResults[`${cc}_articles`] = 'already has detail_content';
+            }
+        } catch (e: any) {
+            migrationResults[`${cc}_articles`] = { error: e?.message || String(e) };
+        }
+    }
+
+    return c.json({ migration: migrationResults });
+});
+
 // Temporary debug endpoint — diagnose rss_sources query hang
 app.get('/debug/db', async (c) => {
     const { createClient } = await import('@libsql/client');
