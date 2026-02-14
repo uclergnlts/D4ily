@@ -165,6 +165,46 @@ app.post('/ops/digest', async (c) => {
     return c.json({ success: true, message: `Digest (${period}) started in background` });
 });
 
+// Temporary migration endpoint - remove after running
+app.post('/ops/migrate-reliability', async (c) => {
+    const { db } = await import('./config/db.js');
+    const { sql } = await import('drizzle-orm');
+    const results: string[] = [];
+
+    const alterStatements = [
+        `ALTER TABLE rss_sources ADD COLUMN reliability_score REAL DEFAULT 0`,
+        `ALTER TABLE rss_sources ADD COLUMN reliability_vote_count INTEGER NOT NULL DEFAULT 0`,
+        `CREATE TABLE IF NOT EXISTS source_reliability_votes (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            source_id INTEGER NOT NULL,
+            score INTEGER NOT NULL,
+            created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+            UNIQUE(user_id, source_id)
+        )`,
+        `CREATE INDEX IF NOT EXISTS source_reliability_votes_user_idx ON source_reliability_votes(user_id)`,
+        `CREATE INDEX IF NOT EXISTS source_reliability_votes_source_idx ON source_reliability_votes(source_id)`,
+    ];
+
+    // Also add sections column to all digest tables
+    const countries = ['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru'];
+    for (const cc of countries) {
+        alterStatements.push(`ALTER TABLE ${cc}_daily_digests ADD COLUMN sections TEXT DEFAULT '[]'`);
+    }
+
+    for (const stmt of alterStatements) {
+        try {
+            await db.run(sql.raw(stmt));
+            results.push(`OK: ${stmt.substring(0, 60)}...`);
+        } catch (e: any) {
+            results.push(`SKIP: ${stmt.substring(0, 60)}... (${e.message})`);
+        }
+    }
+
+    return c.json({ success: true, results });
+});
+
 app.post('/ops/tweets', async (c) => {
     const { scrapeAllTwitterAccounts } = await import('./services/scraper/tweetScraperService.js');
     logger.info('OPS: Manual tweet scraper trigger');
