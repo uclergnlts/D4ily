@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
-import { rss_sources, sourceBiasVotes, sourceAlignmentHistory, userFollowedSources, sourceVotes } from '../db/schema/index.js';
+import { rss_sources, sourceBiasVotes, sourceAlignmentHistory, userFollowedSources, sourceVotes, sourceReliabilityVotes } from '../db/schema/index.js';
 import { eq, and, desc } from 'drizzle-orm';
 import { handleError } from '../utils/errors.js';
 import { countrySchema, biasScoreSchema } from '../utils/schemas.js';
@@ -641,6 +641,121 @@ app.get('/:sourceId/alignment-feedback', async (c) => {
         });
     } catch (error) {
         return handleError(c, error, 'Failed to fetch alignment feedback');
+    }
+});
+
+// POST /sources/:sourceId/reliability-vote - Vote on source reliability (1-5)
+app.post('/:sourceId/reliability-vote', voteRateLimiter, authMiddleware, async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const sourceId = parseInt(c.req.param('sourceId'), 10);
+
+        if (isNaN(sourceId)) {
+            return c.json({ success: false, error: 'Invalid source ID' }, 400);
+        }
+
+        const body = await c.req.json();
+        const score = body.score;
+
+        if (score === undefined || !Number.isInteger(score) || score < 1 || score > 5) {
+            return c.json({
+                success: false,
+                error: 'Invalid score. Must be an integer between 1 and 5',
+            }, 400);
+        }
+
+        const source = await db
+            .select()
+            .from(rss_sources)
+            .where(eq(rss_sources.id, sourceId))
+            .get();
+
+        if (!source) {
+            return c.json({ success: false, error: 'Source not found' }, 404);
+        }
+
+        const existingVote = await db
+            .select()
+            .from(sourceReliabilityVotes)
+            .where(and(
+                eq(sourceReliabilityVotes.userId, user.uid),
+                eq(sourceReliabilityVotes.sourceId, sourceId)
+            ))
+            .get();
+
+        if (existingVote) {
+            await db
+                .update(sourceReliabilityVotes)
+                .set({ score, updatedAt: new Date() })
+                .where(eq(sourceReliabilityVotes.id, existingVote.id));
+        } else {
+            await db.insert(sourceReliabilityVotes).values({
+                id: uuidv4(),
+                userId: user.uid,
+                sourceId,
+                score,
+                createdAt: new Date(),
+                updatedAt: new Date(),
+            });
+        }
+
+        // Recalculate average reliability score
+        const allVotes = await db
+            .select({ score: sourceReliabilityVotes.score })
+            .from(sourceReliabilityVotes)
+            .where(eq(sourceReliabilityVotes.sourceId, sourceId));
+
+        const avgScore = allVotes.reduce((sum, v) => sum + v.score, 0) / allVotes.length;
+        const voteCount = allVotes.length;
+
+        await db
+            .update(rss_sources)
+            .set({ reliabilityScore: avgScore, reliabilityVoteCount: voteCount })
+            .where(eq(rss_sources.id, sourceId));
+
+        logger.info({ userId: user.uid, sourceId, score, newAvg: avgScore }, 'User voted on source reliability');
+
+        return c.json({
+            success: true,
+            data: {
+                reliabilityScore: avgScore,
+                reliabilityVoteCount: voteCount,
+                yourVote: score,
+            },
+        }, existingVote ? 200 : 201);
+    } catch (error) {
+        return handleError(c, error, 'Failed to submit reliability vote');
+    }
+});
+
+// GET /sources/:sourceId/my-votes - Get current user's votes for a source
+app.get('/:sourceId/my-votes', authMiddleware, async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const sourceId = parseInt(c.req.param('sourceId'), 10);
+
+        if (isNaN(sourceId)) {
+            return c.json({ success: false, error: 'Invalid source ID' }, 400);
+        }
+
+        const [alignmentVote, reliabilityVote] = await Promise.all([
+            db.select().from(sourceVotes)
+                .where(and(eq(sourceVotes.userId, user.uid), eq(sourceVotes.sourceId, sourceId)))
+                .get(),
+            db.select().from(sourceReliabilityVotes)
+                .where(and(eq(sourceReliabilityVotes.userId, user.uid), eq(sourceReliabilityVotes.sourceId, sourceId)))
+                .get(),
+        ]);
+
+        return c.json({
+            success: true,
+            data: {
+                alignmentVote: alignmentVote?.score ?? null,
+                reliabilityVote: reliabilityVote?.score ?? null,
+            },
+        });
+    } catch (error) {
+        return handleError(c, error, 'Failed to fetch user votes');
     }
 });
 

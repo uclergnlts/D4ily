@@ -62,12 +62,14 @@ function transformTopTopics(topics: any): { title: string; description: string; 
 // Transform digest response for mobile compatibility
 function transformDigestResponse(digest: any) {
     const topTopics = safeJsonParse(digest.topTopics, []);
+    const sections = safeJsonParse(digest.sections, []);
     return {
         ...digest,
         date: digest.digestDate,           // digestDate → date
         summary: digest.summaryText,       // summaryText → summary
         title: generateTitle(digest),      // Generate title
         topTopics: transformTopTopics(topTopics), // string[] → {title, description}[]
+        sections,                          // Category-based sections (TR only)
     };
 }
 

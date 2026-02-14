@@ -11,6 +11,8 @@ export interface Source {
     govAlignmentConfidence: number;
     govAlignmentNotes: string;
     govAlignmentLastUpdated: string;
+    reliabilityScore: number;
+    reliabilityVoteCount: number;
 }
 
 // API Response Types
@@ -56,6 +58,14 @@ export interface Category {
     color: string | null;
 }
 
+export interface DigestSection {
+    category: string;
+    icon: string;
+    summary: string;
+    highlights: string[];
+    tweetContext?: string;
+}
+
 export interface DailyDigest {
     id: string;
     date: string; // YYYY-MM-DD
@@ -68,6 +78,7 @@ export interface DailyDigest {
         description: string;
         articleId?: string;
     }[];
+    sections?: DigestSection[];
     articleCount: number;
     createdAt: string;
 }

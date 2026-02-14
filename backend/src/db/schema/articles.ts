@@ -98,6 +98,7 @@ export function createDailyDigestsTable(countryCode: string) {
         digestDate: text('digest_date').notNull(), // YYYY-MM-DD
         summaryText: text('summary_text').notNull(),
         topTopics: text('top_topics', { mode: 'json' }).notNull(),
+        sections: text('sections', { mode: 'json' }), // Category-based digest sections (TR only for now)
         articleCount: integer('article_count').notNull(),
         tweetCount: integer('tweet_count').notNull().default(0),
         createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),

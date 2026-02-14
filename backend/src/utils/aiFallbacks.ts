@@ -46,9 +46,18 @@ export interface EntityFallback {
     events: string[];
 }
 
+export interface DigestSection {
+    category: string;
+    icon: string;
+    summary: string;
+    highlights: string[];
+    tweetContext?: string;
+}
+
 export interface DigestFallback {
     summaryText: string;
     topTopics: { title: string; description: string }[];
+    sections: DigestSection[];
     articleCount: number;
 }
 
@@ -154,6 +163,7 @@ export function getDigestFallback(
             ? `Bugün ${articleCount} haber işlendi. Önemli gelişmeler için haberleri inceleyiniz.`
             : `${articleCount} articles were processed today. Please check the news for important developments.`,
         topTopics: [],
+        sections: [],
         articleCount,
     };
 }

@@ -25,7 +25,21 @@ export const sourceService = {
         return response.data.data;
     },
 
-    getSource: async (sourceId: number) => {
-        // Logic for fetching source details if needed
-    }
+    voteReliability: async (sourceId: number, score: number) => {
+        const response = await client.post<ApiResponse<any>>(`/sources/${sourceId}/reliability-vote`, { score });
+        if (!response.data.success) {
+            throw new Error(response.data.error || 'Reliability vote failed');
+        }
+        return response.data.data;
+    },
+
+    getMyVotes: async (sourceId: number): Promise<{ alignmentVote: number | null; reliabilityVote: number | null }> => {
+        try {
+            const response = await client.get<ApiResponse<{ alignmentVote: number | null; reliabilityVote: number | null }>>(`/sources/${sourceId}/my-votes`);
+            if (!response.data.success) return { alignmentVote: null, reliabilityVote: null };
+            return response.data.data;
+        } catch {
+            return { alignmentVote: null, reliabilityVote: null };
+        }
+    },
 };

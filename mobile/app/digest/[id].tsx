@@ -5,6 +5,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useDigestDetail } from '../../src/hooks/useDigest';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
 import { DigestHeader } from '../../src/components/digest/DigestHeader';
+import { DigestSectionList } from '../../src/components/digest/DigestSectionList';
 import { DigestTopicList } from '../../src/components/digest/DigestTopicList';
 
 
@@ -70,6 +71,14 @@ export default function DigestDetailScreen() {
                         summary={digest.summary}
                         className="m-4"
                     />
+
+                    {/* Category Sections (TR digests) */}
+                    {digest.sections && digest.sections.length > 0 && (
+                        <DigestSectionList
+                            sections={digest.sections}
+                            className="mt-2 mb-4"
+                        />
+                    )}
 
                     {/* Top Topics */}
                     <DigestTopicList

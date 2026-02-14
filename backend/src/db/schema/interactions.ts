@@ -157,6 +157,20 @@ export const readingHistory = sqliteTable('reading_history', {
     viewedAtIdx: index('reading_history_viewed_at_idx').on(table.viewedAt),
 }));
 
+// Source reliability votes - Users rate source trustworthiness (1-5)
+export const sourceReliabilityVotes = sqliteTable('source_reliability_votes', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    sourceId: integer('source_id').notNull(),
+    score: integer('score').notNull(), // 1-5 (1=unreliable, 5=very reliable)
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+    unique: unique().on(table.userId, table.sourceId),
+    userIdx: index('source_reliability_votes_user_idx').on(table.userId),
+    sourceIdx: index('source_reliability_votes_source_idx').on(table.sourceId),
+}));
+
 // Source alignment votes - Users can vote on alignment accuracy
 export const sourceAlignmentVotes = sqliteTable('source_alignment_votes', {
     id: text('id').primaryKey(),

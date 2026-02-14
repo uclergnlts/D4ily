@@ -50,6 +50,9 @@ export const rss_sources = sqliteTable('rss_sources', {
     govAlignmentConfidence: real('gov_alignment_confidence').default(0.7),
     govAlignmentNotes: text('gov_alignment_notes'),
     govAlignmentLastUpdated: integer('gov_alignment_last_updated', { mode: 'timestamp' }),
+    // Reliability / trustworthiness index (user-voted, 1-5 scale)
+    reliabilityScore: real('reliability_score').default(0),
+    reliabilityVoteCount: integer('reliability_vote_count').notNull().default(0),
 }, (table) => ({
     countryIdx: index('rss_sources_country_idx').on(table.countryCode),
     activeIdx: index('rss_sources_active_idx').on(table.isActive),
