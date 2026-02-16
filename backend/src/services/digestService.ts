@@ -66,48 +66,53 @@ interface ArticleInput {
 }
 
 /**
- * Generate daily digest for non-TR countries (original format)
+ * Generate daily digest for non-TR countries
+ * Tweets are the PRIMARY source, RSS articles provide supporting context.
  */
 async function generateDefaultDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
     period: Period,
 ): Promise<DigestResult> {
-    const articleSummaries = articles
-        .map((a, i) => `${i + 1}. ${a.translatedTitle}: ${a.summary}`)
-        .join('\n');
+    const periodLabel = period === 'morning' ? 'sabah' : 'akşam';
 
-    const tweetSection = tweets.length > 0
-        ? `\n\n--- ÖNEMLİ TWEETLER ---\n${tweets.map((t, i) =>
-            `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" (❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)})`
-        ).join('\n')}`
+    // Tweets are primary — build them first and prominently
+    const tweetBlock = tweets.length > 0
+        ? tweets.map((t, i) =>
+            `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" [❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)}]`
+        ).join('\n')
         : '';
 
-    const sourceDescription = tweets.length > 0
-        ? `${articles.length} haberi ve ${tweets.length} önemli tweeti`
-        : `${articles.length} haberi`;
-
-    const tweetInstruction = tweets.length > 0
-        ? `\n   Hem haber kaynaklarından hem de resmi/kurumsal Twitter hesaplarından gelen bilgileri sentezle. Tweetlerdeki açıklamalar haberlere ek bağlam sağlıyorsa bunu belirt.`
+    // Articles are supporting context
+    const articleBlock = articles.length > 0
+        ? articles.map((a, i) => `${i + 1}. ${a.translatedTitle}: ${a.summary}`).join('\n')
         : '';
 
-    const prompt = `Aşağıdaki ${sourceDescription} analiz et ve ${period === 'morning' ? 'sabah' : 'akşam'} özeti oluştur:
+    const sourceStats = `${tweets.length} tweet${articles.length > 0 ? ` ve ${articles.length} haber kaynağı` : ''}`;
 
---- HABERLER ---
-${articleSummaries}${tweetSection}
+    const prompt = `Aşağıdaki ${sourceStats} kullanarak ${periodLabel} bültenini oluştur.
 
-Lütfen şunları sağla:
-1. summary: Günün önemli gelişmelerini özetleyen 2-3 paragraf (Türkçe, 150-200 kelime)${tweetInstruction}
-2. top_topics: En çok konuşulan 3-5 konu, her biri için:
-   - title: Konu başlığı (örn: "Ekonomi", "Siyaset", "Spor")
-   - description: Kısa açıklama (1-2 cümle)
+ÖNEMLİ: X (Twitter) paylaşımları birincil haber kaynağıdır — gündemin nabzını tweetler belirler. Haber kaynakları ise ek bağlam ve detay sağlar.
 
-Örnek format:
+=== ANA KAYNAKLAR: X (Twitter) Paylaşımları ===
+${tweetBlock || '(Tweet verisi yok)'}
+
+=== DESTEKLEYICI: Haber Kaynakları ===
+${articleBlock || '(Haber verisi yok)'}
+
+Şunları üret (JSON):
+1. summary: Gündemin genel değerlendirmesi (2-3 paragraf, 150-200 kelime).
+   - Tweetlerdeki anlık gelişmeleri, resmi açıklamaları ve kamuoyu tepkilerini ÖNCELİKLİ olarak yansıt.
+   - Haber kaynaklarından gelen detayları bağlam olarak ekle.
+   - Kim ne dedi, nasıl tepki aldı — bunu yansıt.
+2. top_topics: En çok konuşulan 3-5 konu:
+   - title: Konu başlığı
+   - description: 1-2 cümle açıklama
+
 {
   "summary": "...",
   "top_topics": [
-    { "title": "Ekonomi", "description": "Dolar kuru ve enflasyon gelişmeleri gündemin başında" },
-    { "title": "Siyaset", "description": "Yerel seçimler öncesi partiler arası rekabet artıyor" }
+    { "title": "...", "description": "..." }
   ]
 }
 
@@ -119,7 +124,7 @@ Sadece JSON formatında cevap ver.`;
             messages: [
                 {
                     role: 'system',
-                    content: 'Sen bir haber analisti AI\'sısın. Günlük haber özetleri oluşturuyorsun. Sadece JSON formatında cevap ver.',
+                    content: 'Sen bir gündem analisti AI\'sısın. X (Twitter) platformundaki anlık paylaşımları birincil kaynak olarak kullanıp, haber sitelerinden gelen bilgilerle destekleyerek günlük bültenler oluşturuyorsun. Sadece JSON formatında cevap ver.',
                 },
                 { role: 'user', content: prompt },
             ],
@@ -131,7 +136,7 @@ Sadece JSON formatında cevap ver.`;
             useQuickClient: false,
             skipCircuitBreaker: true,
             fallback: () => getDigestFallback(articles.length, true),
-            maxContentLength: 30000,
+            maxContentLength: 40000,
         }
     );
 
@@ -156,13 +161,29 @@ Sadece JSON formatında cevap ver.`;
 
 /**
  * Generate detailed sectioned digest for Turkey
+ * Tweets are the PRIMARY source — they set the agenda.
+ * RSS articles provide depth and context.
  */
 async function generateTRDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
     period: Period,
 ): Promise<DigestResult> {
-    // Group articles by category for structured prompt
+    const periodLabel = period === 'morning' ? 'sabah' : 'akşam';
+
+    // --- PRIMARY: Tweets grouped by engagement tiers ---
+    const highEngagement = tweets.filter(t => t.likeCount >= 1000 || t.retweetCount >= 200);
+    const medEngagement = tweets.filter(t => t.likeCount < 1000 && t.retweetCount < 200);
+
+    const formatTweet = (t: TweetInput, i: number) =>
+        `  ${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" [❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)}]`;
+
+    const tweetBlock = [
+        highEngagement.length > 0 ? `[Yüksek Etkileşim]\n${highEngagement.map(formatTweet).join('\n')}` : '',
+        medEngagement.length > 0 ? `[Diğer Önemli Paylaşımlar]\n${medEngagement.map(formatTweet).join('\n')}` : '',
+    ].filter(Boolean).join('\n\n');
+
+    // --- SUPPORTING: Articles grouped by category ---
     const grouped: Record<string, ArticleInput[]> = {};
     for (const article of articles) {
         const catName = article.categoryId ? (CATEGORY_NAMES[article.categoryId] || 'Gündem') : 'Gündem';
@@ -170,60 +191,50 @@ async function generateTRDigestWithAI(
         grouped[catName].push(article);
     }
 
-    // Build category-grouped article text
     const categoryBlocks = Object.entries(grouped)
-        .sort((a, b) => b[1].length - a[1].length) // Most articles first
+        .sort((a, b) => b[1].length - a[1].length)
         .map(([cat, arts]) => {
             const items = arts.map((a, i) => `  ${i + 1}. ${a.translatedTitle}: ${a.summary}`).join('\n');
             return `[${cat}] (${arts.length} haber)\n${items}`;
         })
         .join('\n\n');
 
-    const tweetSection = tweets.length > 0
-        ? `\n\n--- ÖNEMLİ TWEETLER ---\n${tweets.map((t, i) =>
-            `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" (❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)})`
-        ).join('\n')}`
-        : '';
+    const prompt = `Aşağıdaki ${tweets.length} X (Twitter) paylaşımı ve ${articles.length} haber kaynağını kullanarak Türkiye ${periodLabel} bültenini oluştur.
 
-    const tweetInstruction = tweets.length > 0
-        ? `Tweetlerdeki resmi açıklamalar haberlere ek bağlam sağlıyorsa, ilgili bölümün "tweetContext" alanında belirt.`
-        : '';
+ÖNEMLİ: X platformundaki paylaşımlar BİRİNCİL haber kaynağıdır. Gündemin nabzı tweetlerden okunur — kim ne dedi, nasıl tepki aldı, hangi konular trend oldu. Haber siteleri ise bu gelişmelere derinlik ve bağlam katar.
 
-    const periodLabel = period === 'morning' ? 'sabah' : 'akşam';
+=== ANA KAYNAKLAR: X (Twitter) Paylaşımları ===
+${tweetBlock || '(Tweet verisi yok)'}
 
-    const prompt = `Aşağıdaki ${articles.length} haber${tweets.length > 0 ? ` ve ${tweets.length} önemli tweet` : ''} analiz ederek Türkiye ${periodLabel} bültenini oluştur.
+=== DESTEKLEYICI: Haber Kaynakları (kategorilere göre) ===
+${categoryBlocks || '(Haber verisi yok)'}
 
-Haberler kategorilere göre gruplandırılmıştır:
-
-${categoryBlocks}${tweetSection}
-
-Detaylı bir bülten oluştur. JSON formatında şu yapıyı kullan:
+Detaylı bülten oluştur. JSON formatında:
 
 {
-  "summary": "Günün genel değerlendirmesi, 2-3 cümlelik kısa giriş paragrafı",
+  "summary": "Gündemin genel değerlendirmesi — tweetlerdeki ana akımları ve tepkileri öne çıkar, haber detaylarıyla destekle (2-3 cümle)",
   "sections": [
     {
       "category": "Kategori adı",
       "icon": "Uygun emoji",
-      "summary": "Bu kategorideki gelişmeleri anlatan detaylı 1-2 paragraf (her paragraf en az 3-4 cümle)",
-      "highlights": ["Öne çıkan gelişme 1", "Öne çıkan gelişme 2", "Öne çıkan gelişme 3"],
-      "tweetContext": "Varsa ilgili tweet bilgisi, yoksa boş string"
+      "summary": "Bu kategorideki gelişmeler. Önce tweetlerdeki açıklamalar/tepkiler, sonra haberlerin sağladığı bağlam (en az 80 kelime)",
+      "highlights": ["Öne çıkan gelişme 1", "Gelişme 2", "Gelişme 3"],
+      "tweetContext": "Bu kategoride öne çıkan tweet(ler) ve kim ne dedi — doğrudan alıntı yapılabilir"
     }
   ],
   "top_topics": [
-    { "title": "Konu başlığı", "description": "1-2 cümle açıklama" }
+    { "title": "Konu başlığı", "description": "1-2 cümle, tweetlerdeki tartışmayı yansıtan açıklama" }
   ]
 }
 
 Kurallar:
-- Haberlere göre en az 3, en fazla 6 bölüm (section) oluştur. Yeterli haber olmayan kategorileri ATLA.
-- Her bölümün summary'si detaylı olsun (en az 80 kelime). Sadece başlıkları değil, gelişmelerin bağlamını ve önemini açıkla.
-- highlights her bölümde 2-4 madde olsun.
-- ${tweetInstruction}
-- top_topics en çok konuşulan 3-5 ana konuyu listelesin (bölümlerden bağımsız).
-- Tüm içerik Türkçe olsun.
-- Toplam bülten yaklaşık 500-700 kelime olmalı.
-- icon alanında kategoriye uygun tek bir emoji kullan (örn: 🏛️ Siyaset, 💰 Ekonomi, ⚽ Spor, 🌍 Dünya, 🛡️ Güvenlik, 💻 Teknoloji, 🏥 Sağlık, ⚡ Enerji, 🎭 Kültür, 📰 Gündem, 🗺️ Jeopolitik).
+- En az 3, en fazla 6 bölüm oluştur. Her bölümde tweet kaynaklı bilgi ÖNCELİKLİ olsun.
+- Her bölümün summary'si detaylı olsun (en az 80 kelime). Tweetlerdeki resmi açıklamaları, siyasetçi/gazeteci yorumlarını, kamuoyu tepkisini yansıt. Haber kaynaklarından detay ekle.
+- tweetContext alanı zorunlu — o kategoride en dikkat çekici tweeti/açıklamayı özetle.
+- highlights her bölümde 2-4 madde.
+- top_topics: Tweetlerde en çok tartışılan 3-5 konuyu listele.
+- Tüm içerik Türkçe, toplam 500-700 kelime.
+- icon: tek emoji (🏛️ Siyaset, 💰 Ekonomi, ⚽ Spor, 🌍 Dünya, 🛡️ Güvenlik, 💻 Teknoloji, 🏥 Sağlık, ⚡ Enerji, 🎭 Kültür, 📰 Gündem, 🗺️ Jeopolitik).
 
 Sadece JSON formatında cevap ver.`;
 
@@ -233,7 +244,7 @@ Sadece JSON formatında cevap ver.`;
             messages: [
                 {
                     role: 'system',
-                    content: 'Sen deneyimli bir Türkiye haber analisti AI\'sısın. Günlük haber bültenleri oluşturuyorsun. Haberleri kategorilere ayırarak detaylı, bilgilendirici özetler hazırlıyorsun. Sadece JSON formatında cevap ver.',
+                    content: 'Sen deneyimli bir Türkiye gündem analisti AI\'sısın. X (Twitter) platformundaki anlık paylaşımları birincil kaynak olarak kullanıp, haber sitelerinden gelen bilgilerle destekleyerek kategorize edilmiş günlük bültenler oluşturuyorsun. Tweetlerdeki açıklamalar, tepkiler ve tartışmalar bültenin omurgasını oluşturur. Sadece JSON formatında cevap ver.',
                 },
                 { role: 'user', content: prompt },
             ],
@@ -245,7 +256,7 @@ Sadece JSON formatında cevap ver.`;
             useQuickClient: false,
             skipCircuitBreaker: true,
             fallback: () => getDigestFallback(articles.length, true),
-            maxContentLength: 50000, // Larger budget for TR sectioned prompt
+            maxContentLength: 60000,
         }
     );
 

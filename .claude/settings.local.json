@@ -85,7 +85,8 @@
       "Bash(do curl -s \"https://d4ily-production.up.railway.app/digest/$cc/latest\")",
       "Bash(done)",
       "Bash(where:*)",
-      "Bash(eas:*)"
+      "Bash(eas:*)",
+      "Bash(npm uninstall:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"
