@@ -104,6 +104,20 @@ export interface Comment {
     replyCount?: number;
 }
 
+export interface WeeklyComparison {
+    id: string;
+    weekStart: string; // YYYY-MM-DD (Monday)
+    weekEnd: string;   // YYYY-MM-DD (Sunday)
+    countriesData: Record<string, {
+        topics: string[];
+        sentiment: 'positive' | 'neutral' | 'negative';
+        summary: string;
+    }>;
+    comparisonText: string;
+    createdAt: string;
+    commentCount: number;
+}
+
 // Emotional Analysis Types
 export type EmotionalTone = {
     anger: number;

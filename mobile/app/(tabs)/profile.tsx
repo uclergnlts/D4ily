@@ -7,8 +7,11 @@ import { useAppStore } from '../../src/store/useAppStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useSources } from '../../src/hooks/useSources';
 import { useLatestDigest } from '../../src/hooks/useDigest';
+import { useCII, useAllCII } from '../../src/hooks/useCII';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { sourceService } from '../../src/api/services/sourceService';
+import { NewsAtmosphereCard } from '../../src/components/analysis/NewsAtmosphereCard';
+import { CountryCIIComparison } from '../../src/components/analysis/CountryCIIComparison';
 import { Source } from '../../src/types';
 import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 import { useQueryClient } from '@tanstack/react-query';
@@ -337,6 +340,8 @@ export default function AnalysisScreen() {
     const user = useAuthStore(s => s.user);
     const { data: sources, isLoading: sourcesLoading } = useSources(selectedCountry);
     const { data: latestDigest, isLoading: digestLoading } = useLatestDigest(selectedCountry);
+    const { data: ciiData } = useCII(selectedCountry);
+    const { data: allCII } = useAllCII();
     const { getEntryAnimation } = useStaggeredEntry();
     const queryClient = useQueryClient();
 
@@ -436,14 +441,28 @@ export default function AnalysisScreen() {
                         </Animated.View>
                     )}
 
+                    {/* News Atmosphere - CII Breakdown */}
+                    {ciiData && (
+                        <Animated.View className="mb-4" entering={getEntryAnimation(1)}>
+                            <NewsAtmosphereCard data={ciiData} />
+                        </Animated.View>
+                    )}
+
+                    {/* Country CII Comparison */}
+                    {allCII && Object.keys(allCII).length > 1 && (
+                        <Animated.View className="mb-4" entering={getEntryAnimation(2)}>
+                            <CountryCIIComparison allCII={allCII} selectedCountry={selectedCountry} />
+                        </Animated.View>
+                    )}
+
                     {/* Spectrum overview */}
                     {sortedSources.length > 0 && (
-                        <Animated.View entering={getEntryAnimation(1)}>
+                        <Animated.View entering={getEntryAnimation(3)}>
                             <SpectrumOverview sources={sortedSources} />
                         </Animated.View>
                     )}
 
-                    <Animated.View className="mb-3" entering={getEntryAnimation(2)}>
+                    <Animated.View className="mb-3" entering={getEntryAnimation(4)}>
                         <View className="flex-row items-center gap-2 mb-1">
                             <ShieldCheck size={18} color="#006FFF" />
                             <Text
@@ -466,7 +485,7 @@ export default function AnalysisScreen() {
 
                     {sortedSources.length > 0 ? (
                         sortedSources.map((source, i) => (
-                            <Animated.View key={source.id} entering={getEntryAnimation(i + 3)}>
+                            <Animated.View key={source.id} entering={getEntryAnimation(i + 5)}>
                                 <SourceCard
                                     source={source}
                                     onAlignmentVote={handleAlignmentVote}

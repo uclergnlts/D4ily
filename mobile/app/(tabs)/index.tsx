@@ -157,7 +157,7 @@ export default function HomeScreen() {
                                 // @ts-ignore
                                 onPress={() => router.push({
                                     pathname: '/digest/[id]',
-                                    params: { id: dailyDigests.morning!.id }
+                                    params: { id: dailyDigests.morning!.id, country: selectedCountry }
                                 })}
                             />
                         ) : (
@@ -176,7 +176,7 @@ export default function HomeScreen() {
                                 // @ts-ignore
                                 onPress={() => router.push({
                                     pathname: '/digest/[id]',
-                                    params: { id: dailyDigests.evening!.id }
+                                    params: { id: dailyDigests.evening!.id, country: selectedCountry }
                                 })}
                             />
                         ) : (

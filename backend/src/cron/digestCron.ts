@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { logger } from '../config/logger.js';
 import { generateAllDigests } from '../services/digestService.js';
+import { sendDigestNotifications } from '../services/digestNotificationService.js';
 
 /**
  * Digest Cron Job
@@ -17,11 +18,20 @@ export function startDigestCron() {
             const failed = results.filter(r => !r.success).length;
 
             logger.info({ successful, failed, results }, 'Morning digest generation completed');
+
+            // Send push notifications for morning digest
+            if (successful > 0) {
+                try {
+                    await sendDigestNotifications('morning');
+                } catch (notifError) {
+                    logger.error({ error: notifError }, 'Failed to send morning digest notifications');
+                }
+            }
         } catch (error) {
             logger.error({ error }, 'Morning digest generation failed');
         }
     }, {
-        timezone: 'Europe/Istanbul', // Adjust timezone as needed
+        timezone: 'Europe/Istanbul',
     });
 
     // Evening digest at 19:00
@@ -34,6 +44,15 @@ export function startDigestCron() {
             const failed = results.filter(r => !r.success).length;
 
             logger.info({ successful, failed, results }, 'Evening digest generation completed');
+
+            // Send push notifications for evening digest
+            if (successful > 0) {
+                try {
+                    await sendDigestNotifications('evening');
+                } catch (notifError) {
+                    logger.error({ error: notifError }, 'Failed to send evening digest notifications');
+                }
+            }
         } catch (error) {
             logger.error({ error }, 'Evening digest generation failed');
         }

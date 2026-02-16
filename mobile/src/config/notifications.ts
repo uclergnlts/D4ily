@@ -45,7 +45,7 @@ export async function initNotifications() {
 
         // Get push token
         const tokenData = await Notifications.getExpoPushTokenAsync({
-            projectId: process.env.EXPO_PUBLIC_PROJECT_ID || 'your-project-id',
+            projectId: '48c5bd0c-f017-4675-a5b1-039df60c199e',
         });
 
         const pushToken = tokenData.data;
@@ -74,16 +74,15 @@ export async function registerPushToken(
     authToken: string
 ): Promise<boolean> {
     try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/notifications/register`, {
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/notifications/register-device`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`,
             },
             body: JSON.stringify({
-                token,
-                platform: Platform.OS,
-                userId,
+                fcmToken: token,
+                deviceType: Platform.OS,
             }),
         });
 
@@ -106,32 +105,33 @@ export async function registerPushToken(
  */
 export async function unregisterPushToken(
     token: string,
-    userId: string,
     authToken: string
 ): Promise<boolean> {
     try {
-        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/notifications/unregister`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${authToken}`,
-            },
-            body: JSON.stringify({
-                token,
-                userId,
-            }),
+        // Get user's devices and find matching one
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/notifications/devices`, {
+            headers: { 'Authorization': `Bearer ${authToken}` },
         });
 
-        if (!response.ok) {
-            throw new Error('Failed to unregister push token');
-        }
+        if (!response.ok) return false;
 
-        console.log('✅ Push token unregistered successfully');
-        trackEvent('push_token_unregistered', { userId });
-        return true;
+        const { data: devices } = await response.json();
+        const device = devices?.find((d: any) => d.fcmToken === token);
+        if (!device) return true; // Already gone
+
+        const deleteRes = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/notifications/device/${device.id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+        });
+
+        if (deleteRes.ok) {
+            console.log('✅ Push token unregistered successfully');
+            trackEvent('push_token_unregistered');
+        }
+        return deleteRes.ok;
     } catch (error) {
         console.error('❌ Failed to unregister push token:', error);
-        captureException(error as Error, { context: 'unregisterPushToken', userId });
+        captureException(error as Error, { context: 'unregisterPushToken' });
         return false;
     }
 }

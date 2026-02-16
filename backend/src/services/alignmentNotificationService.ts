@@ -11,7 +11,6 @@ import { eq, and, inArray } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getAlignmentLabel } from '../utils/alignment.js';
-import { messaging, isFirebaseEnabled } from '../config/firebase.js';
 
 export interface AlignmentChange {
     sourceId: number;
@@ -193,7 +192,7 @@ export async function processPendingAlignmentNotifications(batchSize: number = 5
 }
 
 /**
- * Send push notifications to devices using FCM
+ * Send push notifications to devices using Expo Push API
  */
 async function sendPushNotifications(
     devices: Array<{ fcmToken: string; deviceType: string }>,
@@ -201,58 +200,39 @@ async function sendPushNotifications(
     body: string,
     data: Record<string, string>
 ): Promise<void> {
-    if (!isFirebaseEnabled || !messaging) {
-        logger.warn('Firebase messaging not configured, skipping push notifications');
-        return;
-    }
-
     if (devices.length === 0) {
         return;
     }
 
-    const tokens = devices.map(d => d.fcmToken);
+    const messages = devices.map(d => ({
+        to: d.fcmToken,
+        sound: 'default' as const,
+        title,
+        body,
+        data,
+    }));
 
     try {
-        // Send using sendEachForMulticast for better error handling
-        const response = await messaging.sendEachForMulticast({
-            tokens,
-            notification: { title, body },
-            data,
-            android: {
-                priority: 'high',
-                notification: {
-                    channelId: 'alignment_changes',
-                },
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(process.env.EXPO_ACCESS_TOKEN
+                    ? { 'Authorization': `Bearer ${process.env.EXPO_ACCESS_TOKEN}` }
+                    : {}),
             },
-            apns: {
-                payload: {
-                    aps: {
-                        sound: 'default',
-                        badge: 1,
-                    },
-                },
-            },
+            body: JSON.stringify(messages),
         });
 
-        logger.info({
-            successCount: response.successCount,
-            failureCount: response.failureCount,
-            title,
-        }, 'Push notifications sent');
-
-        // Log failed tokens for cleanup
-        if (response.failureCount > 0) {
-            response.responses.forEach((resp, idx) => {
-                if (!resp.success) {
-                    logger.warn({
-                        token: tokens[idx].substring(0, 20) + '...',
-                        error: resp.error?.code,
-                    }, 'Failed to send push notification');
-                }
-            });
+        if (!response.ok) {
+            logger.error({ status: response.status }, 'Expo Push API error');
+            return;
         }
+
+        const result = await response.json();
+        logger.info({ title, deviceCount: devices.length, result }, 'Push notifications sent via Expo');
     } catch (error) {
-        logger.error({ error }, 'FCM sendEachForMulticast failed');
+        logger.error({ error }, 'Expo Push API request failed');
     }
 }
 

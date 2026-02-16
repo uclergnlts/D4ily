@@ -187,13 +187,10 @@ export async function sendPushNotification(
             return false;
         }
 
-        // Send notification to all tokens
-        // This is where you would integrate with your push notification service
-        // Example with Expo Push Notifications:
-        /*
+        // Send via Expo Push API
         const messages = tokens.map(token => ({
             to: token.token,
-            sound: 'default',
+            sound: 'default' as const,
             title: payload.title,
             body: payload.body,
             data: payload.data || {},
@@ -203,11 +200,17 @@ export async function sendPushNotification(
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.EXPO_ACCESS_TOKEN}`,
+                ...(process.env.EXPO_ACCESS_TOKEN
+                    ? { 'Authorization': `Bearer ${process.env.EXPO_ACCESS_TOKEN}` }
+                    : {}),
             },
             body: JSON.stringify(messages),
         });
-        */
+
+        if (!response.ok) {
+            console.error('❌ Expo Push API error:', response.status, await response.text());
+            return false;
+        }
 
         console.log(`✅ Push notification sent to ${tokens.length} device(s) for user:`, userId);
         trackEvent(userId, 'push_notification_sent', { type: payload.type, deviceCount: tokens.length });

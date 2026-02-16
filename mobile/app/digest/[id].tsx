@@ -1,21 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share , useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useDigestDetail } from '../../src/hooks/useDigest';
+import { useTrackReading } from '../../src/hooks/useHistory';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
 import { DigestHeader } from '../../src/components/digest/DigestHeader';
 import { DigestSectionList } from '../../src/components/digest/DigestSectionList';
 import { DigestTopicList } from '../../src/components/digest/DigestTopicList';
+import { CommentSection } from '../../src/components/comments/CommentSection';
 
 
 export default function DigestDetailScreen() {
-    const { id } = useLocalSearchParams<{ id: string }>();
+    const { id, country } = useLocalSearchParams<{ id: string; country?: string }>();
     const router = useRouter();
     const colorScheme = useColorScheme();
     const isDark = colorScheme === 'dark';
+    const queryClient = useQueryClient();
+    const countryCode = country || 'tr';
+    const trackReading = useTrackReading();
 
-    const { data: digest, isLoading } = useDigestDetail('tr', id!);
+    const { data: digest, isLoading } = useDigestDetail(countryCode, id!);
+
+    // Track reading history
+    useEffect(() => {
+        if (id && countryCode) {
+            trackReading.mutate({ articleId: id, countryCode });
+        }
+    }, [id, countryCode]);
 
     if (isLoading || !digest) {
         return (
@@ -87,7 +100,16 @@ export default function DigestDetailScreen() {
                             pathname: '/article/[id]',
                             params: { id: articleId }
                         })}
-                        className="mb-6"
+                        className="mb-4"
+                    />
+
+                    {/* Comments */}
+                    <CommentSection
+                        comments={(digest as any).comments ?? []}
+                        targetType="daily_digest"
+                        targetId={id!}
+                        country={countryCode}
+                        onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['digest', id] })}
                     />
                 </ScrollView>
             </SafeAreaView>

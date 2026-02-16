@@ -39,6 +39,23 @@ export const THEME = {
     },
 };
 
+export const MARKER_THEME = {
+    light: {
+        bg: '#6366f1',         // indigo-500
+        text: '#ffffff',
+        ring: '#818cf8',       // indigo-400
+        selectedBg: '#4f46e5', // indigo-600
+        selectedRing: '#a5b4fc', // indigo-300
+    },
+    dark: {
+        bg: '#818cf8',         // indigo-400
+        text: '#1e1b4b',       // indigo-950
+        ring: '#6366f1',       // indigo-500
+        selectedBg: '#a5b4fc', // indigo-300
+        selectedRing: '#c7d2fe', // indigo-200
+    },
+};
+
 export function getCIIColor(level?: 'low' | 'medium' | 'high'): string {
     switch (level) {
         case 'low': return '#10b981';

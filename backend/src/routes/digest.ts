@@ -11,7 +11,7 @@ import {
     ru_daily_digests,
     comments,
 } from '../db/schema/index.js';
-import { eq, and, desc, isNull } from 'drizzle-orm';
+import { eq, and, desc, isNull, gte } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getLatestDigest, getDigestByDateAndPeriod } from '../services/digestService.js';
@@ -72,6 +72,79 @@ function transformDigestResponse(digest: any) {
         sections,                          // Category-based sections (TR only)
     };
 }
+
+// In-memory cache for locations endpoint
+let locationsCache: { data: any; timestamp: number; days: number } | null = null;
+const LOCATIONS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+
+/**
+ * GET /digest/locations
+ * Aggregate recent digest topics per country for map markers
+ * Query params: ?days=7 (default 7, max 14)
+ */
+digestRoute.get('/locations', async (c) => {
+    try {
+        const daysParam = parseInt(c.req.query('days') || '7', 10);
+        const days = Math.min(Math.max(daysParam, 1), 14);
+
+        // Check cache
+        if (locationsCache && locationsCache.days === days && Date.now() - locationsCache.timestamp < LOCATIONS_CACHE_TTL) {
+            return c.json({ success: true, data: locationsCache.data, cached: true });
+        }
+
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+        const countries = Object.keys(COUNTRY_TABLES) as Array<keyof typeof COUNTRY_TABLES>;
+        const result: Record<string, any> = {};
+
+        const queries = countries.map(async (country) => {
+            const table = COUNTRY_TABLES[country];
+            const digests = await db
+                .select({
+                    digestDate: table.digestDate,
+                    period: table.period,
+                    topTopics: table.topTopics,
+                })
+                .from(table)
+                .where(gte(table.digestDate, cutoffStr))
+                .orderBy(desc(table.createdAt));
+
+            const allTopics: { title: string; description: string; date: string; period: string }[] = [];
+            for (const digest of digests) {
+                const topics = safeJsonParse(digest.topTopics, []);
+                const transformed = transformTopTopics(topics);
+                for (const topic of transformed) {
+                    allTopics.push({
+                        title: topic.title,
+                        description: topic.description,
+                        date: digest.digestDate,
+                        period: digest.period,
+                    });
+                }
+            }
+
+            result[country] = {
+                countryCode: country,
+                digestCount: digests.length,
+                topTopics: allTopics,
+            };
+        });
+
+        await Promise.all(queries);
+
+        locationsCache = { data: result, timestamp: Date.now(), days };
+
+        return c.json({ success: true, data: result });
+    } catch (error) {
+        logger.error({ error }, 'Get digest locations failed');
+        return c.json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get locations',
+        }, 500);
+    }
+});
 
 /**
  * GET /digest/:country/latest

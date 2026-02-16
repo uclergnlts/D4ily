@@ -24,3 +24,11 @@ export function useDigestDetail(country: string, digestId: string) {
         enabled: !!digestId,
     });
 }
+
+export function useNewsLocations(days: number = 7) {
+    return useQuery({
+        queryKey: ['digest', 'locations', days],
+        queryFn: () => digestService.getNewsLocations(days),
+        staleTime: 1000 * 60 * 15, // 15 minutes
+    });
+}

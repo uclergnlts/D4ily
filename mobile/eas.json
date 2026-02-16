@@ -20,7 +20,7 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api-staging.yourapp.com"
+        "EXPO_PUBLIC_API_URL": "https://d4ily-production.up.railway.app"
       },
       "ios": {
         "resourceClass": "m-medium"
@@ -32,7 +32,7 @@
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.yourapp.com"
+        "EXPO_PUBLIC_API_URL": "https://d4ily-production.up.railway.app"
       },
       "ios": {
         "resourceClass": "m-medium"
