@@ -16,22 +16,22 @@ export const ArticleHeader = React.memo(function ArticleHeader({ title, publishe
             <View className="flex-row items-center justify-between mb-5">
                 {category ? (
                     <View className="bg-blue-600/10 dark:bg-blue-400/10 px-3 py-1.5 rounded-full">
-                        <Text className="text-[11px] font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest leading-none">
+                        <Text className="text-body-xs font-black text-blue-700 dark:text-blue-400 uppercase tracking-widest leading-none">
                             {category}
                         </Text>
                     </View>
                 ) : <View />}
 
-                <View className="bg-zinc-100 dark:bg-zinc-800 px-3 py-1.5 rounded-full">
+                <View className="bg-surface-subtle dark:bg-surface-subtle-dark px-3 py-1.5 rounded-full">
                     <TimeAgo
                         date={publishedAt}
-                        className="text-[11px] text-zinc-500 dark:text-zinc-400 font-semibold leading-none"
+                        className="text-body-xs text-zinc-500 dark:text-zinc-400 font-semibold leading-none"
                     />
                 </View>
             </View>
 
             {/* Main Title: Modern & Big */}
-            <Text className="text-[34px] leading-[42px] font-black text-zinc-900 dark:text-white font-['System'] tracking-tight mb-4 text-left">
+            <Text className="text-display-2xl font-display text-zinc-900 dark:text-white tracking-tight mb-4 text-left">
                 {title}
             </Text>
 

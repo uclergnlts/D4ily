@@ -79,14 +79,14 @@ export const SideMenu = () => {
 
             {/* Menu Panel */}
             <Animated.View
-                className="absolute top-0 left-0 bottom-0 bg-white dark:bg-zinc-900 shadow-2xl z-50 h-full border-r border-zinc-100 dark:border-zinc-800"
+                className="absolute top-0 left-0 bottom-0 bg-surface-light dark:bg-zinc-900 shadow-2xl z-50 h-full border-r border-zinc-100 dark:border-zinc-800"
                 style={[{ width: MENU_WIDTH }, animatedStyle]}
                 pointerEvents="auto"
             >
                 <SafeAreaViewWrapper>
                     {/* Header */}
                     {/* User Profile Header */}
-                    <View className="px-6 pt-2 pb-6 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900">
+                    <View className="px-6 pt-2 pb-6 border-b border-zinc-100 dark:border-zinc-800 bg-surface-light dark:bg-zinc-900">
                         {user ? (
                             <View className="flex-row items-center gap-4">
                                 <View className="w-14 h-14 rounded-full bg-blue-100 dark:bg-blue-900 justify-center items-center border-2 border-white dark:border-zinc-800 shadow-sm">
@@ -95,10 +95,10 @@ export const SideMenu = () => {
                                     </Text>
                                 </View>
                                 <View className="flex-1">
-                                    <Text className="text-lg font-bold text-zinc-900 dark:text-white leading-6">
+                                    <Text className="text-body-lg font-bold text-zinc-900 dark:text-white leading-6">
                                         {user.name || 'Kullanıcı'}
                                     </Text>
-                                    <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+                                    <Text className="text-body-xs text-zinc-500 dark:text-zinc-400">
                                         {user.email}
                                     </Text>
                                     <View className="mt-2 flex-row items-center">
@@ -116,10 +116,10 @@ export const SideMenu = () => {
                                     <User size={24} color="#a1a1aa" />
                                 </View>
                                 <View>
-                                    <Text className="text-lg font-bold text-zinc-900 dark:text-white">
+                                    <Text className="text-body-lg font-bold text-zinc-900 dark:text-white">
                                         Giriş Yap
                                     </Text>
-                                    <Text className="text-xs text-zinc-500">
+                                    <Text className="text-body-xs text-zinc-500">
                                         Özelleştirilmiş deneyim için
                                     </Text>
                                 </View>
@@ -138,23 +138,23 @@ export const SideMenu = () => {
 
                     {/* Country Selector in Menu */}
                     <View className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-                        <Text className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Ülke / Bölge</Text>
+                        <Text className="text-body-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Ülke / Bölge</Text>
                         <CountrySelector />
                     </View>
 
                     {/* Mode Switcher in Menu */}
                     <View className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800">
-                        <Text className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Akış Modu</Text>
+                        <Text className="text-body-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Akış Modu</Text>
                         <View className="flex-row items-center justify-between bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
                             <View className="flex-row items-center gap-3">
                                 <View className={`w-8 h-8 rounded-full items-center justify-center ${isBalanced ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-zinc-200 dark:bg-zinc-700'}`}>
                                     <Scale size={16} color={isBalanced ? '#6366f1' : '#71717a'} />
                                 </View>
                                 <View>
-                                    <Text className="font-bold text-zinc-900 dark:text-white">
+                                    <Text className="font-bold text-body-md text-zinc-900 dark:text-white">
                                         {isBalanced ? 'Dengeli Mod' : 'Normal Mod'}
                                     </Text>
-                                    <Text className="text-[11px] text-zinc-500">
+                                    <Text className="text-body-xs text-zinc-500">
                                         {isBalanced ? 'Tüm perspektifler' : 'Standart akış'}
                                     </Text>
                                 </View>
@@ -173,7 +173,7 @@ export const SideMenu = () => {
                     <View className="flex-1">
                         {/* Navigation Items */}
                         <View className="p-4">
-                            <Text className="px-4 mb-2 text-xs font-bold text-zinc-400 uppercase tracking-wider">Menü</Text>
+                            <Text className="px-4 mb-2 text-body-xs font-bold text-zinc-400 uppercase tracking-wider">Menü</Text>
                             {menuItems.map((item, index) => (
                                 <TouchableOpacity
                                     key={index}

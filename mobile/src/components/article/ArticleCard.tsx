@@ -30,17 +30,17 @@ export const ArticleCard = React.memo(function ArticleCard({ article }: ArticleC
 
     return (
         <Link href={`/article/${article.id}`} asChild>
-            <TouchableOpacity className="bg-white dark:bg-zinc-900 mx-4 mb-4 p-4 rounded-[24px] shadow-sm shadow-zinc-200/50 dark:shadow-none border border-zinc-100 dark:border-zinc-800 active:scale-[0.98] transition-transform">
+            <TouchableOpacity className="bg-surface-light dark:bg-zinc-900 mx-4 mb-4 p-4 rounded-[20px] shadow-sm shadow-zinc-200/50 dark:shadow-none border border-zinc-100 dark:border-zinc-800 active:scale-[0.98] transition-transform">
                 {/* Header/Badge Area if needed, or just spacers */}
 
                 <View className="flex-row gap-4">
                     <View className="flex-1">
-                        <Text className="text-[16px] font-bold text-zinc-900 dark:text-white leading-[22px] mb-2 tracking-tight">
+                        <Text className="text-body-lg font-bold text-zinc-900 dark:text-white mb-2 tracking-tight">
                             {article.translatedTitle}
                         </Text>
                         <Text
                             numberOfLines={3}
-                            className="text-[13px] text-zinc-500 dark:text-zinc-400 leading-[19px] font-medium"
+                            className="text-body-sm text-zinc-500 dark:text-zinc-400 font-medium"
                         >
                             {article.summary || "Haber detayı için tıklayınız..."}
                         </Text>
@@ -49,16 +49,16 @@ export const ArticleCard = React.memo(function ArticleCard({ article }: ArticleC
                         <View className="flex-row items-center gap-2 mt-3.5">
                             <Image
                                 source={{ uri: finalLogo }}
-                                style={{ width: 18, height: 18, borderRadius: 6, backgroundColor: '#f4f4f5' }}
+                                style={{ width: 16, height: 16, borderRadius: 4, backgroundColor: '#f4f4f5' }}
                                 contentFit="cover"
                             />
-                            <Text className="text-[11px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">
+                            <Text className="text-[10px] font-bold text-zinc-600 dark:text-zinc-300 uppercase tracking-wide">
                                 {sourceName}
                             </Text>
-                            <Text className="text-[11px] text-zinc-300 dark:text-zinc-600">
+                            <Text className="text-[10px] text-zinc-300 dark:text-zinc-600">
                                 •
                             </Text>
-                            <Text className="text-[11px] text-zinc-400 font-medium">
+                            <Text className="text-[10px] text-zinc-400 font-medium">
                                 <TimeAgo date={article.publishedAt} />
                             </Text>
                         </View>
@@ -68,21 +68,21 @@ export const ArticleCard = React.memo(function ArticleCard({ article }: ArticleC
                     {article.imageUrl ? (
                         <Image
                             source={{ uri: article.imageUrl }}
-                            style={{ width: 96, height: 96, borderRadius: 16 }}
+                            style={{ width: 96, height: 96, borderRadius: 12 }}
                             contentFit="cover"
                             transition={200}
                         />
                     ) : null}
                 </View>
 
-                <View className="flex-row items-center gap-5 mt-4 pt-4 border-t border-zinc-50 dark:border-zinc-800/50">
-                    <View className="flex-row items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1 rounded-lg">
-                        <Eye size={13} color="#a1a1aa" />
-                        <Text className="text-[11px] text-zinc-500 font-semibold">{article.viewCount || Math.floor(Math.random() * 500) + 100}</Text>
+                <View className="flex-row items-center gap-5 mt-4 pt-3 border-t border-zinc-50 dark:border-zinc-800/50">
+                    <View className="flex-row items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/50 px-2.5 py-1 rounded-lg">
+                        <Eye size={12} color="#a1a1aa" />
+                        <Text className="text-body-xs text-zinc-500 font-semibold">{article.viewCount || Math.floor(Math.random() * 500) + 100}</Text>
                     </View>
-                    <View className="flex-row items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1 rounded-lg">
-                        <MessageCircle size={13} color="#a1a1aa" />
-                        <Text className="text-[11px] text-zinc-500 font-semibold">{article.commentCount || Math.floor(Math.random() * 20)}</Text>
+                    <View className="flex-row items-center gap-1.5 bg-zinc-50 dark:bg-zinc-800/50 px-2.5 py-1 rounded-lg">
+                        <MessageCircle size={12} color="#a1a1aa" />
+                        <Text className="text-body-xs text-zinc-500 font-semibold">{article.commentCount || Math.floor(Math.random() * 20)}</Text>
                     </View>
                     <View className="flex-1" />
                     <TouchableOpacity className="p-1">

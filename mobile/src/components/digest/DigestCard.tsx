@@ -22,7 +22,7 @@ export const DigestCard = ({ type, title, summary, onPress, disabled }: DigestCa
             onPress={onPress}
             disabled={disabled}
             activeOpacity={0.8}
-            className={`flex-1 rounded-3xl p-4 border ${borderColor} ${bgColor} mr-3 last:mr-0 min-h-[180px] justify-between`}
+            className={`flex-1 rounded-[20px] p-4 border ${borderColor} ${bgColor} mr-3 last:mr-0 min-h-[180px] justify-between shadow-sm shadow-zinc-200/50 dark:shadow-none`}
             style={{ opacity: disabled ? 0.6 : 1 }}
             accessibilityLabel={`${isMorning ? 'Gündüz' : 'Akşam'} özeti: ${title}`}
             accessibilityRole="button"
@@ -30,28 +30,26 @@ export const DigestCard = ({ type, title, summary, onPress, disabled }: DigestCa
         >
             <View>
                 <View className="flex-row items-center justify-between mb-3">
-                    <View className="w-8 h-8 rounded-full items-center justify-center bg-white dark:bg-black/20">
+                    <View className="w-8 h-8 rounded-full items-center justify-center bg-surface-light dark:bg-black/20">
                         <Icon size={18} color={iconColor} fill={iconColor} />
                     </View>
                     <Text
-                        className="text-xs text-zinc-500 uppercase tracking-widest"
-                        style={{ fontFamily: 'DMSans_700Bold' }}
+                        className="text-body-xs text-zinc-500 uppercase tracking-widest font-bold"
                     >
                         {isMorning ? 'GÜNDÜZ' : 'AKŞAM'}
                     </Text>
                 </View>
 
                 <Text
-                    className="text-[16px] text-zinc-900 dark:text-white mb-2"
-                    style={{ fontFamily: 'DMSans_700Bold', lineHeight: 22 }}
+                    className="text-body-lg font-bold text-zinc-900 dark:text-white mb-2 leading-[22px]"
                     numberOfLines={2}
                 >
                     {title}
                 </Text>
 
                 <Text
-                    className="text-[13px] text-zinc-600 dark:text-zinc-400"
-                    style={{ fontFamily: 'DMSans_400Regular', lineHeight: 20 }}
+                    className="text-body-sm text-zinc-600 dark:text-zinc-400 leading-[20px]"
+                    style={{ fontFamily: 'DMSans_400Regular' }}
                     numberOfLines={3}
                 >
                     {summary}

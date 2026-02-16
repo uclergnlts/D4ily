@@ -14,11 +14,18 @@ import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 
 export default function HomeScreen() {
     const router = useRouter();
-    const colorScheme = useColorScheme();
-    const isDark = colorScheme === 'dark';
+    const activeScheme = useThemeStore(state => state.activeScheme);
+    const isDark = activeScheme === 'dark';
     const { selectedCountry, toggleSideMenu } = useAppStore();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [hasAutoSelected, setHasAutoSelected] = useState(false);
+
+    // Initialize period based on time of day (Morning < 17:00 <= Evening)
+    const [selectedPeriod, setSelectedPeriod] = useState<'morning' | 'evening'>(() => {
+        const hour = new Date().getHours();
+        return hour >= 17 ? 'evening' : 'morning';
+    });
+
     const { getEntryAnimation } = useStaggeredEntry();
 
     const { data: digests, isLoading, refetch, isRefetching } = useDigests(selectedCountry);
@@ -41,14 +48,11 @@ export default function HomeScreen() {
         }
     }, [digests, hasAutoSelected]);
 
-    const dailyDigests = useMemo(() => {
-        if (!digests) return { morning: null, evening: null };
+    const currentDigest = useMemo(() => {
+        if (!digests) return null;
         const dateStr = selectedDate.toISOString().split('T')[0];
-        return {
-            morning: digests.find(d => d.date === dateStr && d.period === 'morning'),
-            evening: digests.find(d => d.date === dateStr && d.period === 'evening')
-        };
-    }, [digests, selectedDate]);
+        return digests.find(d => d.date === dateStr && d.period === selectedPeriod);
+    }, [digests, selectedDate, selectedPeriod]);
 
     const changeDate = (days: number) => {
         const newDate = new Date(selectedDate);
@@ -72,8 +76,8 @@ export default function HomeScreen() {
     }
 
     return (
-        <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
-            <View className="px-5 py-4 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-black z-10">
+        <SafeAreaView className="flex-1 bg-surface-light dark:bg-black" edges={['top']}>
+            <View className="px-5 py-4 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800 bg-surface-light dark:bg-black z-10">
                 <View className="flex-row items-center gap-3">
                     <TouchableOpacity
                         onPress={toggleSideMenu}
@@ -102,8 +106,7 @@ export default function HomeScreen() {
                     <View className="flex-row items-center mx-2 gap-2">
                         <Calendar size={14} color="#71717a" />
                         <Text
-                            className="text-[14px] text-zinc-700 dark:text-zinc-300"
-                            style={{ fontFamily: 'DMSans_700Bold' }}
+                            className="text-body-md text-zinc-700 dark:text-zinc-300 font-sans-bold"
                         >
                             {formatDateDisplay(selectedDate)}
                         </Text>
@@ -133,71 +136,69 @@ export default function HomeScreen() {
             >
                 <Animated.View className="mb-6 items-center" entering={getEntryAnimation(0)}>
                     <Text
-                        className="text-[28px] text-zinc-900 dark:text-white mb-1"
-                        style={{ fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}
+                        className="text-display-xl text-zinc-900 dark:text-white mb-1 font-display-extrabold"
+                        style={{ letterSpacing: -0.5 }}
                         accessibilityRole="header"
                     >
                         {selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
                     </Text>
                     <Text
-                        className="text-[16px] text-zinc-500 dark:text-zinc-400"
-                        style={{ fontFamily: 'DMSans_500Medium' }}
+                        className="text-body-lg text-zinc-500 dark:text-zinc-400 font-sans-medium"
                     >
                         {selectedDate.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric' })}
                     </Text>
                 </Animated.View>
 
-                <View className="flex-row gap-4">
-                    <Animated.View className="flex-1" entering={getEntryAnimation(1)}>
-                        {dailyDigests.morning ? (
-                            <DigestCard
-                                type="morning"
-                                title={dailyDigests.morning.title}
-                                summary={dailyDigests.morning.summary}
-                                // @ts-ignore
-                                onPress={() => router.push({
-                                    pathname: '/digest/[id]',
-                                    params: { id: dailyDigests.morning!.id, country: selectedCountry }
-                                })}
-                            />
-                        ) : (
-                            <View className="rounded-3xl p-4 border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 min-h-[180px] items-center justify-center opacity-60">
-                                <Text className="text-zinc-400 text-center" style={{ fontFamily: 'DMSans_500Medium' }}>Gündüz özeti yok</Text>
-                            </View>
-                        )}
-                    </Animated.View>
-
-                    <Animated.View className="flex-1" entering={getEntryAnimation(2)}>
-                        {dailyDigests.evening ? (
-                            <DigestCard
-                                type="evening"
-                                title={dailyDigests.evening.title}
-                                summary={dailyDigests.evening.summary}
-                                // @ts-ignore
-                                onPress={() => router.push({
-                                    pathname: '/digest/[id]',
-                                    params: { id: dailyDigests.evening!.id, country: selectedCountry }
-                                })}
-                            />
-                        ) : (
-                            <View className="rounded-3xl p-4 border border-dashed border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/50 min-h-[180px] items-center justify-center opacity-60">
-                                <Text className="text-zinc-400 text-center" style={{ fontFamily: 'DMSans_500Medium' }}>Akşam özeti yok</Text>
-                            </View>
-                        )}
-                    </Animated.View>
+                {/* Period Toggle */}
+                <View className="flex-row bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl mb-6 border border-zinc-200 dark:border-zinc-800">
+                    <TouchableOpacity
+                        onPress={() => setSelectedPeriod('morning')}
+                        className={`flex-1 flex-row items-center justify-center py-3 rounded-xl gap-2 ${selectedPeriod === 'morning' ? 'bg-white dark:bg-zinc-800 shadow-sm' : ''}`}
+                    >
+                        <View className={`w-2 h-2 rounded-full ${selectedPeriod === 'morning' ? 'bg-amber-500' : 'bg-zinc-400'}`} />
+                        <Text className={`text-body-md font-bold ${selectedPeriod === 'morning' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
+                            Gündüz Bülteni
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => setSelectedPeriod('evening')}
+                        className={`flex-1 flex-row items-center justify-center py-3 rounded-xl gap-2 ${selectedPeriod === 'evening' ? 'bg-white dark:bg-zinc-800 shadow-sm' : ''}`}
+                    >
+                        <View className={`w-2 h-2 rounded-full ${selectedPeriod === 'evening' ? 'bg-indigo-500' : 'bg-zinc-400'}`} />
+                        <Text className={`text-body-md font-bold ${selectedPeriod === 'evening' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
+                            Akşam Bülteni
+                        </Text>
+                    </TouchableOpacity>
                 </View>
 
-                {!dailyDigests.morning && !dailyDigests.evening && (
-                    <Animated.View className="mt-12 items-center" entering={getEntryAnimation(0)}>
-                        <BookOpen size={48} color="#e4e4e7" strokeWidth={1.5} />
-                        <Text
-                            className="text-zinc-400 text-center mt-4"
-                            style={{ fontFamily: 'DMSans_400Regular' }}
-                        >
-                            Bu tarih için henüz bülten oluşturulmamış.
-                        </Text>
-                    </Animated.View>
-                )}
+                <Animated.View className="flex-1" entering={getEntryAnimation(1)}>
+                    {currentDigest ? (
+                        <View className="min-h-[300px]">
+                            <DigestCard
+                                type={selectedPeriod}
+                                title={currentDigest.title}
+                                summary={currentDigest.summary}
+                                // @ts-ignore
+                                onPress={() => router.push({
+                                    pathname: '/digest/[id]',
+                                    params: { id: currentDigest.id, country: selectedCountry }
+                                })}
+                            />
+                        </View>
+                    ) : (
+                        <View className="rounded-[24px] p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 bg-surface-subtle dark:bg-surface-subtle-dark min-h-[300px] items-center justify-center">
+                            <View className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center mb-4">
+                                <BookOpen size={32} color={isDark ? "#52525b" : "#a1a1aa"} />
+                            </View>
+                            <Text className="text-display-lg text-zinc-900 dark:text-white font-display text-center mb-2">
+                                {selectedPeriod === 'morning' ? 'Gündüz' : 'Akşam'} Özeti Yok
+                            </Text>
+                            <Text className="text-body-md text-zinc-500 text-center font-medium max-w-[250px]">
+                                Bu tarih için henüz {selectedPeriod === 'morning' ? 'sabah' : 'akşam'} bülteni oluşturulmamış.
+                            </Text>
+                        </View>
+                    )}
+                </Animated.View>
             </ScrollView>
         </SafeAreaView>
     );
