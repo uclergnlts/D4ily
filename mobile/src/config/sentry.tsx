@@ -1,3 +1,4 @@
+import React from 'react';
 import * as Sentry from '@sentry/react-native';
 import { Platform } from 'react-native';
 
