@@ -90,33 +90,35 @@ async function generateDefaultDigestWithAI(
 
     const sourceStats = `${tweets.length} tweet${articles.length > 0 ? ` ve ${articles.length} haber kaynağı` : ''}`;
 
-    const prompt = `Aşağıdaki ${sourceStats} kullanarak ${periodLabel} bültenini oluştur.
+    const prompt = `${sourceStats} ile ${periodLabel} bültenini oluştur.
 
-ÖNEMLİ: X (Twitter) paylaşımları birincil haber kaynağıdır — gündemin nabzını tweetler belirler. Haber kaynakları ise ek bağlam ve detay sağlar.
-
-=== ANA KAYNAKLAR: X (Twitter) Paylaşımları ===
+=== X (Twitter) — Birincil Kaynak ===
 ${tweetBlock || '(Tweet verisi yok)'}
 
-=== DESTEKLEYICI: Haber Kaynakları ===
+=== Haber Siteleri — Destekleyici ===
 ${articleBlock || '(Haber verisi yok)'}
 
-Şunları üret (JSON):
-1. summary: Gündemin genel değerlendirmesi (2-3 paragraf, 150-200 kelime).
-   - Tweetlerdeki anlık gelişmeleri, resmi açıklamaları ve kamuoyu tepkilerini ÖNCELİKLİ olarak yansıt.
-   - Haber kaynaklarından gelen detayları bağlam olarak ekle.
-   - Kim ne dedi, nasıl tepki aldı — bunu yansıt.
-2. top_topics: En çok konuşulan 3-5 konu:
-   - title: Konu başlığı
-   - description: 1-2 cümle açıklama
+JSON üret:
+1. summary (2-3 paragraf, 150-200 kelime):
+   YASAK KALIPLAR — bunları kesinlikle kullanma:
+   ✗ "Bugün önemli gelişmeler yaşandı"
+   ✗ "Gündem yoğun geçti"
+   ✗ "Dikkat çekici gelişmeler"
+   ✗ "...öne çıkıyor/öne çıktı"
+   ✗ "...dikkat çekti/dikkat çekiyor"
+   ✗ "...gündemde yer aldı/gündemde"
+   ✗ "...yankı buldu/yankı uyandırdı"
 
-{
-  "summary": "...",
-  "top_topics": [
-    { "title": "...", "description": "..." }
-  ]
-}
+   DOĞRU YAZIM:
+   ✓ İlk cümle doğrudan bir olayla başlasın: "[İsim] [ne yaptı/ne açıkladı]."
+   ✓ Örnek: "Dışişleri Bakanı Fidan, Gazze Yönetimi Başkanı Şaat'ı Ankara'da kabul etti."
+   ✓ Her cümle yeni bir bilgi versin. Yorum veya değerlendirme ekleme, sadece olgu.
 
-Sadece JSON formatında cevap ver.`;
+2. top_topics (3-5 konu): title + description (somut bilgi, klişe yok)
+
+{ "summary": "...", "top_topics": [{ "title": "...", "description": "..." }] }
+
+Sadece JSON.`;
 
     const result = await aiChatCompletion<any>(
         {
@@ -124,12 +126,12 @@ Sadece JSON formatında cevap ver.`;
             messages: [
                 {
                     role: 'system',
-                    content: 'Sen bir gündem analisti AI\'sısın. X (Twitter) platformundaki anlık paylaşımları birincil kaynak olarak kullanıp, haber sitelerinden gelen bilgilerle destekleyerek günlük bültenler oluşturuyorsun. Sadece JSON formatında cevap ver.',
+                    content: 'Profesyonel haber spikerisin. Sadece olgu yaz. Klişe/dolgu cümle YASAK. İlk cümle: [Kim] [ne yaptı]. Yorum ekleme. JSON döndür.',
                 },
                 { role: 'user', content: prompt },
             ],
             response_format: { type: 'json_object' },
-            temperature: 0.5,
+            temperature: 0.3,
         },
         {
             circuitName: 'openai:digest',
@@ -199,44 +201,53 @@ async function generateTRDigestWithAI(
         })
         .join('\n\n');
 
-    const prompt = `Aşağıdaki ${tweets.length} X (Twitter) paylaşımı ve ${articles.length} haber kaynağını kullanarak Türkiye ${periodLabel} bültenini oluştur.
+    const prompt = `${tweets.length} tweet ve ${articles.length} haber ile Türkiye ${periodLabel} bülteni oluştur.
 
-ÖNEMLİ: X platformundaki paylaşımlar BİRİNCİL haber kaynağıdır. Gündemin nabzı tweetlerden okunur — kim ne dedi, nasıl tepki aldı, hangi konular trend oldu. Haber siteleri ise bu gelişmelere derinlik ve bağlam katar.
-
-=== ANA KAYNAKLAR: X (Twitter) Paylaşımları ===
+=== X (Twitter) — Birincil Kaynak ===
 ${tweetBlock || '(Tweet verisi yok)'}
 
-=== DESTEKLEYICI: Haber Kaynakları (kategorilere göre) ===
+=== Haber Siteleri — Destekleyici ===
 ${categoryBlocks || '(Haber verisi yok)'}
 
-Detaylı bülten oluştur. JSON formatında:
-
+JSON:
 {
-  "summary": "Gündemin genel değerlendirmesi — tweetlerdeki ana akımları ve tepkileri öne çıkar, haber detaylarıyla destekle (2-3 cümle)",
-  "sections": [
-    {
-      "category": "Kategori adı",
-      "icon": "Uygun emoji",
-      "summary": "Bu kategorideki gelişmeler. Önce tweetlerdeki açıklamalar/tepkiler, sonra haberlerin sağladığı bağlam (en az 80 kelime)",
-      "highlights": ["Öne çıkan gelişme 1", "Gelişme 2", "Gelişme 3"],
-      "tweetContext": "Bu kategoride öne çıkan tweet(ler) ve kim ne dedi — doğrudan alıntı yapılabilir"
-    }
-  ],
-  "top_topics": [
-    { "title": "Konu başlığı", "description": "1-2 cümle, tweetlerdeki tartışmayı yansıtan açıklama" }
-  ]
+  "summary": "2-3 cümle gündem özeti",
+  "sections": [{
+    "category": "Kategori",
+    "icon": "emoji",
+    "summary": "En az 80 kelime. [Kim] [ne yaptı] ile başla.",
+    "highlights": ["Gelişme 1", "Gelişme 2"],
+    "tweetContext": "Öne çıkan tweet alıntısı"
+  }],
+  "top_topics": [{ "title": "...", "description": "..." }]
 }
 
-Kurallar:
-- En az 3, en fazla 6 bölüm oluştur. Her bölümde tweet kaynaklı bilgi ÖNCELİKLİ olsun.
-- Her bölümün summary'si detaylı olsun (en az 80 kelime). Tweetlerdeki resmi açıklamaları, siyasetçi/gazeteci yorumlarını, kamuoyu tepkisini yansıt. Haber kaynaklarından detay ekle.
-- tweetContext alanı zorunlu — o kategoride en dikkat çekici tweeti/açıklamayı özetle.
-- highlights her bölümde 2-4 madde.
-- top_topics: Tweetlerde en çok tartışılan 3-5 konuyu listele.
-- Tüm içerik Türkçe, toplam 500-700 kelime.
-- icon: tek emoji (🏛️ Siyaset, 💰 Ekonomi, ⚽ Spor, 🌍 Dünya, 🛡️ Güvenlik, 💻 Teknoloji, 🏥 Sağlık, ⚡ Enerji, 🎭 Kültür, 📰 Gündem, 🗺️ Jeopolitik).
+YASAK KALIPLAR — bunları kesinlikle kullanma:
+✗ "Bugün Türkiye'de önemli gelişmeler yaşandı"
+✗ "Gündem yoğun geçti" / "Gündemde yer aldı"
+✗ "Dikkat çekici gelişmeler" / "Dikkat çekti"
+✗ "...öne çıkıyor" / "...öne çıktı"
+✗ "...yankı buldu" / "...yankı uyandırdı"
+✗ "Bu durum, ...açısından önem taşıyor"
+✗ "Bu bağlamda" / "Diğer yandan" / "Ayrıca" (paragraf açılışında)
+✗ "...endişelerini artırıyor" / "...tartışmaları beraberinde getirdi"
 
-Sadece JSON formatında cevap ver.`;
+DOĞRU YAZIM:
+✓ Her cümle [Kim/Ne] [ne yaptı/ne oldu] formatında olsun.
+✓ Örnek: "Erdoğan, BAE Devlet Başkanı ile telefonda Gazze'yi görüştü."
+✓ Örnek: "İzmir'de fırtına sahildeki iş yerlerini su bastı, yollar göle döndü."
+✓ Yorum ve değerlendirme ekleme, sadece olgu bildir.
+✓ Her cümle yeni bilgi taşısın, tekrar yapma.
+
+KURALLAR:
+- 3-6 bölüm. Tweet bilgisi öncelikli.
+- tweetContext zorunlu.
+- highlights: 2-4 madde, her biri somut.
+- top_topics: 3-5 konu.
+- Türkçe, 500-700 kelime.
+- icon: 🏛️/💰/⚽/🌍/🛡️/💻/🏥/⚡/🎭/📰/🗺️
+
+Sadece JSON.`;
 
     const result = await aiChatCompletion<any>(
         {
@@ -244,12 +255,12 @@ Sadece JSON formatında cevap ver.`;
             messages: [
                 {
                     role: 'system',
-                    content: 'Sen deneyimli bir Türkiye gündem analisti AI\'sısın. X (Twitter) platformundaki anlık paylaşımları birincil kaynak olarak kullanıp, haber sitelerinden gelen bilgilerle destekleyerek kategorize edilmiş günlük bültenler oluşturuyorsun. Tweetlerdeki açıklamalar, tepkiler ve tartışmalar bültenin omurgasını oluşturur. Sadece JSON formatında cevap ver.',
+                    content: 'Profesyonel haber spikerisin. Türkiye gündemini oluştur. Sadece olgu yaz — yorum, değerlendirme, klişe YASAK. Her cümle: [Kim] [ne yaptı]. "Önemli gelişmeler yaşandı", "dikkat çekti", "öne çıktı", "gündemde" gibi dolgu ifadeler kullanırsan başarısız sayılırsın. JSON döndür.',
                 },
                 { role: 'user', content: prompt },
             ],
             response_format: { type: 'json_object' },
-            temperature: 0.5,
+            temperature: 0.3,
         },
         {
             circuitName: 'openai:digest-tr',
