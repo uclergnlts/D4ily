@@ -13,9 +13,9 @@ module.exports = {
         'display-extrabold': ['Syne_800ExtraBold'],
       },
       fontSize: {
-        'display-2xl': ['34px', { lineHeight: '42px', letterSpacing: '-0.02em' }], // Article Titles
-        'display-xl': ['28px', { lineHeight: '34px', letterSpacing: '-0.02em' }],  // Section Headers
-        'display-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.01em' }],  // Card Titles
+        'display-2xl': ['34px', { lineHeight: '42px', letterSpacing: '-0.7' }], // Article Titles
+        'display-xl': ['28px', { lineHeight: '34px', letterSpacing: '-0.56' }],  // Section Headers
+        'display-lg': ['24px', { lineHeight: '30px', letterSpacing: '-0.24' }],  // Card Titles
         'body-lg': ['16px', { lineHeight: '24px' }],   // Main Content
         'body-md': ['14px', { lineHeight: '21px' }],   // Secondary Content
         'body-sm': ['13px', { lineHeight: '18px' }],   // Meta / Captions

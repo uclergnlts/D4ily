@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { DigestCard } from '../../src/components/digest/DigestCard';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { useAppStore } from '../../src/store/useAppStore';
+import { useThemeStore } from '../../src/store/useThemeStore';
 import { useCII } from '../../src/hooks/useCII';
 import { CIIBadge } from '../../src/components/ui/CIIBadge';
 import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
@@ -19,12 +20,6 @@ export default function HomeScreen() {
     const { selectedCountry, toggleSideMenu } = useAppStore();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [hasAutoSelected, setHasAutoSelected] = useState(false);
-
-    // Initialize period based on time of day (Morning < 17:00 <= Evening)
-    const [selectedPeriod, setSelectedPeriod] = useState<'morning' | 'evening'>(() => {
-        const hour = new Date().getHours();
-        return hour >= 17 ? 'evening' : 'morning';
-    });
 
     const { getEntryAnimation } = useStaggeredEntry();
 
@@ -51,8 +46,11 @@ export default function HomeScreen() {
     const currentDigest = useMemo(() => {
         if (!digests) return null;
         const dateStr = selectedDate.toISOString().split('T')[0];
-        return digests.find(d => d.date === dateStr && d.period === selectedPeriod);
-    }, [digests, selectedDate, selectedPeriod]);
+        // Pick the latest digest for the date (evening > morning)
+        return digests
+            .filter(d => d.date === dateStr)
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+    }, [digests, selectedDate]);
 
     const changeDate = (days: number) => {
         const newDate = new Date(selectedDate);
@@ -149,33 +147,10 @@ export default function HomeScreen() {
                     </Text>
                 </Animated.View>
 
-                {/* Period Toggle */}
-                <View className="flex-row bg-zinc-100 dark:bg-zinc-900 p-1 rounded-2xl mb-6 border border-zinc-200 dark:border-zinc-800">
-                    <TouchableOpacity
-                        onPress={() => setSelectedPeriod('morning')}
-                        className={`flex-1 flex-row items-center justify-center py-3 rounded-xl gap-2 ${selectedPeriod === 'morning' ? 'bg-white dark:bg-zinc-800 shadow-sm' : ''}`}
-                    >
-                        <View className={`w-2 h-2 rounded-full ${selectedPeriod === 'morning' ? 'bg-amber-500' : 'bg-zinc-400'}`} />
-                        <Text className={`text-body-md font-bold ${selectedPeriod === 'morning' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
-                            Gündüz Bülteni
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => setSelectedPeriod('evening')}
-                        className={`flex-1 flex-row items-center justify-center py-3 rounded-xl gap-2 ${selectedPeriod === 'evening' ? 'bg-white dark:bg-zinc-800 shadow-sm' : ''}`}
-                    >
-                        <View className={`w-2 h-2 rounded-full ${selectedPeriod === 'evening' ? 'bg-indigo-500' : 'bg-zinc-400'}`} />
-                        <Text className={`text-body-md font-bold ${selectedPeriod === 'evening' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
-                            Akşam Bülteni
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
                 <Animated.View className="flex-1" entering={getEntryAnimation(1)}>
                     {currentDigest ? (
                         <View className="min-h-[300px]">
                             <DigestCard
-                                type={selectedPeriod}
                                 title={currentDigest.title}
                                 summary={currentDigest.summary}
                                 // @ts-ignore
@@ -191,10 +166,10 @@ export default function HomeScreen() {
                                 <BookOpen size={32} color={isDark ? "#52525b" : "#a1a1aa"} />
                             </View>
                             <Text className="text-display-lg text-zinc-900 dark:text-white font-display text-center mb-2">
-                                {selectedPeriod === 'morning' ? 'Gündüz' : 'Akşam'} Özeti Yok
+                                Özet Yok
                             </Text>
                             <Text className="text-body-md text-zinc-500 text-center font-medium max-w-[250px]">
-                                Bu tarih için henüz {selectedPeriod === 'morning' ? 'sabah' : 'akşam'} bülteni oluşturulmamış.
+                                Bu tarih için henüz bülten oluşturulmamış.
                             </Text>
                         </View>
                     )}
