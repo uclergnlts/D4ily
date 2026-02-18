@@ -216,3 +216,31 @@ export const pendingAlignmentNotifications = sqliteTable('pending_alignment_noti
     statusIdx: index('pending_alignment_notif_status_idx').on(table.status),
     sourceIdx: index('pending_alignment_notif_source_idx').on(table.sourceId),
 }));
+
+// Digest reactions - like/dislike for daily digests
+export const digestReactions = sqliteTable('digest_reactions', {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    digestId: text('digest_id').notNull(),
+    countryCode: text('country_code').notNull(),
+    reactionType: text('reaction_type', { enum: ['like', 'dislike'] }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+    unique: unique().on(table.userId, table.digestId),
+    userIdx: index('digest_reactions_user_idx').on(table.userId),
+    digestIdx: index('digest_reactions_digest_idx').on(table.digestId),
+}));
+
+// User feedback - istek, oneri, sikayet
+export const userFeedback = sqliteTable('user_feedback', {
+    id: text('id').primaryKey(),
+    userId: text('user_id'),
+    type: text('type', { enum: ['istek', 'oneri', 'sikayet', 'genel'] }).notNull(),
+    content: text('content').notNull(),
+    email: text('email'),
+    status: text('status', { enum: ['new', 'read', 'resolved'] }).notNull().default('new'),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
+}, (table) => ({
+    statusIdx: index('user_feedback_status_idx').on(table.status),
+    typeIdx: index('user_feedback_type_idx').on(table.type),
+}));

@@ -10,14 +10,18 @@ import {
     it_daily_digests,
     ru_daily_digests,
     comments,
+    digestReactions,
 } from '../db/schema/index.js';
-import { eq, and, desc, isNull, gte } from 'drizzle-orm';
+import { eq, and, desc, isNull, gte, sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { getLatestDigest, getDigestByDateAndPeriod } from '../services/digestService.js';
 import { safeJsonParse } from '../utils/json.js';
+import { authMiddleware, AuthUser } from '../middleware/auth.js';
+import { v4 as uuidv4 } from 'uuid';
 
-const digestRoute = new Hono();
+type Variables = { user: AuthUser };
+const digestRoute = new Hono<{ Variables: Variables }>();
 
 // Validation schemas
 const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']);
@@ -295,6 +299,128 @@ digestRoute.get('/:country/:digestId', async (c) => {
         return c.json({
             success: false,
             error: error instanceof Error ? error.message : 'Failed to get digest',
+        }, 500);
+    }
+});
+
+/**
+ * POST /digest/:country/:digestId/react
+ * Toggle like/dislike on a digest (auth required)
+ * Body: { action: 'like' | 'dislike' | 'remove' }
+ */
+digestRoute.post('/:country/:digestId/react', authMiddleware, async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const { country, digestId } = c.req.param();
+        const validatedCountry = countrySchema.parse(country);
+
+        const body = await c.req.json();
+        const { action } = z.object({
+            action: z.enum(['like', 'dislike', 'remove']),
+        }).parse(body);
+
+        // Check existing reaction
+        const existing = await db
+            .select()
+            .from(digestReactions)
+            .where(and(
+                eq(digestReactions.userId, user.uid),
+                eq(digestReactions.digestId, digestId)
+            ))
+            .get();
+
+        if (action === 'remove') {
+            if (existing) {
+                await db.delete(digestReactions).where(eq(digestReactions.id, existing.id));
+            }
+        } else if (existing) {
+            // Update existing reaction
+            await db
+                .update(digestReactions)
+                .set({ reactionType: action })
+                .where(eq(digestReactions.id, existing.id));
+        } else {
+            // Create new reaction
+            await db.insert(digestReactions).values({
+                id: uuidv4(),
+                userId: user.uid,
+                digestId,
+                countryCode: validatedCountry,
+                reactionType: action,
+                createdAt: new Date(),
+            });
+        }
+
+        // Get updated counts
+        const likeCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(digestReactions)
+            .where(and(eq(digestReactions.digestId, digestId), eq(digestReactions.reactionType, 'like')))
+            .get();
+        const dislikeCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(digestReactions)
+            .where(and(eq(digestReactions.digestId, digestId), eq(digestReactions.reactionType, 'dislike')))
+            .get();
+
+        return c.json({
+            success: true,
+            data: {
+                userReaction: action === 'remove' ? null : action,
+                likeCount: likeCount?.count || 0,
+                dislikeCount: dislikeCount?.count || 0,
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Digest reaction failed');
+        return c.json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to react',
+        }, 500);
+    }
+});
+
+/**
+ * GET /digest/:country/:digestId/reaction-status
+ * Get current user's reaction status (auth required)
+ */
+digestRoute.get('/:country/:digestId/reaction-status', authMiddleware, async (c) => {
+    try {
+        const user = c.get('user') as AuthUser;
+        const { digestId } = c.req.param();
+
+        const existing = await db
+            .select()
+            .from(digestReactions)
+            .where(and(
+                eq(digestReactions.userId, user.uid),
+                eq(digestReactions.digestId, digestId)
+            ))
+            .get();
+
+        const likeCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(digestReactions)
+            .where(and(eq(digestReactions.digestId, digestId), eq(digestReactions.reactionType, 'like')))
+            .get();
+        const dislikeCount = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(digestReactions)
+            .where(and(eq(digestReactions.digestId, digestId), eq(digestReactions.reactionType, 'dislike')))
+            .get();
+
+        return c.json({
+            success: true,
+            data: {
+                userReaction: existing?.reactionType || null,
+                likeCount: likeCount?.count || 0,
+                dislikeCount: dislikeCount?.count || 0,
+            },
+        });
+    } catch (error) {
+        return c.json({
+            success: false,
+            error: 'Failed to get reaction status',
         }, 500);
     }
 });

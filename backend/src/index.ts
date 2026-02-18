@@ -30,6 +30,7 @@ import premiumRoute from './routes/premium';
 import historyRoute from './routes/history';
 import webhookRoute from './routes/webhooks';
 import ciiRoute from './routes/cii';
+import feedbackRoute from './routes/feedback';
 
 const app = new Hono();
 
@@ -112,6 +113,7 @@ app.route('/premium', premiumRoute);
 app.route('/history', historyRoute);
 app.route('/webhooks', webhookRoute);
 app.route('/cii', ciiRoute);
+app.route('/feedback', feedbackRoute);
 
 // DEV-ONLY: Manual trigger endpoints (no auth required)
 if (env.NODE_ENV !== 'production') {

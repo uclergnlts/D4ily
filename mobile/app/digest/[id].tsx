@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, useColorScheme } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -10,7 +10,9 @@ import { DigestHeader } from '../../src/components/digest/DigestHeader';
 import { DigestSectionList } from '../../src/components/digest/DigestSectionList';
 import { DigestTopicList } from '../../src/components/digest/DigestTopicList';
 import { SocialHighlights } from '../../src/components/digest/SocialHighlights';
+import { DigestReactions } from '../../src/components/digest/DigestReactions';
 import { CommentSection } from '../../src/components/comments/CommentSection';
+import { FeedbackButton, FeedbackSheet } from '../../src/components/feedback/FeedbackSheet';
 
 
 export default function DigestDetailScreen() {
@@ -21,6 +23,7 @@ export default function DigestDetailScreen() {
     const queryClient = useQueryClient();
     const countryCode = country || 'tr';
     const trackReading = useTrackReading();
+    const [feedbackVisible, setFeedbackVisible] = useState(false);
 
     const { data: digest, isLoading } = useDigestDetail(countryCode, id!);
 
@@ -85,6 +88,12 @@ export default function DigestDetailScreen() {
                         summary={digest.summary}
                     />
 
+                    {/* Reactions (Like/Dislike) */}
+                    <DigestReactions
+                        digestId={id!}
+                        country={countryCode}
+                    />
+
                     {/* Category Sections (TR digests) */}
                     {digest.sections && digest.sections.length > 0 && (
                         <DigestSectionList
@@ -119,8 +128,17 @@ export default function DigestDetailScreen() {
                         country={countryCode}
                         onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['digest', id] })}
                     />
+
+                    {/* Feedback */}
+                    <FeedbackButton onPress={() => setFeedbackVisible(true)} />
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Feedback Modal */}
+            <FeedbackSheet
+                visible={feedbackVisible}
+                onClose={() => setFeedbackVisible(false)}
+            />
         </View>
     );
 }

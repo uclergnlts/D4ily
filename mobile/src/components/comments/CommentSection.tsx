@@ -91,6 +91,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
         try {
             await client.post(`/comments/${country}`, {
                 articleId: targetId,
+                targetType,
                 content: newComment.trim(),
             });
             setNewComment('');

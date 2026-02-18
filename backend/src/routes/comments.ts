@@ -16,8 +16,11 @@ const commentsRoute = new Hono<{ Variables: Variables }>();
 // Validation schemas
 const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']);
 
+const targetTypeSchema = z.enum(['article', 'daily_digest', 'weekly_comparison']).default('article');
+
 const createCommentSchema = z.object({
-    articleId: z.string().min(1, 'Article ID is required'),
+    articleId: z.string().min(1, 'Target ID is required'),
+    targetType: targetTypeSchema.optional(),
     content: z.string().min(1, 'Comment content is required').max(1000, 'Comment too long'),
     parentCommentId: z.string().nullable().optional(),
 });
@@ -39,13 +42,15 @@ commentsRoute.get('/:country/:articleId', async (c) => {
         const limit = Math.min(parseInt(c.req.query('limit') ?? '20', 10), 100);
         const offset = (page - 1) * limit;
 
+        const targetType = (c.req.query('targetType') || 'article') as 'article' | 'daily_digest' | 'weekly_comparison';
+
         // Get top-level comments (no parent)
         const topLevelComments = await db
             .select()
             .from(comments)
             .where(and(
                 eq(comments.targetId, articleId),
-                eq(comments.targetType, 'article'),
+                eq(comments.targetType, targetType),
                 eq(comments.countryCode, validatedCountry),
                 isNull(comments.parentCommentId)
             ))
@@ -59,7 +64,7 @@ commentsRoute.get('/:country/:articleId', async (c) => {
             .from(comments)
             .where(and(
                 eq(comments.targetId, articleId),
-                eq(comments.targetType, 'article'),
+                eq(comments.targetType, targetType),
                 eq(comments.countryCode, validatedCountry),
                 isNull(comments.parentCommentId)
             ))
@@ -135,7 +140,7 @@ commentsRoute.post('/:country', authMiddleware, async (c) => {
             .insert(comments)
             .values({
                 id: uuidv4(),
-                targetType: 'article',
+                targetType: validatedData.targetType || 'article',
                 targetId: validatedData.articleId,
                 countryCode: validatedCountry,
                 userId: user.uid, // Get from authenticated user
