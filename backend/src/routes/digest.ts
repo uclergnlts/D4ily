@@ -62,7 +62,7 @@ function transformTopTopics(topics: any): { title: string; description: string; 
 // Transform digest response for mobile compatibility
 function transformDigestResponse(digest: any) {
     const topTopics = safeJsonParse(digest.topTopics, []);
-    const sections = safeJsonParse(digest.sections, []);
+    const sections: any[] = safeJsonParse(digest.sections, []);
 
     // Collect all section tweets into a flat socialHighlights array
     const socialHighlights: { author: string; handle: string; text: string }[] = [];
