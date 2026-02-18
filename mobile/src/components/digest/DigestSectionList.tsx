@@ -84,8 +84,41 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
                                         </View>
                                     )}
 
-                                    {/* Tweet context */}
-                                    {section.tweetContext ? (
+                                    {/* Tweet references */}
+                                    {section.tweets && section.tweets.length > 0 ? (
+                                        <View className="gap-2">
+                                            {section.tweets.map((tweet, tIdx) => (
+                                                <View key={tIdx} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3">
+                                                    <View className="flex-row items-center gap-2 mb-1.5">
+                                                        <View className="w-5 h-5 rounded-full bg-zinc-900 dark:bg-white items-center justify-center">
+                                                            <Text className="text-white dark:text-zinc-900 text-[9px] font-bold">𝕏</Text>
+                                                        </View>
+                                                        <Text
+                                                            className="text-[12px] text-zinc-900 dark:text-zinc-200"
+                                                            style={{ fontFamily: 'DMSans_700Bold' }}
+                                                            numberOfLines={1}
+                                                        >
+                                                            {tweet.author}
+                                                        </Text>
+                                                        <Text
+                                                            className="text-[11px] text-zinc-400"
+                                                            style={{ fontFamily: 'DMSans_400Regular' }}
+                                                            numberOfLines={1}
+                                                        >
+                                                            {tweet.handle}
+                                                        </Text>
+                                                    </View>
+                                                    <Text
+                                                        className="text-[13px] text-zinc-600 dark:text-zinc-300"
+                                                        style={{ fontFamily: 'DMSans_400Regular', lineHeight: 20 }}
+                                                        numberOfLines={3}
+                                                    >
+                                                        {tweet.text}
+                                                    </Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    ) : section.tweetContext ? (
                                         <View className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 flex-row items-start gap-2">
                                             <MessageCircle size={14} color="#a1a1aa" className="mt-0.5" />
                                             <Text

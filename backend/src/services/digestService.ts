@@ -217,7 +217,11 @@ JSON:
     "icon": "emoji",
     "summary": "En az 80 kelime. [Kim] [ne yaptı] ile başla.",
     "highlights": ["Gelişme 1", "Gelişme 2"],
-    "tweetContext": "Öne çıkan tweet alıntısı"
+    "tweetContext": "Öne çıkan tweet alıntısı",
+    "tweets": [
+      { "author": "Görünen Ad", "handle": "@kullanici", "text": "Tweet metni (tam alıntı)" },
+      { "author": "Başka Kişi", "handle": "@diger", "text": "İlgili tweet" }
+    ]
   }],
   "top_topics": [{ "title": "...", "description": "..." }]
 }
@@ -242,6 +246,7 @@ DOĞRU YAZIM:
 KURALLAR:
 - 3-6 bölüm. Tweet bilgisi öncelikli.
 - tweetContext zorunlu.
+- tweets: her bölümde 2-3 ilgili tweet alıntısı (author, handle, text). Kaynak tweetlerden birebir al.
 - highlights: 2-4 madde, her biri somut.
 - top_topics: 3-5 konu.
 - Türkçe, 500-700 kelime.
@@ -278,6 +283,13 @@ Sadece JSON.`;
         summary: String(s.summary || ''),
         highlights: Array.isArray(s.highlights) ? s.highlights.map(String) : [],
         tweetContext: s.tweetContext ? String(s.tweetContext) : undefined,
+        tweets: Array.isArray(s.tweets)
+            ? s.tweets.map((t: any) => ({
+                author: String(t.author || ''),
+                handle: String(t.handle || ''),
+                text: String(t.text || ''),
+            })).filter((t: any) => t.text)
+            : undefined,
     })).filter((s: DigestSection) => s.category && s.summary);
 
     // Parse top_topics

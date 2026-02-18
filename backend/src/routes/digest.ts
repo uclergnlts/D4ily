@@ -63,6 +63,25 @@ function transformTopTopics(topics: any): { title: string; description: string; 
 function transformDigestResponse(digest: any) {
     const topTopics = safeJsonParse(digest.topTopics, []);
     const sections = safeJsonParse(digest.sections, []);
+
+    // Collect all section tweets into a flat socialHighlights array
+    const socialHighlights: { author: string; handle: string; text: string }[] = [];
+    if (Array.isArray(sections)) {
+        for (const section of sections) {
+            if (Array.isArray(section.tweets)) {
+                for (const tweet of section.tweets) {
+                    if (tweet.text && !socialHighlights.some(h => h.text === tweet.text)) {
+                        socialHighlights.push({
+                            author: tweet.author || '',
+                            handle: tweet.handle || '',
+                            text: tweet.text,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     return {
         ...digest,
         date: digest.digestDate,           // digestDate → date
@@ -70,6 +89,7 @@ function transformDigestResponse(digest: any) {
         title: generateTitle(digest),      // Generate title
         topTopics: transformTopTopics(topTopics), // string[] → {title, description}[]
         sections,                          // Category-based sections (TR only)
+        socialHighlights,                  // Aggregated tweets from all sections
     };
 }
 

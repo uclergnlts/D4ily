@@ -26,54 +26,46 @@ export const CountrySelector = () => {
     };
 
     return (
-        <View className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl overflow-hidden border border-zinc-100 dark:border-zinc-800">
+        <View className="relative z-50">
             <TouchableOpacity
                 onPress={() => setIsExpanded(!isExpanded)}
-                className="flex-row items-center justify-between p-3"
+                className="flex-row items-center p-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl border border-zinc-100 dark:border-zinc-800"
                 activeOpacity={0.7}
                 accessibilityLabel={`Ülke seçici: ${activeCountry.name}`}
                 accessibilityRole="button"
                 accessibilityHint="Ülke listesini aç"
                 accessibilityState={{ expanded: isExpanded }}
             >
-                <View className="flex-row items-center">
-                    <Text className="text-2xl mr-3">{activeCountry.flag}</Text>
-                    <Text
-                        className="text-base text-zinc-900 dark:text-white"
-                        style={{ fontFamily: 'DMSans_700Bold' }}
-                    >
-                        {activeCountry.name}
-                    </Text>
-                </View>
+                <Text className="text-2xl mr-2">{activeCountry.flag}</Text>
                 <ChevronDown
-                    size={20}
+                    size={16}
                     color="#71717a"
                     style={{ transform: [{ rotate: isExpanded ? '180deg' : '0deg' }] }}
                 />
             </TouchableOpacity>
 
             {isExpanded && (
-                <View className="border-t border-zinc-200 dark:border-zinc-700">
-                    {COUNTRIES.map((country) => {
-                        if (country.code === selectedCountry) return null;
-                        return (
-                            <TouchableOpacity
-                                key={country.code}
-                                onPress={() => handleSelect(country.code)}
-                                className="flex-row items-center p-3 pl-4 active:bg-zinc-100 dark:active:bg-zinc-700/50"
-                                accessibilityLabel={`${country.name} seç`}
-                                accessibilityRole="button"
+                <View className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-100 dark:border-zinc-800 shadow-xl shadow-black/10 z-50 overflow-hidden">
+                    {COUNTRIES.map((country) => (
+                        <TouchableOpacity
+                            key={country.code}
+                            onPress={() => handleSelect(country.code)}
+                            className={`flex-row items-center p-3 pl-4 active:bg-zinc-50 dark:active:bg-zinc-800 ${country.code === selectedCountry ? 'bg-blue-50 dark:bg-blue-900/10' : ''
+                                }`}
+                            accessibilityLabel={`${country.name} seç`}
+                            accessibilityRole="button"
+                        >
+                            <Text className="text-xl mr-3">{country.flag}</Text>
+                            <Text
+                                className={`text-sm ${country.code === selectedCountry
+                                        ? 'text-blue-600 dark:text-blue-400 font-bold'
+                                        : 'text-zinc-600 dark:text-zinc-400 font-medium'
+                                    }`}
                             >
-                                <Text className="text-xl mr-3">{country.flag}</Text>
-                                <Text
-                                    className="text-sm text-zinc-600 dark:text-zinc-400"
-                                    style={{ fontFamily: 'DMSans_500Medium' }}
-                                >
-                                    {country.name}
-                                </Text>
-                            </TouchableOpacity>
-                        );
-                    })}
+                                {country.name}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
                 </View>
             )}
         </View>

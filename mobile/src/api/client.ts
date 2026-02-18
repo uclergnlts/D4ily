@@ -70,8 +70,8 @@ apiClient.interceptors.response.use(
           break;
 
         case 404:
-          // Not Found
-          console.error('[API] Not Found');
+          // Not Found — expected for missing resources
+          console.warn('[API] Not Found:', response.config?.url);
           break;
 
         case 429:
@@ -84,7 +84,7 @@ apiClient.interceptors.response.use(
         case 503:
         case 504:
           // Server errors
-          console.error('[API] Server error:', status);
+          console.warn('[API] Server error:', status, response.config?.url);
           break;
 
         default:

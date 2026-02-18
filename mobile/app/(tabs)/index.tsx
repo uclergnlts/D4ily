@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl, useColorScheme } from 'react-native';
-import Animated from 'react-native-reanimated';
+import React, { useMemo } from 'react';
+import { View, Text, ActivityIndicator, TouchableOpacity, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDigests } from '../../src/hooks/useDigest';
-import { BookOpen, ChevronLeft, ChevronRight, Calendar, Menu } from 'lucide-react-native';
+import { BookOpen, Menu } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { DigestCard } from '../../src/components/digest/DigestCard';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
@@ -18,52 +17,15 @@ export default function HomeScreen() {
     const activeScheme = useThemeStore(state => state.activeScheme);
     const isDark = activeScheme === 'dark';
     const { selectedCountry, toggleSideMenu } = useAppStore();
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [hasAutoSelected, setHasAutoSelected] = useState(false);
-
-    const { getEntryAnimation } = useStaggeredEntry();
 
     const { data: digests, isLoading, refetch, isRefetching } = useDigests(selectedCountry);
     const { data: ciiData } = useCII(selectedCountry);
 
-    useEffect(() => {
-        if (digests && digests.length > 0 && !hasAutoSelected) {
-            const latestDate = digests
-                .map(d => d.date)
-                .sort((a, b) => b.localeCompare(a))[0];
-
-            if (latestDate) {
-                const todayStr = new Date().toISOString().split('T')[0];
-                const hasTodayDigest = digests.some(d => d.date === todayStr);
-                if (!hasTodayDigest) {
-                    setSelectedDate(new Date(latestDate + 'T12:00:00'));
-                }
-            }
-            setHasAutoSelected(true);
-        }
-    }, [digests, hasAutoSelected]);
-
-    const currentDigest = useMemo(() => {
-        if (!digests) return null;
-        const dateStr = selectedDate.toISOString().split('T')[0];
-        // Pick the latest digest for the date (evening > morning)
-        return digests
-            .filter(d => d.date === dateStr)
-            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
-    }, [digests, selectedDate]);
-
-    const changeDate = (days: number) => {
-        const newDate = new Date(selectedDate);
-        newDate.setDate(selectedDate.getDate() + days);
-        if (newDate > new Date()) return;
-        setSelectedDate(newDate);
-    };
-
-    const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
-
-    const formatDateDisplay = (date: Date) => {
-        return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
-    };
+    // Sort digests by date descending
+    const sortedDigests = useMemo(() => {
+        if (!digests) return [];
+        return [...digests].sort((a, b) => b.date.localeCompare(a.date));
+    }, [digests]);
 
     if (isLoading) {
         return (
@@ -75,106 +37,74 @@ export default function HomeScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-surface-light dark:bg-black" edges={['top']}>
-            <View className="px-5 py-4 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800 bg-surface-light dark:bg-black z-10">
+            <View className="px-5 py-4 flex-row items-center justify-between bg-surface-light dark:bg-black z-10">
+                <TouchableOpacity
+                    onPress={toggleSideMenu}
+                    className="p-1 -ml-1"
+                    accessibilityLabel="Menüyü aç"
+                    accessibilityRole="button"
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <Menu size={24} color={isDark ? "#ffffff" : "#18181b"} />
+                </TouchableOpacity>
+
+                <Text className="text-xl font-bold text-blue-500">Günlük Özet</Text>
+
                 <View className="flex-row items-center gap-3">
-                    <TouchableOpacity
-                        onPress={toggleSideMenu}
-                        className="p-1 -ml-1"
-                        accessibilityLabel="Menüyü aç"
-                        accessibilityRole="button"
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <Menu size={24} color={isDark ? "#ffffff" : "#18181b"} />
-                    </TouchableOpacity>
+                    {/* Keep CountrySelector/CIIBadge if needed, or maybe move them to a different place or keep them here? 
+                         User design shows a bell icon. For now I'll keep the functionality accessible but maybe simplify.
+                         Actually, let's keep the user's existing Country/CII logic but maybe cleaner. 
+                         The user explicitly asked for the screenshot UI. 
+                         Screenshot: Menu - Title - Bell. 
+                         I will stick to the screenshot layout but keep CountrySelector maybe as a small element or remove if it conflicts too much.
+                         Let's keep it simple and clean as requested. I'll put CountrySelector back in if they miss it, 
+                         or maybe better: put it in the header but compact.
+                     */}
+                    {/* <CountrySelector /> */}
+                    {/* I will comment out CountrySelector to match the clean design for now, assuming it's in the menu or unnecessary to show constantly. 
+                         Wait, changing country is core functionality. I should probably keep it.
+                         Let's place it next to the bell or instead of the bell since I don't have a bell action yet.
+                      */}
                     <CountrySelector />
-                    <CIIBadge data={ciiData} compact />
-                </View>
-
-                <View className="flex-row items-center bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800 px-3 py-1.5 shadow-sm">
-                    <TouchableOpacity
-                        onPress={() => changeDate(-1)}
-                        className="p-1"
-                        accessibilityLabel="Önceki gün"
-                        accessibilityRole="button"
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <ChevronLeft size={20} color="#71717a" />
-                    </TouchableOpacity>
-
-                    <View className="flex-row items-center mx-2 gap-2">
-                        <Calendar size={14} color="#71717a" />
-                        <Text
-                            className="text-body-md text-zinc-700 dark:text-zinc-300 font-sans-bold"
-                        >
-                            {formatDateDisplay(selectedDate)}
-                        </Text>
-                    </View>
-
-                    <TouchableOpacity
-                        onPress={() => changeDate(1)}
-                        disabled={isToday}
-                        className="p-1"
-                        style={{ opacity: isToday ? 0.3 : 1 }}
-                        accessibilityLabel="Sonraki gün"
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: isToday }}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    >
-                        <ChevronRight size={20} color="#71717a" />
-                    </TouchableOpacity>
+                    {/* <CIIBadge data={ciiData} compact /> */}
                 </View>
             </View>
 
-            <ScrollView
-                className="flex-1"
-                contentContainerStyle={{ padding: 20 }}
+            <FlatList
+                data={sortedDigests}
+                keyExtractor={(item) => item.id}
+                contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
                 refreshControl={
                     <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor="#006FFF" />
                 }
-            >
-                <Animated.View className="mb-6 items-center" entering={getEntryAnimation(0)}>
-                    <Text
-                        className="text-display-xl text-zinc-900 dark:text-white mb-1 font-display-extrabold"
-                        style={{ letterSpacing: -0.5 }}
-                        accessibilityRole="header"
-                    >
-                        {selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
-                    </Text>
-                    <Text
-                        className="text-body-lg text-zinc-500 dark:text-zinc-400 font-sans-medium"
-                    >
-                        {selectedDate.toLocaleDateString('tr-TR', { weekday: 'long', year: 'numeric' })}
-                    </Text>
-                </Animated.View>
-
-                <Animated.View className="flex-1" entering={getEntryAnimation(1)}>
-                    {currentDigest ? (
-                        <View className="min-h-[300px]">
-                            <DigestCard
-                                title={currentDigest.title}
-                                summary={currentDigest.summary}
-                                // @ts-ignore
-                                onPress={() => router.push({
-                                    pathname: '/digest/[id]',
-                                    params: { id: currentDigest.id, country: selectedCountry }
-                                })}
-                            />
+                ListEmptyComponent={
+                    <View className="rounded-[24px] p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 bg-surface-subtle dark:bg-surface-subtle-dark min-h-[300px] items-center justify-center mt-10">
+                        <View className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center mb-4">
+                            <BookOpen size={32} color={isDark ? "#52525b" : "#a1a1aa"} />
                         </View>
-                    ) : (
-                        <View className="rounded-[24px] p-8 border-2 border-dashed border-zinc-200 dark:border-zinc-800 bg-surface-subtle dark:bg-surface-subtle-dark min-h-[300px] items-center justify-center">
-                            <View className="w-16 h-16 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center mb-4">
-                                <BookOpen size={32} color={isDark ? "#52525b" : "#a1a1aa"} />
-                            </View>
-                            <Text className="text-display-lg text-zinc-900 dark:text-white font-display text-center mb-2">
-                                Özet Yok
-                            </Text>
-                            <Text className="text-body-md text-zinc-500 text-center font-medium max-w-[250px]">
-                                Bu tarih için henüz bülten oluşturulmamış.
-                            </Text>
-                        </View>
-                    )}
-                </Animated.View>
-            </ScrollView>
+                        <Text className="text-display-lg text-zinc-900 dark:text-white font-display text-center mb-2">
+                            Özet Yok
+                        </Text>
+                        <Text className="text-body-md text-zinc-500 text-center font-medium max-w-[250px]">
+                            Henüz bülten oluşturulmamış.
+                        </Text>
+                    </View>
+                }
+                renderItem={({ item, index }) => (
+                    <DigestCard
+                        title={item.title}
+                        summary={item.summary}
+                        date={item.date}
+                        isFeatured={index === 0}
+                        isNew={index === 0} // Logic: First one is "New"
+                        // @ts-ignore
+                        onPress={() => router.push({
+                            pathname: '/digest/[id]',
+                            params: { id: item.id, country: selectedCountry }
+                        })}
+                    />
+                )}
+            />
         </SafeAreaView>
     );
 }

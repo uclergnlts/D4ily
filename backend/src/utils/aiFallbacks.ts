@@ -46,12 +46,19 @@ export interface EntityFallback {
     events: string[];
 }
 
+export interface SectionTweet {
+    author: string;
+    handle: string;
+    text: string;
+}
+
 export interface DigestSection {
     category: string;
     icon: string;
     summary: string;
     highlights: string[];
     tweetContext?: string;
+    tweets?: SectionTweet[];
 }
 
 export interface DigestFallback {
