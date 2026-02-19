@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { Calendar, Sun, Moon } from 'lucide-react-native';
 
 interface DigestHeaderProps {
     title: string;
@@ -11,17 +10,12 @@ interface DigestHeaderProps {
 }
 
 export const DigestHeader = React.memo(function DigestHeader({ title, date, period, summary, className }: DigestHeaderProps) {
-
     const dateObj = new Date(date);
     const formattedDate = !isNaN(dateObj.getTime())
         ? dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })
         : date;
 
-    const isMorning = period === 'morning';
-    const periodLabel = isMorning ? 'SABAH ÖZETİ' : 'AKŞAM ÖZETİ';
-    const PeriodIcon = isMorning ? Sun : Moon;
-    const periodColor = isMorning ? 'text-amber-600' : 'text-indigo-400';
-    const periodBg = isMorning ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-indigo-50 dark:bg-indigo-900/20';
+    const periodLabel = period === 'morning' ? 'SABAH OZETI' : 'AKSAM OZETI';
 
     return (
         <View className={`mx-4 mt-2 mb-6 ${className}`}>

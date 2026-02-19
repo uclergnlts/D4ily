@@ -1,5 +1,6 @@
 import { client } from '../client';
 import { ApiResponse, Source } from '../../types';
+import { getMockSources } from '../mock/mockData';
 
 export const sourceService = {
     getSources: async (country?: string): Promise<Source[]> => {
@@ -16,7 +17,7 @@ export const sourceService = {
             // To avoid circular deps if any, usually okay for mock.
             // Let's return mock data directly here or import it.
             // For now, let's assume valid import.
-            return require('../mock/mockData').getMockSources(country || 'tr');
+            return getMockSources(country || 'tr');
         }
     },
 

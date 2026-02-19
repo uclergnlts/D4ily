@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -16,13 +16,7 @@ export const DigestReactions = React.memo(function DigestReactions({ digestId, c
     const [dislikeCount, setDislikeCount] = useState(0);
     const [loading, setLoading] = useState(false);
 
-    useEffect(() => {
-        if (user) {
-            fetchStatus();
-        }
-    }, [digestId, user]);
-
-    const fetchStatus = async () => {
+    const fetchStatus = useCallback(async () => {
         try {
             const res = await client.get(`/digest/${country}/${digestId}/reaction-status`);
             if (res.data.success) {
@@ -31,13 +25,19 @@ export const DigestReactions = React.memo(function DigestReactions({ digestId, c
                 setDislikeCount(res.data.data.dislikeCount);
             }
         } catch {
-            // Silently fail — counts stay at 0
+            // Silently fail - counts stay at 0
         }
-    };
+    }, [country, digestId]);
+
+    useEffect(() => {
+        if (user) {
+            fetchStatus();
+        }
+    }, [fetchStatus, user]);
 
     const handleReaction = async (action: 'like' | 'dislike') => {
         if (!user) {
-            Alert.alert('Giriş Gerekli', 'Reaksiyon vermek için giriş yapmalısın.');
+            Alert.alert('Giris Gerekli', 'Reaksiyon vermek icin giris yapmalisin.');
             return;
         }
 
@@ -54,7 +54,7 @@ export const DigestReactions = React.memo(function DigestReactions({ digestId, c
                 setDislikeCount(res.data.data.dislikeCount);
             }
         } catch {
-            Alert.alert('Hata', 'Bir sorun oluştu.');
+            Alert.alert('Hata', 'Bir sorun olustu.');
         } finally {
             setLoading(false);
         }
@@ -82,7 +82,7 @@ export const DigestReactions = React.memo(function DigestReactions({ digestId, c
                     }`}
                     style={{ fontFamily: 'DMSans_600SemiBold' }}
                 >
-                    {likeCount > 0 ? likeCount : 'Beğen'}
+                    {likeCount > 0 ? likeCount : 'Begen'}
                 </Text>
             </TouchableOpacity>
 
@@ -106,7 +106,7 @@ export const DigestReactions = React.memo(function DigestReactions({ digestId, c
                     }`}
                     style={{ fontFamily: 'DMSans_600SemiBold' }}
                 >
-                    {dislikeCount > 0 ? dislikeCount : 'Beğenme'}
+                    {dislikeCount > 0 ? dislikeCount : 'Begenme'}
                 </Text>
             </TouchableOpacity>
         </View>

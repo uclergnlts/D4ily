@@ -81,7 +81,7 @@ const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
     try {
       const isAdmin = await useAuthStore.getState().checkAdminStatus();
       useAuthStore.setState({ isLoading: false, isAdmin });
-    } catch (error) {
+    } catch {
       useAuthStore.setState({ isLoading: false, isAdmin: false, error: 'Failed to verify admin status' });
     }
   } else {

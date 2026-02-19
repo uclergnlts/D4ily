@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, FlatList } from 'react-native';
-import { MessageCircle } from 'lucide-react-native';
 import type { SectionTweet } from '../../types';
 
 interface SocialHighlightsProps {

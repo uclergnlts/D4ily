@@ -32,7 +32,7 @@ export default function DigestDetailScreen() {
         if (id && countryCode) {
             trackReading.mutate({ articleId: id, countryCode });
         }
-    }, [id, countryCode]);
+    }, [id, countryCode, trackReading]);
 
     if (isLoading || !digest) {
         return (

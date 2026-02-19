@@ -7,7 +7,6 @@ import {
     ActivityIndicator,
     Modal,
     useColorScheme,
-    Pressable,
 } from 'react-native';
 import { X, Sparkles, AlertTriangle, CheckCircle } from 'lucide-react-native';
 import { EmotionalAnalysisCard } from './EmotionalAnalysisCard';

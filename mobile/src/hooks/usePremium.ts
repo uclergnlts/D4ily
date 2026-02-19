@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 import { useAuthStore } from '../store/useAuthStore';
 
 const REVENUECAT_API_KEY = Platform.select({
-    ios: 'test_CaEVCJZXSWamswOHAcBeiiPjoAX', // Test key
-    android: 'test_CaEVCJZXSWamswOHAcBeiiPjoAX', // Test key
+    ios: 'test_CaEVCJZXSWamswOHAcBeiiPjoAX',
+    android: 'test_CaEVCJZXSWamswOHAcBeiiPjoAX',
     default: 'test_CaEVCJZXSWamswOHAcBeiiPjoAX',
 });
 
@@ -36,64 +36,23 @@ export function usePremium() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Initialize RevenueCat
-    useEffect(() => {
-        const initPurchases = async () => {
-            try {
-                Purchases.configure({ apiKey: REVENUECAT_API_KEY });
-
-                if (user?.uid) {
-                    await Purchases.logIn(user.uid);
-                }
-
-                await loadOfferings();
-                await checkSubscriptionStatus();
-            } catch (err) {
-                console.error('Failed to initialize purchases:', err);
-                setError('Ödeme sistemi başlatılamadı');
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        initPurchases();
-
-        return () => {
-            // Cleanup if needed
-        };
-    }, [user?.uid]);
-
-    // Load available offerings/packages
     const loadOfferings = useCallback(async () => {
         try {
             const offerings = await Purchases.getOfferings();
-
             if (offerings.current?.availablePackages) {
                 setPackages(offerings.current.availablePackages);
             }
         } catch (err) {
             console.error('Failed to load offerings:', err);
-            setError('Paketler yüklenemedi');
+            setError('Paketler yuklenemedi');
         }
     }, []);
 
-    // Check subscription status from RevenueCat
-    const checkSubscriptionStatus = useCallback(async () => {
-        try {
-            const customerInfo = await Purchases.getCustomerInfo();
-            updatePremiumStatus(customerInfo);
-        } catch (err) {
-            console.error('Failed to check subscription:', err);
-        }
-    }, []);
-
-    // Update premium status based on customer info
     const updatePremiumStatus = useCallback((customerInfo: CustomerInfo) => {
-        const isPro = customerInfo.entitlements.active['premium'] !== undefined;
+        const isPro = customerInfo.entitlements.active.premium !== undefined;
         setIsPremium(isPro);
 
-        // Get subscription details if active
-        const premiumEntitlement = customerInfo.entitlements.active['premium'];
+        const premiumEntitlement = customerInfo.entitlements.active.premium;
         if (premiumEntitlement) {
             setSubscription({
                 id: premiumEntitlement.identifier,
@@ -111,60 +70,18 @@ export function usePremium() {
         }
     }, []);
 
-    // Purchase a package
-    const purchasePackage = useCallback(async (pkg: PurchasesPackage) => {
-        setIsLoading(true);
-        setError(null);
-
+    const checkSubscriptionStatus = useCallback(async () => {
         try {
-            const { customerInfo } = await Purchases.purchasePackage(pkg);
+            const customerInfo = await Purchases.getCustomerInfo();
             updatePremiumStatus(customerInfo);
-
-            // Sync with backend
-            await syncSubscriptionWithBackend(customerInfo);
-
-            return { success: true };
-        } catch (err: any) {
-            console.error('Purchase failed:', err);
-
-            if (err.userCancelled) {
-                return { success: false, cancelled: true };
-            }
-
-            setError(err.message || 'Satın alma başarısız');
-            return { success: false, error: err.message };
-        } finally {
-            setIsLoading(false);
+        } catch (err) {
+            console.error('Failed to check subscription:', err);
         }
-    }, []);
+    }, [updatePremiumStatus]);
 
-    // Restore purchases
-    const restorePurchases = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-
-        try {
-            const customerInfo = await Purchases.restorePurchases();
-            updatePremiumStatus(customerInfo);
-
-            // Sync with backend
-            await syncSubscriptionWithBackend(customerInfo);
-
-            return { success: true };
-        } catch (err: any) {
-            console.error('Restore failed:', err);
-            setError(err.message || 'Satın almalar geri yüklenemedi');
-            return { success: false, error: err.message };
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    // Sync subscription with backend
     const syncSubscriptionWithBackend = useCallback(async (customerInfo: CustomerInfo) => {
         try {
-            const premiumEntitlement = customerInfo.entitlements.active['premium'];
-
+            const premiumEntitlement = customerInfo.entitlements.active.premium;
             if (!premiumEntitlement || !token) return;
 
             const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/premium/subscribe`, {
@@ -190,6 +107,67 @@ export function usePremium() {
         }
     }, [token]);
 
+    const purchasePackage = useCallback(async (pkg: PurchasesPackage) => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const { customerInfo } = await Purchases.purchasePackage(pkg);
+            updatePremiumStatus(customerInfo);
+            await syncSubscriptionWithBackend(customerInfo);
+            return { success: true };
+        } catch (err: any) {
+            console.error('Purchase failed:', err);
+            if (err.userCancelled) {
+                return { success: false, cancelled: true };
+            }
+            setError(err.message || 'Satin alma basarisiz');
+            return { success: false, error: err.message };
+        } finally {
+            setIsLoading(false);
+        }
+    }, [syncSubscriptionWithBackend, updatePremiumStatus]);
+
+    const restorePurchases = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const customerInfo = await Purchases.restorePurchases();
+            updatePremiumStatus(customerInfo);
+            await syncSubscriptionWithBackend(customerInfo);
+            return { success: true };
+        } catch (err: any) {
+            console.error('Restore failed:', err);
+            setError(err.message || 'Satin almalar geri yuklenemedi');
+            return { success: false, error: err.message };
+        } finally {
+            setIsLoading(false);
+        }
+    }, [syncSubscriptionWithBackend, updatePremiumStatus]);
+
+    useEffect(() => {
+        const initPurchases = async () => {
+            try {
+                Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+
+                if (user?.uid) {
+                    await Purchases.logIn(user.uid);
+                }
+
+                await loadOfferings();
+                await checkSubscriptionStatus();
+            } catch (err) {
+                console.error('Failed to initialize purchases:', err);
+                setError('Odeme sistemi baslatilamadi');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        initPurchases();
+    }, [user?.uid, loadOfferings, checkSubscriptionStatus]);
+
     return {
         isPremium,
         subscription,
@@ -199,17 +177,14 @@ export function usePremium() {
         purchasePackage,
         restorePurchases,
         checkSubscriptionStatus,
-        // Premium gate helpers
         requirePremium: (callback: () => void) => {
             if (isPremium) {
                 callback();
             } else {
-                // Show premium upgrade modal or navigate to premium screen
                 console.log('Premium required');
             }
         },
         isPremiumFeature: (feature: string) => {
-            // Define premium features
             const premiumFeatures = [
                 'comparison_view',
                 'unlimited_comments',
@@ -221,7 +196,6 @@ export function usePremium() {
     };
 }
 
-// Helper function to map store to provider
 function mapStoreToProvider(store: string): 'stripe' | 'iyzico' | 'apple' | 'google' {
     switch (store) {
         case 'APP_STORE':

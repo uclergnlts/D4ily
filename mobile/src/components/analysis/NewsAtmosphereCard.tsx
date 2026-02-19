@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { Activity, Flame, Newspaper, MessageSquareWarning, Megaphone } from 'lucide-react-native';
 import type { CIIData } from '../../hooks/useCII';
-import { useEffect } from 'react';
+
 
 interface MetricBarProps {
     label: string;

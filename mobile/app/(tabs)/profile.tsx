@@ -1,21 +1,18 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ShieldCheck, TrendingUp, AlertTriangle, Info, Star, ChevronDown, ChevronUp, Vote, Menu } from 'lucide-react-native';
+import { Star, ChevronDown, ChevronUp, Vote, Menu } from 'lucide-react-native';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useSources } from '../../src/hooks/useSources';
 import { useLatestDigest } from '../../src/hooks/useDigest';
-import { useCII, useAllCII } from '../../src/hooks/useCII';
+import { useCII } from '../../src/hooks/useCII';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { sourceService } from '../../src/api/services/sourceService';
 import { NewsAtmosphereCard } from '../../src/components/analysis/NewsAtmosphereCard';
-import { CountryCIIComparison } from '../../src/components/analysis/CountryCIIComparison';
 import { Source } from '../../src/types';
-import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 
 // ... (Helper functions for Alignment Color - kept same or improved)
 function getAlignmentColor(score: number): string {
@@ -24,10 +21,6 @@ function getAlignmentColor(score: number): string {
     if (score <= 1) return '#71717a';  // Neutral - zinc-500
     if (score <= 3) return '#fbbf24';  // Slight gov - amber-400
     return '#f59e0b';                  // Strong gov - amber-500 (adjusted for visibility)
-}
-
-function getAlignmentBgColor(score: number): string {
-    return `${getAlignmentColor(score)}15`; // 15% opacity
 }
 
 function AlignmentBar({ score }: { score: number }) {
@@ -212,7 +205,6 @@ function SpectrumChart({ sources }: { sources: Source[] }) {
 
 export default function AnalysisScreen() {
     const { selectedCountry, toggleSideMenu } = useAppStore();
-    const router = useRouter();
     const { data: sources, isLoading } = useSources(selectedCountry);
     const { data: latestDigest } = useLatestDigest(selectedCountry);
     const { data: ciiData } = useCII(selectedCountry);

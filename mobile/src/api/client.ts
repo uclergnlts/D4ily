@@ -7,6 +7,30 @@ import { useAuthStore } from '../store/useAuthStore';
  */
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://d4ily-production.up.railway.app';
+const DEBUG_API_LOGS = process.env.EXPO_PUBLIC_DEBUG_API === 'true';
+const REDACT_KEYS = ['authorization', 'token', 'password', 'secret', 'apiKey', 'api_key', 'refreshToken', 'accessToken'];
+
+function sanitizeValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeValue);
+  }
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, nestedValue] of Object.entries(record)) {
+      const lowered = key.toLowerCase();
+      if (REDACT_KEYS.some((sensitive) => lowered.includes(sensitive.toLowerCase()))) {
+        sanitized[key] = '[REDACTED]';
+      } else {
+        sanitized[key] = sanitizeValue(nestedValue);
+      }
+    }
+    return sanitized;
+  }
+
+  return value;
+}
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -26,9 +50,14 @@ apiClient.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Log request in development
-    if (__DEV__) {
-      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, config.data);
+    // Request/response logs are optional and sanitized to avoid leaking secrets.
+    if (__DEV__ && DEBUG_API_LOGS) {
+      const safeHeaders = sanitizeValue(config.headers);
+      const safeData = sanitizeValue(config.data);
+      console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, {
+        headers: safeHeaders,
+        data: safeData,
+      });
     }
 
     return config;
@@ -42,9 +71,9 @@ apiClient.interceptors.request.use(
 // Response interceptor - Handle errors
 apiClient.interceptors.response.use(
   (response: AxiosResponse) => {
-    // Log response in development
-    if (__DEV__) {
-      console.log(`[API Response] ${response.config.url}`, response.status, response.data);
+    if (__DEV__ && DEBUG_API_LOGS) {
+      const safeData = sanitizeValue(response.data);
+      console.log(`[API Response] ${response.config.url}`, response.status, safeData);
     }
 
     return response;

@@ -116,7 +116,7 @@ const MonthlyStats = () => (
 );
 
 export const ComparisonView = () => {
-    const { isPremium, requirePremium, purchasePackage, packages } = usePremium();
+    const { isPremium, purchasePackage, packages } = usePremium();
     const [showPremiumModal, setShowPremiumModal] = React.useState(false);
 
     const handlePremiumFeature = (callback: () => void) => {

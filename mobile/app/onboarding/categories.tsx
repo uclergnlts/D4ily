@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Check, Zap, Briefcase, Cpu, Trophy, Globe, Heart } from 'lucide-react-native';
@@ -91,6 +91,12 @@ export default function CategoriesScreen() {
                     Hangi konularda haber almak istersin?
                 </Text>
 
+                {loading && (
+                    <View className="items-center justify-center py-10">
+                        <Text className="text-zinc-500">Kategoriler yukleniyor...</Text>
+                    </View>
+                )}
+
                 <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
                     <View className="flex-row flex-wrap gap-3">
                         {categories.map((category) => {
@@ -133,10 +139,10 @@ export default function CategoriesScreen() {
                     <TouchableOpacity
                         onPress={handleComplete}
                         className={`w-full py-4 rounded-2xl flex-row items-center justify-center shadow-lg active:scale-[0.98] ${selected.length > 0 ? 'bg-zinc-900 dark:bg-white shadow-zinc-500/20' : 'bg-zinc-200 dark:bg-zinc-800'}`}
-                        disabled={selected.length === 0}
+                        disabled={selected.length === 0 || saving}
                     >
                         <Text className={`font-bold text-lg mr-2 ${selected.length > 0 ? 'text-white dark:text-black' : 'text-zinc-400'}`}>
-                            Kurulumu Tamamla
+                            {saving ? 'Kaydediliyor...' : 'Kurulumu Tamamla'}
                         </Text>
                         {selected.length > 0 && <Check size={20} color={selected.length > 0 ? (true ? '#fff' : '#000') : '#9ca3af'} className="text-white dark:text-black" />}
                         {/* Note: In-line logic for icon color is simplified for brevity. Assuming dark mode creates black text. */}

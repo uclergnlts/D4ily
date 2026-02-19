@@ -20,7 +20,7 @@ export const CommentThread = React.memo(function CommentThread({
     isPremiumFeature = false,
     maxReplies = 3,
 }: CommentThreadProps) {
-    const { isPremium, requirePremium, purchasePackage, packages } = usePremium();
+    const { isPremium, purchasePackage, packages } = usePremium();
     const [showPremiumModal, setShowPremiumModal] = React.useState(false);
 
     const handleReply = (id: string, username: string) => {

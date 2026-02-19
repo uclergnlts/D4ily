@@ -52,3 +52,17 @@ ios/build/
 # Broken files
 nul
 backend/nul
+
+# Local reports / temporary artifacts
+tmp_digest.json
+tmp_digest2.json
+twitter_handles.json
+backend/coverage_output.txt
+mobile/lint-report.txt
+mobile/lint_output.txt
+mobile/test_output.txt
+mobile/test_output_2.txt
+
+# Generated config outputs
+admin/vite.config.js
+admin/vite.config.d.ts

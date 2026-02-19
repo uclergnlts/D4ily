@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { ChevronLeft, Mail, Lock, User, Check, Eye, EyeOff } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { authService } from '../src/api/services/authService';
 import { signInWithGoogle, signInWithApple, getIdToken, firebaseUserToAppUser } from '../src/utils/firebaseAuth';
 import Animated, { FadeInDown, FadeOutUp, Layout } from 'react-native-reanimated';
-
-const { width } = Dimensions.get('window');
 
 export default function AuthScreen() {
     const [isLogin, setIsLogin] = useState(true);

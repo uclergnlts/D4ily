@@ -45,7 +45,7 @@ export const feedService = {
             }
 
             return response.data.data;
-        } catch (error) {
+        } catch {
             if (isDevelopment) {
                 console.warn('[DEV] API connection failed, using mock data for Balanced Feed.');
                 await new Promise(resolve => setTimeout(resolve, 300));
@@ -65,7 +65,7 @@ export const feedService = {
             }
 
             return response.data.data;
-        } catch (error) {
+        } catch {
             if (isDevelopment) {
                 console.warn('[DEV] API connection failed, using mock data for Article.');
                 await new Promise(resolve => setTimeout(resolve, 200));
@@ -123,7 +123,7 @@ export const feedService = {
             }
 
             return response.data.data;
-        } catch (error) {
+        } catch {
             if (isDevelopment) {
                 console.warn('[DEV] API connection failed, using mock data for Summary.');
                 await new Promise(resolve => setTimeout(resolve, 500));

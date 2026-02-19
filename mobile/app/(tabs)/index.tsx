@@ -8,9 +8,6 @@ import { DigestCard } from '../../src/components/digest/DigestCard';
 import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
-import { useCII } from '../../src/hooks/useCII';
-import { CIIBadge } from '../../src/components/ui/CIIBadge';
-import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 
 export default function HomeScreen() {
     const router = useRouter();
@@ -19,7 +16,6 @@ export default function HomeScreen() {
     const { selectedCountry, toggleSideMenu } = useAppStore();
 
     const { data: digests, isLoading, refetch, isRefetching } = useDigests(selectedCountry);
-    const { data: ciiData } = useCII(selectedCountry);
 
     // Sort digests by date descending
     const sortedDigests = useMemo(() => {

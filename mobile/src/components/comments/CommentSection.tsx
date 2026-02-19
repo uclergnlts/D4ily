@@ -96,7 +96,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
             });
             setNewComment('');
             onCommentAdded();
-        } catch (error) {
+        } catch {
             Alert.alert('Hata', 'Yorum gönderilemedi. Tekrar dene.');
         } finally {
             setSubmitting(false);

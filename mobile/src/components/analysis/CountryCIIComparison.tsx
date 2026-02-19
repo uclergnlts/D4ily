@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { Globe } from 'lucide-react-native';
 import type { CIIData } from '../../hooks/useCII';
-import { useEffect } from 'react';
+
 
 const COUNTRY_INFO: Record<string, { flag: string; name: string }> = {
     tr: { flag: '🇹🇷', name: 'Türkiye' },
