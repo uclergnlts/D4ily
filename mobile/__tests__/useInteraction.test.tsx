@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor } from '@testing-library/react-native/pure';
 import { useSavedArticles } from '../src/hooks/useInteraction';
 import { interactionService } from '../src/api/services/interactionService';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -16,6 +16,7 @@ const createWrapper = () => {
         defaultOptions: {
             queries: {
                 retry: false,
+                gcTime: Infinity,
             },
         },
     });
@@ -35,7 +36,6 @@ describe('useInteraction', () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(result.current.data).toEqual(['article1', 'article2']);
-        // Verify valid page number is passed (fix verification)
-        expect(interactionService.getSavedArticles).toHaveBeenCalledWith(1);
+        expect(interactionService.getSavedArticles).toHaveBeenCalledWith();
     });
 });

@@ -86,7 +86,8 @@
       "Bash(done)",
       "Bash(where:*)",
       "Bash(eas:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npx expo start:*)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"

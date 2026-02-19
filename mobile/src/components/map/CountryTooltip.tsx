@@ -29,42 +29,58 @@ export const CountryTooltip: React.FC<CountryTooltipProps> = ({ country, cii, on
         <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            className="absolute bottom-6 left-4 right-4"
+            className="absolute bottom-6 left-4 right-4 shadow-xl shadow-black/10"
         >
             <Pressable onPress={onClose}>
-                <View className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800">
-                    <View className="flex-row items-center justify-between mb-3">
-                        <View className="flex-row items-center gap-2">
-                            <Text className="text-lg">{country.flag}</Text>
-                            <Text className="text-[16px] font-bold text-zinc-900 dark:text-white">
-                                {country.name}
-                            </Text>
+                <View className="bg-white dark:bg-zinc-900 rounded-3xl p-5 border border-zinc-100 dark:border-zinc-800">
+                    <View className="flex-row items-center justify-between mb-4">
+                        <View className="flex-row items-center gap-3">
+                            <Text className="text-3xl">{country.flag}</Text>
+                            <View>
+                                <Text className="text-lg font-bold text-zinc-900 dark:text-white">
+                                    {country.name}
+                                </Text>
+                                <Text className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                                    Risk Analizi
+                                </Text>
+                            </View>
                         </View>
-                        <Text className="text-[12px] text-zinc-400">kapat</Text>
+                        <View className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center">
+                            <Text className="text-zinc-400 font-bold text-xs">✕</Text>
+                        </View>
                     </View>
 
                     {cii ? (
-                        <View className="gap-1.5">
-                            <View className="flex-row items-center gap-2">
-                                <View className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
-                                <Text className="text-[14px] font-semibold text-zinc-700 dark:text-zinc-300">
-                                    Risk Skoru: {cii.score}/100
+                        <View className="gap-3">
+                            <View className="flex-row items-center gap-3 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl">
+                                <View className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                                <Text className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                                    Risk Skoru: <Text className="text-zinc-900 dark:text-white font-bold">{cii.score}/100</Text>
                                 </Text>
                             </View>
-                            <Text className="text-[12px] text-zinc-500 dark:text-zinc-400">
-                                Son 24s: {cii.articleCount24h} haber
-                            </Text>
-                            {anomalyText && (
-                                <View className="flex-row items-center gap-1.5 mt-1">
-                                    <View className="w-2 h-2 rounded-full bg-amber-500" />
-                                    <Text className="text-[12px] font-semibold text-amber-600 dark:text-amber-400">
-                                        Anomali: {anomalyText}
+
+                            <View className="flex-row gap-2">
+                                <View className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-2xl">
+                                    <Text className="text-xs text-zinc-400 mb-1 font-medium">Son 24 Saat</Text>
+                                    <Text className="text-sm font-bold text-zinc-900 dark:text-white">
+                                        {cii.articleCount24h} haber
                                     </Text>
                                 </View>
-                            )}
+
+                                {anomalyText && (
+                                    <View className="flex-1 bg-amber-50 dark:bg-amber-900/10 p-3 rounded-2xl border border-amber-100 dark:border-amber-900/20">
+                                        <Text className="text-xs text-amber-600/70 dark:text-amber-400/70 mb-1 font-bold">Anomali</Text>
+                                        <Text className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                                            {anomalyText}
+                                        </Text>
+                                    </View>
+                                )}
+                            </View>
                         </View>
                     ) : (
-                        <Text className="text-[12px] text-zinc-400">Veri yükleniyor...</Text>
+                        <View className="py-4 items-center">
+                            <Text className="text-sm text-zinc-400">Veri yükleniyor...</Text>
+                        </View>
                     )}
                 </View>
             </Pressable>

@@ -26,14 +26,6 @@ export function initSentry() {
                 errorSampleRate: 1.0,
             },
 
-            // Integrations
-            integrations: [
-                new Sentry.ReactNativeTracing({
-                    tracingOrigins: ['localhost', /^\//],
-                    routingInstrumentation: Sentry.ReactNavigationInstrumentation(),
-                }),
-            ],
-
             // Before send hook to filter sensitive data and attach device context
             beforeSend(event, hint) {
                 // Remove sensitive data from request headers
@@ -133,10 +125,12 @@ export function addBreadcrumb(category: string, message: string, data?: Record<s
  * Start a performance transaction
  */
 export function startTransaction(name: string, op: string) {
-    return Sentry.startTransaction({
-        name,
-        op,
-    });
+    // startTransaction is not available in all @sentry/react-native versions.
+    // Keep a safe no-op shape for callers.
+    addBreadcrumb('performance', `transaction:${name}`, { op });
+    return {
+        finish: () => undefined,
+    };
 }
 
 /**

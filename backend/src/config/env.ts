@@ -19,6 +19,8 @@ const envSchema = z.object({
     FIREBASE_PRIVATE_KEY: z.string().optional(),
     FIREBASE_CLIENT_EMAIL: z.string().optional(),
     OPENAI_API_KEY: z.string().optional(),
+    ADMIN_API_KEY: z.string().optional(),
+    OPS_API_KEY: z.string().optional(),
     RESEND_API_KEY: z.string().optional(),
     REVENUECAT_PUBLIC_API_KEY: z.string().optional(),
     REVENUECAT_SECRET_API_KEY: z.string().optional(),

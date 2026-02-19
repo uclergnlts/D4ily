@@ -11,7 +11,7 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set, get) => ({
-    mode: 'system',
+    mode: 'light',
     setMode: (mode) => set({ mode }),
     get activeScheme() {
         const { mode } = get();

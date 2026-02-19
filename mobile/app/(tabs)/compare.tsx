@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshCon
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueries } from '@tanstack/react-query';
-import { Sun, Moon, ChevronLeft, ChevronRight, FileText, BarChart3 } from 'lucide-react-native';
+import { ChevronLeft, ChevronRight, FileText, BarChart3, Menu, Map } from 'lucide-react-native';
 import { digestService } from '../../src/api/services/digestService';
 import { DailyDigest, WeeklyComparison } from '../../src/types';
 import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
@@ -57,7 +57,7 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
         return (
             <View className="py-12 items-center">
                 <ActivityIndicator size="large" color="#a855f7" />
-                <Text className="text-zinc-400 text-sm mt-3" style={{ fontFamily: 'DMSans_400Regular' }}>
+                <Text className="text-zinc-400 text-sm mt-3 font-regular">
                     Haftalık rapor yükleniyor...
                 </Text>
             </View>
@@ -67,7 +67,7 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
     if (!data) {
         return (
             <View className="py-12 items-center">
-                <Text className="text-zinc-400 text-sm text-center" style={{ fontFamily: 'DMSans_400Regular' }}>
+                <Text className="text-zinc-400 text-sm text-center font-regular">
                     Henüz haftalık rapor oluşturulmamış.
                 </Text>
             </View>
@@ -79,14 +79,12 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
             {/* Week header */}
             <View className="bg-purple-50 dark:bg-purple-900/20 rounded-2xl p-4 border border-purple-100 dark:border-purple-800">
                 <Text
-                    className="text-purple-700 dark:text-purple-300 text-xs uppercase tracking-wider mb-1"
-                    style={{ fontFamily: 'DMSans_600SemiBold' }}
+                    className="text-purple-700 dark:text-purple-300 text-xs uppercase tracking-wider mb-1 font-semibold"
                 >
                     Haftalık Analiz
                 </Text>
                 <Text
-                    className="text-purple-900 dark:text-purple-100 text-base"
-                    style={{ fontFamily: 'DMSans_700Bold' }}
+                    className="text-purple-900 dark:text-purple-100 text-base font-bold"
                 >
                     {formatWeekRange(data.weekStart, data.weekEnd)}
                 </Text>
@@ -107,8 +105,7 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
                             <View className="flex-row items-center gap-2">
                                 <Text style={{ fontSize: 24 }}>{meta.flag}</Text>
                                 <Text
-                                    className="text-zinc-900 dark:text-white text-base"
-                                    style={{ fontFamily: 'DMSans_700Bold' }}
+                                    className="text-zinc-900 dark:text-white text-base font-bold"
                                 >
                                     {meta.name}
                                 </Text>
@@ -118,8 +115,8 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
                                 style={{ backgroundColor: `${sentimentColor}20` }}
                             >
                                 <Text
-                                    className="text-[11px]"
-                                    style={{ fontFamily: 'DMSans_600SemiBold', color: sentimentColor }}
+                                    className="text-[11px] font-semibold"
+                                    style={{ color: sentimentColor }}
                                 >
                                     {getSentimentLabel(countryData.sentiment)}
                                 </Text>
@@ -127,8 +124,7 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
                         </View>
 
                         <Text
-                            className="text-zinc-600 dark:text-zinc-300 text-sm mb-3"
-                            style={{ fontFamily: 'DMSans_400Regular', lineHeight: 22 }}
+                            className="text-zinc-600 dark:text-zinc-300 text-sm mb-3 font-regular leading-6"
                         >
                             {countryData.summary}
                         </Text>
@@ -141,8 +137,7 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
                                         className="bg-zinc-100 dark:bg-zinc-800 px-2.5 py-1 rounded-full"
                                     >
                                         <Text
-                                            className="text-[11px] text-zinc-600 dark:text-zinc-400"
-                                            style={{ fontFamily: 'DMSans_500Medium' }}
+                                            className="text-[11px] text-zinc-600 dark:text-zinc-400 font-medium"
                                         >
                                             {topic}
                                         </Text>
@@ -157,14 +152,12 @@ function WeeklyReportView({ data, isLoading }: { data?: WeeklyComparison; isLoad
             {/* Cross-country analysis */}
             <View className="bg-white dark:bg-zinc-900 rounded-2xl p-4 border border-zinc-100 dark:border-zinc-800">
                 <Text
-                    className="text-zinc-900 dark:text-white text-sm mb-2"
-                    style={{ fontFamily: 'DMSans_700Bold' }}
+                    className="text-zinc-900 dark:text-white text-sm mb-2 font-bold"
                 >
                     Karşılaştırmalı Analiz
                 </Text>
                 <Text
-                    className="text-zinc-600 dark:text-zinc-300 text-sm"
-                    style={{ fontFamily: 'DMSans_400Regular', lineHeight: 22 }}
+                    className="text-zinc-600 dark:text-zinc-300 text-sm font-regular leading-6"
                 >
                     {data.comparisonText}
                 </Text>
@@ -191,14 +184,12 @@ function CountryDigestCard({
                 <Text style={{ fontSize: 28 }}>{country.flag}</Text>
                 <View>
                     <Text
-                        className="text-zinc-900 dark:text-white text-base"
-                        style={{ fontFamily: 'DMSans_900Black' }}
+                        className="text-zinc-900 dark:text-white text-base font-black"
                     >
                         {country.name}
                     </Text>
                     <Text
-                        className="text-xs text-zinc-400 uppercase tracking-wider"
-                        style={{ fontFamily: 'DMSans_500Medium' }}
+                        className="text-xs text-zinc-400 uppercase tracking-wider font-medium"
                     >
                         {country.code.toUpperCase()}
                     </Text>
@@ -212,8 +203,7 @@ function CountryDigestCard({
             ) : digest ? (
                 <>
                     <Text
-                        className="text-zinc-700 dark:text-zinc-300 text-sm mb-3"
-                        style={{ fontFamily: 'DMSans_400Regular', lineHeight: 22 }}
+                        className="text-zinc-700 dark:text-zinc-300 text-sm mb-3 font-regular leading-6"
                         numberOfLines={4}
                     >
                         {digest.summary}
@@ -225,14 +215,12 @@ function CountryDigestCard({
                                     <View className="w-1.5 h-1.5 rounded-full bg-[#006FFF] mt-1.5 shrink-0" />
                                     <View className="flex-1">
                                         <Text
-                                            className="text-xs text-zinc-800 dark:text-zinc-200"
-                                            style={{ fontFamily: 'DMSans_700Bold' }}
+                                            className="text-xs text-zinc-800 dark:text-zinc-200 font-bold"
                                         >
                                             {topic.title}
                                         </Text>
                                         <Text
-                                            className="text-[11px] text-zinc-400 mt-0.5"
-                                            style={{ fontFamily: 'DMSans_400Regular', lineHeight: 16 }}
+                                            className="text-[11px] text-zinc-400 mt-0.5 font-regular leading-4"
                                             numberOfLines={2}
                                         >
                                             {topic.description}
@@ -244,8 +232,7 @@ function CountryDigestCard({
                     )}
                     <View className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
                         <Text
-                            className="text-[11px] text-zinc-400"
-                            style={{ fontFamily: 'DMSans_400Regular' }}
+                            className="text-[11px] text-zinc-400 font-regular"
                         >
                             {digest.articleCount} haber analiz edildi
                         </Text>
@@ -254,8 +241,7 @@ function CountryDigestCard({
             ) : (
                 <View className="py-4 items-center">
                     <Text
-                        className="text-zinc-400 text-sm text-center"
-                        style={{ fontFamily: 'DMSans_400Regular' }}
+                        className="text-zinc-400 text-sm text-center font-regular"
                     >
                         Bu tarih için özet bulunamadı.
                     </Text>
@@ -268,7 +254,8 @@ function CountryDigestCard({
 export default function CompareScreen() {
     const [viewMode, setViewMode] = useState<ViewMode>('daily');
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [period, setPeriod] = useState<Period>('morning');
+    const [selectedCountry, setSelectedCountry] = useState<string>('all');
+    const period: Period = 'morning';
     const { getEntryAnimation } = useStaggeredEntry();
 
     const { data: weeklyData, isLoading: weeklyLoading, refetch: refetchWeekly } = useLatestWeekly();
@@ -310,118 +297,125 @@ export default function CompareScreen() {
     return (
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             <View className="px-5 py-4 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50 dark:bg-black">
-                <Text
-                    className="text-2xl text-zinc-900 dark:text-white mb-3"
-                    style={{ fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}
-                    accessibilityRole="header"
-                >
-                    Karşılaştır
-                </Text>
-
-                {/* View mode toggle */}
-                <View className="flex-row gap-2 mb-3">
+                {/* Header: Menu - Title - Map */}
+                <View className="flex-row items-center justify-between mb-6">
                     <TouchableOpacity
-                        onPress={() => setViewMode('daily')}
-                        className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full border ${
-                            viewMode === 'daily'
-                                ? 'bg-zinc-900 dark:bg-white border-zinc-900 dark:border-white'
-                                : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
-                        }`}
+                        onPress={() => import('../../src/store/useAppStore').then(m => m.useAppStore.getState().toggleSideMenu())}
+                        className="p-2 -ml-2"
                     >
-                        <BarChart3 size={16} color={viewMode === 'daily' ? '#fff' : '#71717a'} />
-                        <Text
-                            className={`text-sm ${viewMode === 'daily' ? 'text-white dark:text-black' : 'text-zinc-500'}`}
-                            style={{ fontFamily: 'DMSans_600SemiBold' }}
-                        >
-                            Günlük
-                        </Text>
+                        <Menu size={24} color="#18181b" className="dark:text-white" />
                     </TouchableOpacity>
 
+                    <Text className="text-xl font-bold text-blue-600">
+                        Karşılaştır
+                    </Text>
+
                     <TouchableOpacity
-                        onPress={() => setViewMode('weekly')}
-                        className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full border ${
-                            viewMode === 'weekly'
-                                ? 'bg-purple-600 dark:bg-purple-500 border-purple-600 dark:border-purple-500'
-                                : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
-                        }`}
+                        onPress={() => import('expo-router').then(r => r.router.push('/(tabs)/map'))}
+                        className="p-2 -mr-2"
                     >
-                        <FileText size={16} color={viewMode === 'weekly' ? '#fff' : '#71717a'} />
-                        <Text
-                            className={`text-sm ${viewMode === 'weekly' ? 'text-white' : 'text-zinc-500'}`}
-                            style={{ fontFamily: 'DMSans_600SemiBold' }}
-                        >
-                            Haftalık Rapor
-                        </Text>
+                        <Map size={24} color="#18181b" className="dark:text-white" />
                     </TouchableOpacity>
                 </View>
 
-                {/* Daily mode controls */}
-                {viewMode === 'daily' && (
-                    <>
-                        <View className="flex-row items-center justify-between mb-3">
+                {/* Controls Container */}
+                <View className="mb-2">
+                    {/* Country Filter Chips - Horizontal Scroll */}
+                    <View className="mb-4">
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 4, gap: 8 }}
+                        >
+                            <TouchableOpacity
+                                onPress={() => setSelectedCountry('all')}
+                                className={`px-4 py-2 rounded-full border ${selectedCountry === 'all'
+                                    ? 'bg-blue-600 border-blue-600'
+                                    : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                                    }`}
+                            >
+                                <Text className={`text-sm font-semibold ${selectedCountry === 'all' ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                    Tümü
+                                </Text>
+                            </TouchableOpacity>
+                            {COUNTRIES.map(c => (
+                                <TouchableOpacity
+                                    key={c.code}
+                                    onPress={() => setSelectedCountry(c.code)}
+                                    className={`flex-row items-center gap-2 px-4 py-2 rounded-full border ${selectedCountry === c.code
+                                        ? 'bg-blue-600 border-blue-600'
+                                        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
+                                        }`}
+                                >
+                                    <Text className="text-base">{c.flag}</Text>
+                                    <Text className={`text-sm font-semibold ${selectedCountry === c.code ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}>
+                                        {c.code.toUpperCase()}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+
+                    {/* View Mode Toggle */}
+                    <View className="flex-row bg-zinc-100 dark:bg-zinc-900 p-1 rounded-xl mb-4">
+                        <TouchableOpacity
+                            onPress={() => setViewMode('daily')}
+                            className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-lg ${viewMode === 'daily'
+                                ? 'bg-white dark:bg-zinc-800 shadow-sm'
+                                : 'bg-transparent'
+                                }`}
+                        >
+                            <BarChart3 size={16} color={viewMode === 'daily' ? '#09090b' : '#71717a'} className="dark:text-white" />
+                            <Text className={`text-sm font-semibold ${viewMode === 'daily' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
+                                Günlük
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setViewMode('weekly')}
+                            className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-lg ${viewMode === 'weekly'
+                                ? 'bg-white dark:bg-zinc-800 shadow-sm'
+                                : 'bg-transparent'
+                                }`}
+                        >
+                            <FileText size={16} color={viewMode === 'weekly' ? '#09090b' : '#71717a'} className="dark:text-white" />
+                            <Text className={`text-sm font-semibold ${viewMode === 'weekly' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500'}`}>
+                                Haftalık
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Date Picker (Daily Mode Only) */}
+                    {viewMode === 'daily' && (
+                        <View className="flex-row items-center justify-between bg-white dark:bg-zinc-900 p-2 rounded-2xl border border-zinc-100 dark:border-zinc-800">
                             <TouchableOpacity
                                 onPress={() => changeDate(-1)}
-                                className="p-2 bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800"
+                                className="p-2.5 bg-zinc-50 dark:bg-zinc-800 rounded-xl"
                                 accessibilityLabel="Önceki gün"
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
-                                <ChevronLeft size={18} color="#71717a" />
+                                <ChevronLeft size={20} color="#71717a" />
                             </TouchableOpacity>
 
-                            <Text
-                                className="text-zinc-800 dark:text-zinc-200 text-base"
-                                style={{ fontFamily: 'DMSans_700Bold' }}
-                            >
-                                {selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </Text>
+                            <View className="items-center">
+                                <Text className="text-zinc-900 dark:text-white text-base font-bold">
+                                    {selectedDate.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })}
+                                </Text>
+                                <Text className="text-zinc-400 text-xs font-medium">
+                                    {selectedDate.toLocaleDateString('tr-TR', { year: 'numeric' })}
+                                </Text>
+                            </View>
 
                             <TouchableOpacity
                                 onPress={() => changeDate(1)}
                                 disabled={isToday}
-                                className="p-2 bg-white dark:bg-zinc-900 rounded-full border border-zinc-200 dark:border-zinc-800"
+                                className={`p-2.5 rounded-xl ${isToday ? 'bg-zinc-50/50 dark:bg-zinc-800/50' : 'bg-zinc-50 dark:bg-zinc-800'}`}
                                 style={{ opacity: isToday ? 0.3 : 1 }}
                                 accessibilityLabel="Sonraki gün"
-                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                             >
-                                <ChevronRight size={18} color="#71717a" />
+                                <ChevronRight size={20} color="#71717a" />
                             </TouchableOpacity>
                         </View>
-
-                        <View className="flex-row gap-2">
-                            <TouchableOpacity
-                                onPress={() => setPeriod('morning')}
-                                className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full border ${period === 'morning'
-                                    ? 'bg-amber-50 border-amber-300 dark:bg-amber-900/20 dark:border-amber-700'
-                                    : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
-                                }`}
-                            >
-                                <Sun size={16} color={period === 'morning' ? '#f59e0b' : '#71717a'} />
-                                <Text
-                                    className={`text-sm ${period === 'morning' ? 'text-amber-600 dark:text-amber-400' : 'text-zinc-500'}`}
-                                    style={{ fontFamily: 'DMSans_600SemiBold' }}
-                                >
-                                    Sabah
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                onPress={() => setPeriod('evening')}
-                                className={`flex-1 flex-row items-center justify-center gap-2 py-2.5 rounded-full border ${period === 'evening'
-                                    ? 'bg-indigo-50 border-indigo-300 dark:bg-indigo-900/20 dark:border-indigo-700'
-                                    : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800'
-                                }`}
-                            >
-                                <Moon size={16} color={period === 'evening' ? '#6366f1' : '#71717a'} />
-                                <Text
-                                    className={`text-sm ${period === 'evening' ? 'text-indigo-600 dark:text-indigo-400' : 'text-zinc-500'}`}
-                                    style={{ fontFamily: 'DMSans_600SemiBold' }}
-                                >
-                                    Akşam
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </>
-                )}
+                    )}
+                </View>
             </View>
 
             <ScrollView
@@ -432,25 +426,31 @@ export default function CompareScreen() {
                 }
             >
                 {viewMode === 'weekly' ? (
-                    <WeeklyReportView data={weeklyData} isLoading={weeklyLoading} />
+                    <WeeklyReportView data={weeklyData ?? undefined} isLoading={weeklyLoading} />
                 ) : (
                     <>
                         <Text
-                            className="text-xs text-zinc-400 uppercase tracking-wider mb-4"
-                            style={{ fontFamily: 'DMSans_600SemiBold' }}
+                            className="text-xs text-zinc-400 uppercase tracking-wider mb-4 font-semibold"
                         >
                             {COUNTRIES.length} ülkenin gündemi
                         </Text>
 
-                        {COUNTRIES.map((country, i) => (
-                            <Animated.View key={country.code} entering={getEntryAnimation(i)}>
-                                <CountryDigestCard
-                                    country={country}
-                                    digest={results[i]?.data ?? null}
-                                    isLoading={results[i]?.isLoading ?? false}
-                                />
-                            </Animated.View>
-                        ))}
+                        {COUNTRIES
+                            .filter(c => selectedCountry === 'all' || c.code === selectedCountry)
+                            .map((country, i) => {
+                                const originalIndex = COUNTRIES.findIndex(c => c.code === country.code);
+                                const result = results[originalIndex];
+
+                                return (
+                                    <Animated.View key={country.code} entering={getEntryAnimation(i)}>
+                                        <CountryDigestCard
+                                            country={country}
+                                            digest={result?.data ?? null}
+                                            isLoading={result?.isLoading ?? false}
+                                        />
+                                    </Animated.View>
+                                );
+                            })}
                     </>
                 )}
             </ScrollView>

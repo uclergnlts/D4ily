@@ -1,4 +1,4 @@
- 
+
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Search, LineChart, Newspaper, Scale, Map } from 'lucide-react-native';
@@ -51,6 +51,7 @@ export default function TabLayout() {
         name="map"
         options={{
           title: 'Harita',
+          href: null,
           tabBarIcon: ({ color }) => <Map size={24} color={color} strokeWidth={2.5} />,
         }}
       />

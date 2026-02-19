@@ -74,11 +74,29 @@ const TRANSLATED_TITLES = {
 };
 
 const SOURCES = {
-    tr: ['Habertürk', 'NTV', 'Sözcü', 'Sabah', 'Cumhuriyet'],
-    us: ['CNN', 'Fox News', 'NY Times', 'Washington Post', 'Reuters'],
-    de: ['Der Spiegel', 'Bild', 'Die Zeit', 'FAZ', 'Tagesschau'],
-    uk: ['BBC', 'The Guardian', 'Sky News', 'Daily Mail', 'Telegraph'],
+    tr: [
+        'Habertürk', 'NTV', 'Sözcü', 'Sabah', 'Cumhuriyet',
+        'BBC Türkçe', 'Euronews', 'Webtekno', 'Onedio', 'Ensonhaber',
+        'T24', 'Gazete Duvar', 'Diken', 'Bianet', 'Evrensel'
+    ],
+    us: ['CNN', 'Fox News', 'NY Times', 'Washington Post', 'Reuters', 'Bloomberg', 'TechCrunch', 'The Verge'],
+    de: ['Der Spiegel', 'Bild', 'Die Zeit', 'FAZ', 'Tagesschau', 'Handelsblatt'],
+    uk: ['BBC', 'The Guardian', 'Sky News', 'Daily Mail', 'Telegraph', 'Financial Times'],
     fr: ['Le Monde', 'Le Figaro', 'France 24', 'Libération', 'Les Echos']
+};
+
+export const getMockSources = (country: string = 'tr'): any[] => {
+    const sourceNames = SOURCES[country as keyof typeof SOURCES] || SOURCES.tr;
+    return sourceNames.map((name, index) => ({
+        id: index + 1,
+        sourceName: name,
+        sourceLogoUrl: `https://ui-avatars.com/api/?name=${name.substring(0, 2)}&background=random&color=fff&size=128&font-size=0.5&bold=true`,
+        countryCode: country,
+        reliabilityScore: Math.floor(Math.random() * (100 - 70 + 1) + 70), // Random score between 70-100
+        biasScoreSystem: 0,
+        biasVoteCount: 100,
+        reliabilityVoteCount: 50
+    }));
 };
 
 export const getMockFeed = (country: string = 'tr', page: number = 1): FeedResponse => {

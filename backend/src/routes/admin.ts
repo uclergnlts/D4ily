@@ -700,7 +700,7 @@ admin.patch('/users/:userId', async (c) => {
  */
 admin.get('/articles', async (c) => {
     try {
-        const country = c.req.query('country') as 'tr' | 'de' | 'us' || 'tr';
+        const countryParam = c.req.query('country') || 'tr';
         const page = parseInt(c.req.query('page') ?? '1', 10);
         const limit = parseInt(c.req.query('limit') ?? '20', 10);
         const offset = (page - 1) * limit;
@@ -709,15 +709,16 @@ admin.get('/articles', async (c) => {
         const dateFrom = c.req.query('dateFrom');
         const dateTo = c.req.query('dateTo');
 
-        const articlesTable = articleTables[country];
-        const sourcesTable = articleSourceTables[country];
-
-        if (!articlesTable) {
+        if (!(countryParam in articleTables)) {
             return c.json({
                 success: false,
                 error: 'Invalid country code',
             }, 400);
         }
+
+        const country = countryParam as keyof typeof articleTables;
+        const articlesTable = articleTables[country];
+        const sourcesTable = articleSourceTables[country as keyof typeof articleSourceTables];
 
         // Build conditions
         const conditions = [];
@@ -755,7 +756,7 @@ admin.get('/articles', async (c) => {
 
         // Batch fetch sources for all articles
         const articleIds = articles.map(a => a.id);
-        const allSources = articleIds.length > 0
+        const allSources = sourcesTable && articleIds.length > 0
             ? await db.select().from(sourcesTable).where(inArray(sourcesTable.articleId, articleIds))
             : [];
         const sourcesMap = new Map<string, typeof allSources>();
@@ -798,20 +799,23 @@ admin.delete('/articles/:country/:articleId', async (c) => {
     try {
         const { country, articleId } = c.req.param();
 
-        if (!['tr', 'de', 'us'].includes(country)) {
+        if (!(country in articleTables)) {
             return c.json({
                 success: false,
                 error: 'Invalid country code',
             }, 400);
         }
 
-        const articlesTable = articleTables[country as 'tr' | 'de' | 'us'];
-        const sourcesTable = articleSourceTables[country as 'tr' | 'de' | 'us'];
+        const countryKey = country as keyof typeof articleTables;
+        const articlesTable = articleTables[countryKey];
+        const sourcesTable = articleSourceTables[country as keyof typeof articleSourceTables];
 
         // Delete article sources first
-        await db
-            .delete(sourcesTable)
-            .where(eq(sourcesTable.articleId, articleId));
+        if (sourcesTable) {
+            await db
+                .delete(sourcesTable)
+                .where(eq(sourcesTable.articleId, articleId));
+        }
 
         // Delete article
         const deletedArticle = await db

@@ -47,21 +47,28 @@ export default function VerifyEmailScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-black p-6">
-            <TouchableOpacity onPress={() => router.back()} className="mb-8 w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 items-center justify-center">
+            <TouchableOpacity
+                onPress={() => router.back()}
+                className="mb-8 w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 items-center justify-center shadow-sm"
+            >
                 <ChevronLeft size={24} color="#71717a" />
             </TouchableOpacity>
 
-            <View className="flex-1 items-center pt-10">
-                <View className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full items-center justify-center mb-6">
-                    <Mail size={40} color="#006FFF" />
+            <View className="flex-1 items-center pt-6">
+                <View className="w-20 h-20 bg-blue-50 dark:bg-blue-900/20 rounded-full items-center justify-center mb-6 ring-4 ring-blue-50 dark:ring-blue-900/10">
+                    <Mail size={32} color="#006FFF" />
                 </View>
 
-                <Text className="text-3xl font-black text-zinc-900 dark:text-white text-center mb-2">
+                <Text
+                    className="text-3xl text-zinc-900 dark:text-white text-center mb-3 font-bold"
+                >
                     E-postanı Doğrula
                 </Text>
 
-                <Text className="text-zinc-500 text-center mb-10 px-8 leading-relaxed">
-                    <Text className="font-bold text-zinc-700 dark:text-zinc-300">{email}</Text> adresine gönderdiğimiz 5 haneli doğrulama kodunu gir.
+                <Text
+                    className="text-zinc-500 text-center mb-10 px-4 leading-relaxed text-[15px]"
+                >
+                    <Text className="font-bold text-zinc-900 dark:text-white">{email}</Text> adresine gönderdiğimiz 5 haneli doğrulama kodunu gir.
                 </Text>
 
                 <View className="flex-row gap-3 mb-10">
@@ -69,7 +76,7 @@ export default function VerifyEmailScreen() {
                         <TextInput
                             key={index}
                             ref={(ref) => { inputs.current[index] = ref; }}
-                            className="w-14 h-16 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl text-center text-2xl font-bold text-zinc-900 dark:text-white"
+                            className="w-14 h-16 bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-center text-2xl font-bold text-zinc-900 dark:text-white focus:border-blue-500 focus:bg-white dark:focus:bg-black"
                             maxLength={1}
                             keyboardType="number-pad"
                             value={digit}
@@ -87,12 +94,14 @@ export default function VerifyEmailScreen() {
                     {loading ? (
                         <ActivityIndicator color="white" />
                     ) : (
-                        <Text className="text-white font-bold text-lg">Doğrula ve Devam Et</Text>
+                        <Text className="text-white text-lg font-bold">Doğrula ve Devam Et</Text>
                     )}
                 </TouchableOpacity>
 
-                <TouchableOpacity className="mt-6" onPress={() => Alert.alert('Kod Gönderildi', 'Yeni bir kod gönderildi.')}>
-                    <Text className="text-zinc-400 font-medium">Kod gelmedi mi? <Text className="text-[#006FFF] font-bold">Tekrar Gönder</Text></Text>
+                <TouchableOpacity className="mt-8" onPress={() => Alert.alert('Kod Gönderildi', 'Yeni bir kod gönderildi.')}>
+                    <Text className="text-zinc-400 font-medium">
+                        Kod gelmedi mi? <Text className="text-[#006FFF] font-bold">Tekrar Gönder</Text>
+                    </Text>
                 </TouchableOpacity>
             </View>
         </SafeAreaView>

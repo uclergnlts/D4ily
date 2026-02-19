@@ -110,7 +110,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({
             {/* Header */}
             <TouchableOpacity
                 onPress={() => setExpanded(!expanded)}
-                className="flex-row items-center gap-2 mb-3"
+                className="flex-row items-center gap-2 mb-3 pl-2"
             >
                 <MessageCircle size={18} color="#71717a" />
                 <Text

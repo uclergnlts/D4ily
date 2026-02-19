@@ -3,9 +3,9 @@ import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator,
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Search, X, TrendingUp, Newspaper, Users, Hash } from 'lucide-react-native';
+import { Search, X, TrendingUp, Newspaper, Users, Hash, Menu, Bell } from 'lucide-react-native';
 import { useAppStore } from '../../src/store/useAppStore';
-import { CountrySelector } from '../../src/components/navigation/CountrySelector';
+
 import { useSearch, useSearchSuggestions, useTrending } from '../../src/hooks/useSearch';
 import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 import type { SearchArticle, SearchSource, SearchTopic } from '../../src/api/services/searchService';
@@ -61,26 +61,36 @@ export default function ExploreScreen() {
     return (
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             <View className="px-4 pt-2 pb-4 bg-zinc-50 dark:bg-black z-10">
-                <View className="flex-row items-center justify-between mb-4">
-                    <Text
-                        className="text-3xl text-zinc-900 dark:text-white"
-                        style={{ fontFamily: 'Syne_800ExtraBold', letterSpacing: -0.5 }}
-                        accessibilityRole="header"
+                {/* Header: Menu - Title - Bell */}
+                <View className="flex-row items-center justify-between mb-6 mt-2">
+                    <TouchableOpacity
+                        onPress={() => useAppStore.getState().toggleSideMenu()}
+                        className="p-2 -ml-2"
                     >
+                        <Menu size={24} color="#18181b" className="dark:text-white" />
+                    </TouchableOpacity>
+
+                    <Text className="text-xl font-bold text-blue-600">
                         Ara
                     </Text>
-                    <CountrySelector />
+
+                    <TouchableOpacity
+                        onPress={() => router.push('/notifications')}
+                        className="p-2 -mr-2"
+                    >
+                        <Bell size={24} color="#18181b" className="dark:text-white" />
+                    </TouchableOpacity>
                 </View>
 
+                {/* Search Bar */}
                 <View
-                    className="flex-row items-center bg-white dark:bg-zinc-900 rounded-2xl px-4 py-3.5 shadow-sm border border-zinc-200/50 dark:border-zinc-800"
+                    className="flex-row items-center bg-white dark:bg-zinc-900 rounded-full px-4 py-3.5 border border-zinc-200 dark:border-zinc-800"
                     accessibilityRole="search"
                 >
-                    <Search size={20} color="#71717a" />
+                    <Search size={20} color="#a1a1aa" />
                     <TextInput
-                        className="flex-1 ml-3 text-zinc-900 dark:text-white text-[15px]"
-                        style={{ paddingVertical: 0, fontFamily: 'DMSans_500Medium' }}
-                        placeholder="Haber, kaynak veya konu ara..."
+                        className="flex-1 ml-3 text-zinc-900 dark:text-white text-[15px] font-medium"
+                        placeholder="bir kelime veya kaynak adı girin..."
                         placeholderTextColor="#a1a1aa"
                         value={searchText}
                         onChangeText={handleTextChange}
@@ -113,8 +123,7 @@ export default function ExploreScreen() {
                             >
                                 <Search size={14} color="#a1a1aa" />
                                 <Text
-                                    className="ml-3 text-[14px] text-zinc-700 dark:text-zinc-300"
-                                    style={{ fontFamily: 'DMSans_500Medium' }}
+                                    className="ml-3 text-[14px] text-zinc-700 dark:text-zinc-300 font-medium"
                                 >
                                     {s}
                                 </Text>
@@ -139,8 +148,7 @@ export default function ExploreScreen() {
                                     >
                                         <Icon size={14} color={isActive ? '#fff' : '#71717a'} />
                                         <Text
-                                            className={`text-[13px] ${isActive ? 'text-white' : 'text-zinc-600 dark:text-zinc-400'}`}
-                                            style={{ fontFamily: isActive ? 'DMSans_700Bold' : 'DMSans_500Medium' }}
+                                            className={`text-[13px] ${isActive ? 'text-white font-bold' : 'text-zinc-600 dark:text-zinc-400 font-medium'}`}
                                         >
                                             {label}
                                         </Text>
@@ -163,8 +171,7 @@ export default function ExploreScreen() {
                         <View className="flex-1 items-center justify-center py-20">
                             <Search size={40} color="#d4d4d8" />
                             <Text
-                                className="text-zinc-500 text-center mt-4"
-                                style={{ fontFamily: 'DMSans_400Regular' }}
+                                className="text-zinc-500 text-center mt-4 font-regular"
                             >
                                 "{debouncedQuery}" icin sonuc bulunamadi.
                             </Text>
@@ -178,8 +185,7 @@ export default function ExploreScreen() {
                                         <View className="flex-row items-center gap-2 mb-3">
                                             <Newspaper size={16} color="#006FFF" />
                                             <Text
-                                                className="text-sm text-zinc-900 dark:text-white"
-                                                style={{ fontFamily: 'DMSans_700Bold' }}
+                                                className="text-sm text-zinc-900 dark:text-white font-bold"
                                             >
                                                 Haberler ({articles.length})
                                             </Text>
@@ -196,22 +202,19 @@ export default function ExploreScreen() {
                                                 activeOpacity={0.7}
                                             >
                                                 <Text
-                                                    className="text-zinc-900 dark:text-white text-[15px] mb-1"
-                                                    style={{ fontFamily: 'DMSans_700Bold' }}
+                                                    className="text-zinc-900 dark:text-white text-[15px] mb-1 font-bold"
                                                     numberOfLines={2}
                                                 >
                                                     {article.translatedTitle}
                                                 </Text>
                                                 <Text
-                                                    className="text-zinc-500 text-[13px]"
-                                                    style={{ fontFamily: 'DMSans_400Regular', lineHeight: 20 }}
+                                                    className="text-zinc-500 text-[13px] font-regular leading-5"
                                                     numberOfLines={2}
                                                 >
                                                     {article.summary}
                                                 </Text>
                                                 <Text
-                                                    className="text-[11px] text-zinc-400 mt-2"
-                                                    style={{ fontFamily: 'DMSans_500Medium' }}
+                                                    className="text-[11px] text-zinc-400 mt-2 font-medium"
                                                 >
                                                     {new Date(article.publishedAt).toLocaleDateString('tr-TR', {
                                                         day: 'numeric', month: 'short', year: 'numeric',
@@ -230,8 +233,7 @@ export default function ExploreScreen() {
                                         <View className="flex-row items-center gap-2 mb-3">
                                             <Users size={16} color="#6366f1" />
                                             <Text
-                                                className="text-sm text-zinc-900 dark:text-white"
-                                                style={{ fontFamily: 'DMSans_700Bold' }}
+                                                className="text-sm text-zinc-900 dark:text-white font-bold"
                                             >
                                                 Kaynaklar ({sources.length})
                                             </Text>
@@ -245,14 +247,12 @@ export default function ExploreScreen() {
                                                 </View>
                                                 <View className="flex-1">
                                                     <Text
-                                                        className="text-zinc-900 dark:text-white text-[15px]"
-                                                        style={{ fontFamily: 'DMSans_700Bold' }}
+                                                        className="text-zinc-900 dark:text-white text-[15px] font-bold"
                                                     >
                                                         {source.sourceName}
                                                     </Text>
                                                     <Text
-                                                        className="text-[12px] text-zinc-400"
-                                                        style={{ fontFamily: 'DMSans_500Medium' }}
+                                                        className="text-[12px] text-zinc-400 font-medium"
                                                     >
                                                         {source.countryCode?.toUpperCase()}
                                                     </Text>
@@ -270,8 +270,7 @@ export default function ExploreScreen() {
                                         <View className="flex-row items-center gap-2 mb-3">
                                             <Hash size={16} color="#10b981" />
                                             <Text
-                                                className="text-sm text-zinc-900 dark:text-white"
-                                                style={{ fontFamily: 'DMSans_700Bold' }}
+                                                className="text-sm text-zinc-900 dark:text-white font-bold"
                                             >
                                                 Konular ({topics.length})
                                             </Text>
@@ -289,15 +288,13 @@ export default function ExploreScreen() {
                                                     className="bg-white dark:bg-zinc-900 px-4 py-2.5 rounded-full border border-zinc-200 dark:border-zinc-800"
                                                 >
                                                     <Text
-                                                        className="text-[13px] text-zinc-700 dark:text-zinc-300"
-                                                        style={{ fontFamily: 'DMSans_600SemiBold' }}
+                                                        className="text-[13px] text-zinc-700 dark:text-zinc-300 font-semibold"
                                                     >
                                                         {topic.hashtag || topic.name}
                                                     </Text>
                                                     {topic.articleCount > 0 && (
                                                         <Text
-                                                            className="text-[10px] text-zinc-400 mt-0.5"
-                                                            style={{ fontFamily: 'DMSans_400Regular' }}
+                                                            className="text-[10px] text-zinc-400 mt-0.5 font-regular"
                                                         >
                                                             {topic.articleCount} haber
                                                         </Text>
@@ -323,8 +320,7 @@ export default function ExploreScreen() {
                             <View className="flex-row items-center gap-2 mb-4">
                                 <TrendingUp size={18} color="#006FFF" />
                                 <Text
-                                    className="text-lg text-zinc-900 dark:text-white"
-                                    style={{ fontFamily: 'DMSans_700Bold' }}
+                                    className="text-lg text-zinc-900 dark:text-white font-bold"
                                 >
                                     Gundem
                                 </Text>
@@ -338,23 +334,20 @@ export default function ExploreScreen() {
                                     >
                                         <View className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 items-center justify-center mr-3">
                                             <Text
-                                                className="text-blue-600 dark:text-blue-400 text-[13px]"
-                                                style={{ fontFamily: 'DMSans_700Bold' }}
+                                                className="text-blue-600 dark:text-blue-400 text-[13px] font-bold"
                                             >
                                                 {i + 1}
                                             </Text>
                                         </View>
                                         <View className="flex-1">
                                             <Text
-                                                className="text-zinc-900 dark:text-white text-[15px]"
-                                                style={{ fontFamily: 'DMSans_600SemiBold' }}
+                                                className="text-zinc-900 dark:text-white text-[15px] font-semibold"
                                             >
                                                 {item.term}
                                             </Text>
                                             {item.articleCount > 0 && (
                                                 <Text
-                                                    className="text-[12px] text-zinc-400 mt-0.5"
-                                                    style={{ fontFamily: 'DMSans_400Regular' }}
+                                                    className="text-[12px] text-zinc-400 mt-0.5 font-regular"
                                                 >
                                                     {item.articleCount} haber
                                                 </Text>
@@ -369,8 +362,7 @@ export default function ExploreScreen() {
                         <View className="items-center py-20">
                             <Search size={40} color="#d4d4d8" />
                             <Text
-                                className="text-zinc-400 text-center mt-4"
-                                style={{ fontFamily: 'DMSans_400Regular' }}
+                                className="text-zinc-400 text-center mt-4 font-regular"
                             >
                                 Aramak istediginiz kelimeyi yazin.
                             </Text>

@@ -30,16 +30,23 @@ export default function ForgotPasswordScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-black p-6">
-            <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-900 items-center justify-center mb-8">
+            <TouchableOpacity
+                onPress={() => router.back()}
+                className="w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 items-center justify-center mb-8 shadow-sm"
+            >
                 <ChevronLeft size={24} color="#71717a" />
             </TouchableOpacity>
 
-            <View className="flex-1 px-4">
+            <View className="flex-1 px-2">
                 <View className="mb-10">
-                    <Text className="text-4xl font-black text-zinc-900 dark:text-white mb-4 tracking-tighter">
+                    <Text
+                        className="text-[34px] text-zinc-900 dark:text-white mb-4 font-black leading-[40px] tracking-tight"
+                    >
                         Şifreni mi{'\n'}Unuttun?
                     </Text>
-                    <Text className="text-zinc-500 font-medium text-lg leading-7">
+                    <Text
+                        className="text-zinc-500 font-medium text-lg leading-7"
+                    >
                         Endişelenme, e-posta adresini gir, sana sıfırlama bağlantısı gönderelim.
                     </Text>
                 </View>
@@ -49,7 +56,9 @@ export default function ForgotPasswordScreen() {
                         <View className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full items-center justify-center mb-4">
                             <CheckCircle size={32} color="#10b981" />
                         </View>
-                        <Text className="text-xl font-bold text-zinc-900 dark:text-white mb-2 text-center">kontrol et!</Text>
+                        <Text className="text-xl font-bold text-zinc-900 dark:text-white mb-2 text-center">
+                            Kontrol Et!
+                        </Text>
                         <Text className="text-zinc-500 text-center mb-6">
                             <Text className="font-bold text-zinc-900 dark:text-white">{email}</Text> adresine talimatları gönderdik.
                         </Text>
@@ -63,11 +72,11 @@ export default function ForgotPasswordScreen() {
                 ) : (
                     <View className="gap-6">
                         <View>
-                            <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1">E-posta Adresin</Text>
-                            <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition-all">
+                            <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">E-posta Adresin</Text>
+                            <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4 focus:border-blue-500 focus:bg-white dark:focus:bg-zinc-900 transition-all">
                                 <Mail size={20} color="#a1a1aa" className="mr-3" />
                                 <TextInput
-                                    className="flex-1 text-zinc-900 dark:text-white font-medium text-lg h-full"
+                                    className="flex-1 text-zinc-900 dark:text-white font-medium text-[16px] h-full"
                                     placeholder="ornek@email.com"
                                     placeholderTextColor="#a1a1aa"
                                     value={email}
@@ -87,7 +96,7 @@ export default function ForgotPasswordScreen() {
                                 <ActivityIndicator color="white" />
                             ) : (
                                 <>
-                                    <Text className="text-white font-bold text-lg mr-2">Bağlantı Gönder</Text>
+                                    <Text className="text-white text-lg mr-2 font-bold">Bağlantı Gönder</Text>
                                     <ArrowRight size={20} color="white" />
                                 </>
                             )}

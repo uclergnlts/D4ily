@@ -1,10 +1,11 @@
 import 'dotenv/config';
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { Hono, Context, Next } from 'hono';
 import { cors } from 'hono/cors';
+import crypto from 'node:crypto';
 import { logger } from './config/logger';
 import { env } from './config/env';
-import { apiLimiter } from './middleware/rateLimit';
+import { apiRateLimiter, rateLimiter } from './middleware/rateLimiter';
 import { aiTimeout, defaultTimeout } from './middleware/timeout';
 import { startScraperCron } from './cron/scraperCron';
 import { startDigestCron } from './cron/digestCron';
@@ -33,6 +34,42 @@ import ciiRoute from './routes/cii';
 import feedbackRoute from './routes/feedback';
 
 const app = new Hono();
+const opsRateLimiter = rateLimiter({
+    windowMs: 60 * 1000,
+    max: 5,
+    message: 'Too many ops requests, please wait',
+});
+
+function timingSafeEqualString(a: string, b: string): boolean {
+    const aBuf = Buffer.from(a);
+    const bBuf = Buffer.from(b);
+    if (aBuf.length !== bBuf.length) return false;
+    return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+async function opsAuthMiddleware(c: Context, next: Next) {
+    const configuredOpsKey = env.OPS_API_KEY || env.ADMIN_API_KEY || '';
+
+    if (!configuredOpsKey) {
+        logger.error('OPS_API_KEY/ADMIN_API_KEY is not configured; rejecting ops request');
+        return c.json({
+            success: false,
+            error: 'Ops service unavailable',
+        }, 503);
+    }
+
+    const providedKey = c.req.header('x-ops-key') || '';
+
+    if (!providedKey || !timingSafeEqualString(providedKey, configuredOpsKey)) {
+        logger.warn({ path: c.req.path }, 'Unauthorized ops access attempt');
+        return c.json({
+            success: false,
+            error: 'Unauthorized',
+        }, 401);
+    }
+
+    await next();
+}
 
 // CORS Middleware
 app.use('*', cors({
@@ -46,7 +83,7 @@ app.use('*', cors({
 }));
 
 // Rate Limiting
-app.use('/api/*', apiLimiter);
+app.use('*', apiRateLimiter);
 
 // Request logging
 app.use('*', async (c, next) => {
@@ -143,6 +180,9 @@ if (env.NODE_ENV !== 'production') {
 }
 
 // Ops: manual scraper/digest triggers
+app.use('/ops/*', opsRateLimiter);
+app.use('/ops/*', opsAuthMiddleware);
+
 app.post('/ops/scrape', async (c) => {
     const { runScraper } = await import('./cron/scraperCron.js');
     logger.info('OPS: Manual scraper trigger');

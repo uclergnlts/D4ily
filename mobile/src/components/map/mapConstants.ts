@@ -1,6 +1,6 @@
 export const MAP_VIEWBOX = {
     // Equirectangular projection: x=longitude, y=-latitude
-    // Frames Europe + eastern US coast
+    // Not used by Globe but kept for reference
     x: -130,
     y: -72,
     width: 185,
@@ -12,18 +12,26 @@ export interface CountryMeta {
     name: string;
     flag: string;
     labelX: number; // longitude
-    labelY: number; // -latitude
+    labelY: number; // -latitude (or latitude for 3D globe usage)
 }
 
 export const COUNTRIES: CountryMeta[] = [
-    { code: 'us', name: 'ABD', flag: '🇺🇸', labelX: -98, labelY: -39 },
-    { code: 'uk', name: 'İngiltere', flag: '🇬🇧', labelX: -2, labelY: -54 },
-    { code: 'fr', name: 'Fransa', flag: '🇫🇷', labelX: 2.5, labelY: -46.5 },
-    { code: 'de', name: 'Almanya', flag: '🇩🇪', labelX: 10.5, labelY: -51 },
-    { code: 'es', name: 'İspanya', flag: '🇪🇸', labelX: -3.5, labelY: -40 },
-    { code: 'it', name: 'İtalya', flag: '🇮🇹', labelX: 12, labelY: -42.5 },
-    { code: 'tr', name: 'Türkiye', flag: '🇹🇷', labelX: 35, labelY: -39 },
-    { code: 'ru', name: 'Rusya', flag: '🇷🇺', labelX: 42, labelY: -57 },
+    { code: 'us', name: 'ABD', flag: '🇺🇸', labelX: -98, labelY: 39 },
+    { code: 'uk', name: 'İngiltere', flag: '🇬🇧', labelX: -2, labelY: 54 },
+    { code: 'fr', name: 'Fransa', flag: '🇫🇷', labelX: 2.5, labelY: 46.5 },
+    { code: 'de', name: 'Almanya', flag: '🇩🇪', labelX: 10.5, labelY: 51 },
+    { code: 'es', name: 'İspanya', flag: '🇪🇸', labelX: -3.5, labelY: 40 },
+    { code: 'it', name: 'İtalya', flag: '🇮🇹', labelX: 12, labelY: 42.5 },
+    { code: 'tr', name: 'Türkiye', flag: '🇹🇷', labelX: 35, labelY: 39 },
+    { code: 'ru', name: 'Rusya', flag: '🇷🇺', labelX: 90, labelY: 60 }, // Adjusted Center
+    { code: 'cn', name: 'Çin', flag: '🇨🇳', labelX: 105, labelY: 35 },
+    { code: 'br', name: 'Brezilya', flag: '🇧🇷', labelX: -52, labelY: -10 },
+    { code: 'in', name: 'Hindistan', flag: '🇮🇳', labelX: 77, labelY: 22 },
+    { code: 'au', name: 'Avustralya', flag: '🇦🇺', labelX: 133, labelY: -25 },
+    { code: 'jp', name: 'Japonya', flag: '🇯🇵', labelX: 138, labelY: 36 },
+    { code: 'ca', name: 'Kanada', flag: '🇨🇦', labelX: -106, labelY: 56 },
+    { code: 'mx', name: 'Meksika', flag: '🇲🇽', labelX: -102, labelY: 23 },
+    { code: 'kr', name: 'Güney Kore', flag: '🇰🇷', labelX: 128, labelY: 36 },
 ];
 
 export const THEME = {

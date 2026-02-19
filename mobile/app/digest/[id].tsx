@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, useColorScheme } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, useColorScheme, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useDigestDetail } from '../../src/hooks/useDigest';
@@ -79,59 +79,65 @@ export default function DigestDetailScreen() {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView className="flex-1">
-                    {/* Header Card */}
-                    <DigestHeader
-                        title={digest.title}
-                        date={digest.date}
-                        period={digest.period}
-                        summary={digest.summary}
-                    />
-
-                    {/* Reactions (Like/Dislike) */}
-                    <DigestReactions
-                        digestId={id!}
-                        country={countryCode}
-                    />
-
-                    {/* Category Sections (TR digests) */}
-                    {digest.sections && digest.sections.length > 0 && (
-                        <DigestSectionList
-                            sections={digest.sections}
-                            className="mt-2 mb-4"
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    className="flex-1"
+                    keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+                >
+                    <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+                        {/* Header Card */}
+                        <DigestHeader
+                            title={digest.title}
+                            date={digest.date}
+                            period={digest.period}
+                            summary={digest.summary}
                         />
-                    )}
 
-                    {/* Social Media Highlights */}
-                    {(digest as any).socialHighlights && (digest as any).socialHighlights.length > 0 && (
-                        <SocialHighlights
-                            tweets={(digest as any).socialHighlights}
-                            className="mt-2 mb-4"
+                        {/* Reactions (Like/Dislike) */}
+                        <DigestReactions
+                            digestId={id!}
+                            country={countryCode}
                         />
-                    )}
 
-                    {/* Top Topics */}
-                    <DigestTopicList
-                        topics={digest.topTopics}
-                        onTopicPress={(articleId) => router.push({
-                            pathname: '/article/[id]',
-                            params: { id: articleId }
-                        })}
-                        className="mb-4"
-                    />
+                        {/* Category Sections (TR digests) */}
+                        {digest.sections && digest.sections.length > 0 && (
+                            <DigestSectionList
+                                sections={digest.sections}
+                                className="mt-2 mb-4"
+                            />
+                        )}
 
-                    {/* Comments */}
-                    <CommentSection
-                        comments={(digest as any).comments ?? []}
-                        targetType="daily_digest"
-                        targetId={id!}
-                        country={countryCode}
-                        onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['digest', id] })}
-                    />
+                        {/* Social Media Highlights */}
+                        {(digest as any).socialHighlights && (digest as any).socialHighlights.length > 0 && (
+                            <SocialHighlights
+                                tweets={(digest as any).socialHighlights}
+                                className="mt-2 mb-4"
+                            />
+                        )}
 
-                    {/* Feedback */}
-                    <FeedbackButton onPress={() => setFeedbackVisible(true)} />
-                </ScrollView>
+                        {/* Top Topics */}
+                        <DigestTopicList
+                            topics={digest.topTopics}
+                            onTopicPress={(articleId) => router.push({
+                                pathname: '/article/[id]',
+                                params: { id: articleId }
+                            })}
+                            className="mb-4"
+                        />
+
+                        {/* Comments */}
+                        <CommentSection
+                            comments={(digest as any).comments ?? []}
+                            targetType="daily_digest"
+                            targetId={id!}
+                            country={countryCode}
+                            onCommentAdded={() => queryClient.invalidateQueries({ queryKey: ['digest', id] })}
+                        />
+
+                        {/* Feedback */}
+                        <FeedbackButton onPress={() => setFeedbackVisible(true)} />
+                    </ScrollView>
+                </KeyboardAvoidingView>
             </SafeAreaView>
 
             {/* Feedback Modal */}

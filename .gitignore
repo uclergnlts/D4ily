@@ -38,6 +38,8 @@ Thumbs.db
 *.p12
 *.key
 *.keystore
+mobile/GoogleService-Info.plist
+mobile/google-services.json
 
 # Android
 android/app/build/

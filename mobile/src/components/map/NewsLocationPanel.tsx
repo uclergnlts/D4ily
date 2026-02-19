@@ -42,87 +42,91 @@ export const NewsLocationPanel: React.FC<NewsLocationPanelProps> = ({
         <Animated.View
             entering={FadeIn.duration(200)}
             exiting={FadeOut.duration(150)}
-            className="absolute bottom-0 left-0 right-0"
-            style={{ maxHeight: 320 }}
+            className="absolute bottom-0 left-0 right-0 shadow-2xl shadow-black/20"
+            style={{ maxHeight: 400 }}
         >
-            <View className="bg-white dark:bg-zinc-900 rounded-t-2xl border-t border-x border-zinc-200 dark:border-zinc-800">
+            <View className="bg-white dark:bg-zinc-900 rounded-t-[32px] border-t border-zinc-100 dark:border-zinc-800 overflow-hidden">
+                {/* Drag Handle */}
+                <View className="items-center pt-3 pb-1">
+                    <View className="w-12 h-1 rounded-full bg-zinc-200 dark:bg-zinc-700" />
+                </View>
+
                 {/* Header */}
-                <Pressable onPress={onClose}>
-                    <View className="px-4 pt-3 pb-2 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
-                        <View className="flex-row items-center gap-2">
-                            <Text className="text-lg">{country.flag}</Text>
-                            <Text
-                                className="text-[15px] text-zinc-900 dark:text-white"
-                                style={{ fontFamily: 'DMSans_700Bold' }}
-                            >
+                <View className="px-6 pb-4 flex-row items-center justify-between border-b border-zinc-100 dark:border-zinc-800">
+                    <View className="flex-row items-center gap-3">
+                        <Text className="text-3xl">{country.flag}</Text>
+                        <View>
+                            <Text className="text-lg font-bold text-zinc-900 dark:text-white">
                                 {country.name}
                             </Text>
-                            <View className="bg-indigo-100 dark:bg-indigo-900/40 px-2 py-0.5 rounded-full">
-                                <Text
-                                    className="text-[11px] text-indigo-700 dark:text-indigo-300"
-                                    style={{ fontFamily: 'DMSans_600SemiBold' }}
-                                >
-                                    {locationData.digestCount} özet
-                                </Text>
+                            <View className="flex-row items-center gap-2">
+                                <View className="bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-md">
+                                    <Text className="text-[11px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                                        {locationData.digestCount} Haber
+                                    </Text>
+                                </View>
                             </View>
                         </View>
-                        <Text
-                            className="text-[12px] text-zinc-400"
-                            style={{ fontFamily: 'DMSans_400Regular' }}
-                        >
-                            kapat
-                        </Text>
                     </View>
-                </Pressable>
+                    <Pressable
+                        onPress={onClose}
+                        className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center active:bg-zinc-200 dark:active:bg-zinc-700"
+                    >
+                        <Text className="text-zinc-500 font-bold text-xs">✕</Text>
+                    </Pressable>
+                </View>
 
                 {/* Topics list */}
-                <ScrollView className="px-4" style={{ maxHeight: 240 }}>
+                <ScrollView
+                    className="flex-1 px-6"
+                    contentContainerStyle={{ paddingVertical: 16 }}
+                    style={{ maxHeight: 300 }}
+                    showsVerticalScrollIndicator={false}
+                >
                     {sortedDates.map((date) => (
-                        <View key={date} className="py-2">
-                            <Text
-                                className="text-[11px] text-zinc-500 dark:text-zinc-400 mb-1.5"
-                                style={{ fontFamily: 'DMSans_600SemiBold' }}
-                            >
-                                {formatDate(date)}
-                            </Text>
+                        <View key={date} className="mb-6 last:mb-0">
+                            <View className="flex-row items-center gap-2 mb-3">
+                                <View className="w-1 h-4 bg-zinc-200 dark:bg-zinc-700 rounded-full" />
+                                <Text className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                                    {formatDate(date)}
+                                </Text>
+                            </View>
+
                             {grouped[date].map((topic, idx) => (
                                 <View
                                     key={`${date}-${idx}`}
-                                    className="flex-row items-start gap-2 mb-1.5"
+                                    className="pl-3 border-l border-zinc-100 dark:border-zinc-800 mb-4 last:mb-0"
                                 >
-                                    <View className="mt-1.5 w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                    <View className="flex-1">
-                                        <Text
-                                            className="text-[13px] text-zinc-800 dark:text-zinc-200"
-                                            style={{ fontFamily: 'DMSans_500Medium' }}
-                                        >
-                                            {topic.title}
-                                            <Text className="text-[11px] text-zinc-400 dark:text-zinc-500">
-                                                {' '}· {getPeriodLabel(topic.period)}
+                                    <View className="flex-row items-center gap-2 mb-1">
+                                        <View className="px-1.5 py-0.5 bg-zinc-100 dark:bg-zinc-800 rounded">
+                                            <Text className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase">
+                                                {getPeriodLabel(topic.period)}
                                             </Text>
-                                        </Text>
-                                        {topic.description ? (
-                                            <Text
-                                                className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5"
-                                                style={{ fontFamily: 'DMSans_400Regular' }}
-                                                numberOfLines={2}
-                                            >
-                                                {topic.description}
-                                            </Text>
-                                        ) : null}
+                                        </View>
                                     </View>
+
+                                    <Text className="text-sm font-bold text-zinc-900 dark:text-white leading-5 mb-1">
+                                        {topic.title}
+                                    </Text>
+
+                                    {topic.description ? (
+                                        <Text className="text-xs text-zinc-500 dark:text-zinc-400 leading-4" numberOfLines={2}>
+                                            {topic.description}
+                                        </Text>
+                                    ) : null}
                                 </View>
                             ))}
                         </View>
                     ))}
+
                     {sortedDates.length === 0 && (
-                        <View className="py-4 items-center">
-                            <Text className="text-[12px] text-zinc-400">
-                                Bu dönemde haber bulunamadı
+                        <View className="py-8 items-center justify-center">
+                            <Text className="text-sm font-medium text-zinc-400 text-center">
+                                Bu dönemde haber kaydı bulunamadı
                             </Text>
                         </View>
                     )}
-                    <View className="h-4" />
+                    <View className="h-6" />
                 </ScrollView>
             </View>
         </Animated.View>

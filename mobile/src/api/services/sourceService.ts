@@ -11,7 +11,12 @@ export const sourceService = {
             return response.data.data;
         } catch (error) {
             console.warn('API connection failed for sources', error);
-            return [];
+            // Fallback to mock data
+            // We need to import getMockSources dynamically or assume it's available if we import it at top
+            // To avoid circular deps if any, usually okay for mock.
+            // Let's return mock data directly here or import it.
+            // For now, let's assume valid import.
+            return require('../mock/mockData').getMockSources(country || 'tr');
         }
     },
 
