@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../../src/utils/navigation';
 import { ChevronLeft, Check, Sparkles } from 'lucide-react-native';
 import { useAllCategories, useUserCategories, useSetUserCategories } from '../../src/hooks/useCategories';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -68,7 +69,7 @@ export default function CategoriesScreen() {
             <View className="px-4 py-3 flex-row items-center justify-between bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800">
                 <View className="flex-row items-center">
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        onPress={() => safeBack(router)}
                         className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3"
                     >
                         <ChevronLeft size={24} color="#18181b" />
@@ -184,3 +185,4 @@ export default function CategoriesScreen() {
         </SafeAreaView>
     );
 }
+

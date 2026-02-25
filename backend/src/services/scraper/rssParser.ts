@@ -22,8 +22,9 @@ export async function parseRSSFeed(url: string): Promise<RSSFeed> {
     try {
         const response = await fetch(url, {
             headers: {
-                'User-Agent': 'NewsAggregator/1.0',
+                'User-Agent': 'Mozilla/5.0 (compatible; NewsAggregator/1.0)',
             },
+            redirect: 'follow',
         });
 
         if (!response.ok) {

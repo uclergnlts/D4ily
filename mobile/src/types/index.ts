@@ -77,7 +77,7 @@ export interface DailyDigest {
     id: string;
     date: string; // YYYY-MM-DD
     countryCode: string;
-    period: 'morning' | 'evening';
+    period: 'daily';
     title: string;
     summary: string;
     topTopics: {

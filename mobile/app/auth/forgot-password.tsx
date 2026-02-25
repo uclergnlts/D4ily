@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../../src/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Mail, ArrowRight, CheckCircle } from 'lucide-react-native';
 import { authService } from '../../src/api/services/authService';
@@ -31,7 +32,7 @@ export default function ForgotPasswordScreen() {
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-black p-6">
             <TouchableOpacity
-                onPress={() => router.back()}
+                onPress={() => safeBack(router)}
                 className="w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 items-center justify-center mb-8 shadow-sm"
             >
                 <ChevronLeft size={24} color="#71717a" />
@@ -63,7 +64,7 @@ export default function ForgotPasswordScreen() {
                             <Text className="font-bold text-zinc-900 dark:text-white">{email}</Text> adresine talimatları gönderdik.
                         </Text>
                         <TouchableOpacity
-                            onPress={() => router.back()}
+                            onPress={() => safeBack(router)}
                             className="bg-zinc-900 dark:bg-white px-8 py-3 rounded-xl"
                         >
                             <Text className="font-bold text-white dark:text-zinc-900">Giriş Yap</Text>
@@ -107,3 +108,4 @@ export default function ForgotPasswordScreen() {
         </SafeAreaView>
     );
 }
+

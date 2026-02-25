@@ -6,6 +6,7 @@ import { useDigestDetail } from '../../src/hooks/useDigest';
 import { useTrackReading } from '../../src/hooks/useHistory';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
+import { safeBack } from '../../src/utils/navigation';
 import { DigestHeader } from '../../src/components/digest/DigestHeader';
 import { DigestSectionList } from '../../src/components/digest/DigestSectionList';
 import { DigestTopicList } from '../../src/components/digest/DigestTopicList';
@@ -63,7 +64,7 @@ export default function DigestDetailScreen() {
                 {/* Custom Header */}
                 <View className="flex-row items-center justify-between px-4 py-2 border-b border-zinc-100 dark:border-zinc-800">
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        onPress={() => safeBack(router)}
                         className="p-2 -ml-2"
                     >
                         <ChevronLeft size={28} color={isDark ? "#fff" : "#000"} />
@@ -89,7 +90,6 @@ export default function DigestDetailScreen() {
                         <DigestHeader
                             title={digest.title}
                             date={digest.date}
-                            period={digest.period}
                             summary={digest.summary}
                         />
 

@@ -113,22 +113,12 @@ export function DashboardPage() {
 
                 <Button
                   variant="secondary"
-                  onClick={() => runDigestMutation.mutate('morning')}
+                  onClick={() => runDigestMutation.mutate()}
                   isLoading={runDigestMutation.isPending}
                   className="flex items-center justify-center gap-2 w-full"
                 >
                   <FileText className="h-4 w-4" />
-                  Generate Morning Digest
-                </Button>
-
-                <Button
-                  variant="secondary"
-                  onClick={() => runDigestMutation.mutate('evening')}
-                  isLoading={runDigestMutation.isPending}
-                  className="flex items-center justify-center gap-2 w-full"
-                >
-                  <FileText className="h-4 w-4" />
-                  Generate Evening Digest
+                  Generate Daily Digest
                 </Button>
               </div>
             </CardContent>

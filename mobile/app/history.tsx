@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { ChevronLeft, Trash2, Clock, BookOpen } from 'lucide-react-native';
 import { useReadingHistory, useClearHistory } from '../src/hooks/useHistory';
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -49,7 +50,7 @@ export default function HistoryScreen() {
                 <View className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex-row items-center justify-between bg-white dark:bg-zinc-900">
                     <View className="flex-row items-center">
                         <TouchableOpacity
-                            onPress={() => router.back()}
+                            onPress={() => safeBack(router)}
                             className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3"
                         >
                             <ChevronLeft size={24} color="#18181b" />
@@ -147,3 +148,4 @@ export default function HistoryScreen() {
         </View>
     );
 }
+

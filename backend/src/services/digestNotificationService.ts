@@ -6,7 +6,7 @@ import { logger } from '../config/logger.js';
 /**
  * Send digest notifications to all users who have daily digest notifications enabled
  */
-export async function sendDigestNotifications(period: 'morning' | 'evening'): Promise<{ sent: number; skipped: number }> {
+export async function sendDigestNotifications(): Promise<{ sent: number; skipped: number }> {
     try {
         // Get all active devices
         const devices = await db
@@ -23,12 +23,16 @@ export async function sendDigestNotifications(period: 'morning' | 'evening'): Pr
         }
 
         // Get users who opted out of daily digest
-        const optedOut = await db
-            .select({ userId: userNotificationPreferences.userId })
-            .from(userNotificationPreferences)
-            .where(eq(userNotificationPreferences.notifDailyDigest, false));
-
-        const optedOutSet = new Set(optedOut.map(u => u.userId));
+        let optedOutSet = new Set<string>();
+        try {
+            const optedOut = await db
+                .select({ userId: userNotificationPreferences.userId })
+                .from(userNotificationPreferences)
+                .where(eq(userNotificationPreferences.notifDailyDigest, false));
+            optedOutSet = new Set(optedOut.map(u => u.userId));
+        } catch {
+            logger.warn('Could not query notification preferences, sending to all devices');
+        }
 
         // Filter eligible tokens
         const eligibleTokens = devices
@@ -40,10 +44,8 @@ export async function sendDigestNotifications(period: 'morning' | 'evening'): Pr
             return { sent: 0, skipped: devices.length };
         }
 
-        const title = period === 'morning' ? '☀️ Sabah Bülteni Hazır' : '🌙 Akşam Bülteni Hazır';
-        const body = period === 'morning'
-            ? 'Günün önemli gelişmeleri özetlendi. Hemen oku!'
-            : 'Bugünün son gelişmeleri özetlendi. Hemen oku!';
+        const title = '📰 Günlük Özet Hazır';
+        const body = 'Bugünün önemli gelişmeleri özetlendi. Hemen oku!';
 
         // Send in batches of 100 (Expo Push API limit)
         const BATCH_SIZE = 100;
@@ -56,7 +58,7 @@ export async function sendDigestNotifications(period: 'morning' | 'evening'): Pr
                 sound: 'default' as const,
                 title,
                 body,
-                data: { type: 'digest', period },
+                data: { type: 'digest', period: 'daily' },
             }));
 
             try {
@@ -81,7 +83,7 @@ export async function sendDigestNotifications(period: 'morning' | 'evening'): Pr
             }
         }
 
-        logger.info({ sent, skipped: devices.length - eligibleTokens.length, period }, 'Digest notifications sent');
+        logger.info({ sent, skipped: devices.length - eligibleTokens.length, period: 'daily' }, 'Digest notifications sent');
         return { sent, skipped: devices.length - eligibleTokens.length };
     } catch (error) {
         logger.error({ error }, 'Failed to send digest notifications');

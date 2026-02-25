@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Linking, TextInput, Alert } f
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, MessageCircle, Mail, ChevronDown, Send, ThumbsUp, ThumbsDown } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 
 const FAQItem = ({ question, answer }: { question: string, answer: string }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +46,7 @@ export default function HelpScreen() {
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             {/* Header */}
             <View className="px-4 py-3 flex-row items-center border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm z-10">
-                <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3">
+                <TouchableOpacity onPress={() => safeBack(router)} className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3">
                     <ChevronLeft size={24} color="#18181b" />
                 </TouchableOpacity>
                 <Text className="text-lg font-bold text-zinc-900 dark:text-white">Yardım Merkezi</Text>
@@ -141,3 +142,4 @@ export default function HelpScreen() {
         </SafeAreaView>
     );
 }
+

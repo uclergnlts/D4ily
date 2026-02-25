@@ -8,7 +8,8 @@ import { sendDigestNotifications } from '../services/digestNotificationService.j
  * Runs at 07:00 every day to generate the daily digest
  */
 export function startDigestCron() {
-    const runDigest = async (period: 'morning' | 'evening') => {
+    const runDigest = async () => {
+        const period = 'daily';
         logger.info({ period }, 'Starting daily digest generation...');
 
         try {
@@ -20,7 +21,7 @@ export function startDigestCron() {
 
             if (successful > 0) {
                 try {
-                    await sendDigestNotifications(period);
+                    await sendDigestNotifications();
                 } catch (notifError) {
                     logger.error({ error: notifError, period }, 'Failed to send digest notifications');
                 }
@@ -30,23 +31,16 @@ export function startDigestCron() {
         }
     };
 
-    const morningJob = cron.schedule('0 7 * * *', async () => {
-        await runDigest('morning');
+    const dailyJob = cron.schedule('0 19 * * *', async () => {
+        await runDigest();
     }, {
         timezone: 'Europe/Istanbul',
     });
 
-    const eveningJob = cron.schedule('0 19 * * *', async () => {
-        await runDigest('evening');
-    }, {
-        timezone: 'Europe/Istanbul',
-    });
-
-    logger.info('Digest cron job started (07:00 & 19:00 daily)');
+    logger.info('Digest cron job started (19:00 daily)');
 
     return () => {
-        morningJob.stop();
-        eveningJob.stop();
+        dailyJob.stop();
         logger.info('Digest cron job stopped');
     };
 }
@@ -54,7 +48,8 @@ export function startDigestCron() {
 /**
  * Manual trigger for testing
  */
-export async function triggerDigestManually(period: 'morning' | 'evening') {
+export async function triggerDigestManually(_period: 'morning' | 'evening' | 'daily' = 'daily') {
+    const period = 'daily';
     logger.info({ period }, 'Manual digest generation triggered');
 
     try {

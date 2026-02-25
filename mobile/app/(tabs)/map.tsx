@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../../src/utils/navigation';
 import { ChevronLeft } from 'lucide-react-native';
 import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -37,7 +38,7 @@ export default function MapScreen() {
             {/* Header */}
             <View className="px-5 py-4 flex-row items-center justify-between bg-zinc-50 dark:bg-black border-b border-zinc-100 dark:border-zinc-800">
                 <Pressable
-                    onPress={() => router.back()}
+                    onPress={() => safeBack(router)}
                     className="p-2 -ml-2 rounded-full active:bg-zinc-100 dark:active:bg-zinc-900"
                 >
                     <ChevronLeft size={24} color="#18181b" className="dark:text-white" />
@@ -159,3 +160,4 @@ export default function MapScreen() {
         </SafeAreaView>
     );
 }
+

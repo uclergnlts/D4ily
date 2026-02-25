@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react-native';
+import { safeBack } from '../../src/utils/navigation';
 import { feedService } from '../../src/api/services/feedService';
 import { PerspectivesSection } from '../../src/components/article/PerspectivesSection';
 
@@ -40,7 +41,7 @@ export default function ArticleDetailScreen() {
             <SafeAreaView className="flex-1" edges={['top']}>
                 <View className="flex-row items-center px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        onPress={() => safeBack(router)}
                         className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3"
                     >
                         <ChevronLeft size={24} color={isDark ? '#fff' : '#18181b'} />

@@ -26,7 +26,6 @@ const WEEKLY_COUNTRIES: Record<string, { name: string; flag: string }> = {
     us: { name: 'ABD', flag: '🇺🇸' },
 };
 
-type Period = 'morning' | 'evening';
 type ViewMode = 'daily' | 'weekly';
 
 function getSentimentColor(sentiment: string): string {
@@ -255,7 +254,6 @@ export default function CompareScreen() {
     const [viewMode, setViewMode] = useState<ViewMode>('daily');
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [selectedCountry, setSelectedCountry] = useState<string>('all');
-    const period: Period = 'morning';
     const { getEntryAnimation } = useStaggeredEntry();
 
     const { data: weeklyData, isLoading: weeklyLoading, refetch: refetchWeekly } = useLatestWeekly();
@@ -272,11 +270,13 @@ export default function CompareScreen() {
 
     const results = useQueries({
         queries: COUNTRIES.map(c => ({
-            queryKey: ['digest', c.code, dateStr, period],
+            queryKey: ['digest', c.code, dateStr],
             queryFn: async () => {
                 try {
                     const digests = await digestService.getDigests(c.code);
-                    return digests.find(d => d.date === dateStr && d.period === period) ?? null;
+                    const sameDate = digests.filter(d => d.date === dateStr);
+                    if (sameDate.length === 0) return null;
+                    return sameDate.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
                 } catch {
                     return null;
                 }

@@ -25,7 +25,6 @@ const digestRoute = new Hono<{ Variables: Variables }>();
 
 // Validation schemas
 const countrySchema = z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']);
-const periodSchema = z.enum(['morning', 'evening']);
 
 const COUNTRY_TABLES = {
     tr: tr_daily_digests,
@@ -38,13 +37,12 @@ const COUNTRY_TABLES = {
     ru: ru_daily_digests,
 } as const;
 
-// Generate title from period and date
+// Generate title from date
 function generateTitle(digest: { period: string; digestDate: string }): string {
-    const periodLabel = digest.period === 'morning' ? 'Sabah' : 'Akşam';
     const date = new Date(digest.digestDate);
     const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
     const formattedDate = date.toLocaleDateString('tr-TR', options);
-    return `${formattedDate} ${periodLabel} Özeti`;
+    return `${formattedDate} Günlük Özet`;
 }
 
 // Transform topTopics from string[] to {title, description}[]
@@ -88,6 +86,7 @@ function transformDigestResponse(digest: any) {
 
     return {
         ...digest,
+        period: 'daily',
         date: digest.digestDate,           // digestDate → date
         summary: digest.summaryText,       // summaryText → summary
         title: generateTitle(digest),      // Generate title
@@ -144,7 +143,7 @@ digestRoute.get('/locations', async (c) => {
                         title: topic.title,
                         description: topic.description,
                         date: digest.digestDate,
-                        period: digest.period,
+                        period: 'daily',
                     });
                 }
             }
@@ -203,8 +202,8 @@ digestRoute.get('/:country/latest', async (c) => {
 
 /**
  * GET /digest/:country
- * Get digest by date and period
- * Query params: ?date=YYYY-MM-DD&period=morning|evening
+ * Get digest by date
+ * Query params: ?date=YYYY-MM-DD
  */
 digestRoute.get('/:country', async (c) => {
     try {
@@ -212,10 +211,10 @@ digestRoute.get('/:country', async (c) => {
         const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
         const date = c.req.query('date');
-        const period = c.req.query('period');
+        const period = c.req.query('period') || 'daily';
 
-        if (!date || !period) {
-            // Return latest if no date/period specified
+        if (!date) {
+            // Return latest if no date specified
             const table = COUNTRY_TABLES[validatedCountry];
             const digests = await db
                 .select()
@@ -229,13 +228,12 @@ digestRoute.get('/:country', async (c) => {
             });
         }
 
-        const validatedPeriod = periodSchema.parse(period) as 'morning' | 'evening';
-        const digest = await getDigestByDateAndPeriod(validatedCountry, date, validatedPeriod);
+        const digest = await getDigestByDateAndPeriod(validatedCountry, date, period as 'daily' | 'morning' | 'evening');
 
         if (!digest) {
             return c.json({
                 success: false,
-                error: 'Digest not found for this date and period',
+                error: 'Digest not found for this date',
             }, 404);
         }
 

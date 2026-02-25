@@ -4,7 +4,7 @@ import { env } from './env.js';
 // Main OpenAI client with standard timeout
 export const openai = new OpenAI({
     apiKey: env.OPENAI_API_KEY,
-    timeout: 30000,      // 30 seconds timeout
+    timeout: 60000,      // 60 seconds timeout (digest prompts can be large)
     maxRetries: 2,       // 2 retries on failure
 });
 

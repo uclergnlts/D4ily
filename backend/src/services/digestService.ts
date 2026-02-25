@@ -36,7 +36,8 @@ const CATEGORY_NAMES: Record<number, string> = {
 };
 
 type CountryCode = keyof typeof COUNTRY_TABLES;
-type Period = 'morning' | 'evening';
+type LegacyPeriod = 'morning' | 'evening';
+type Period = 'daily';
 
 interface TopicItem {
     title: string;
@@ -47,6 +48,7 @@ interface TweetInput {
     text: string;
     userName: string;
     displayName: string;
+    profileImageUrl?: string | null;
     likeCount: number;
     retweetCount: number;
 }
@@ -60,9 +62,286 @@ interface DigestResult {
 }
 
 interface ArticleInput {
+    id: string;
     translatedTitle: string;
     summary: string;
     categoryId: number | null;
+    sourceCount: number;
+    politicalTone: number;
+    alignmentSummary?: string;
+}
+
+interface ArticleAlignmentProfile {
+    articleId: string;
+    totalSources: number;
+    oppositionSources: number;
+    proGovernmentSources: number;
+    centerSources: number;
+    unknownSources: number;
+    sourceLeanScore: number;
+    toneLeanScore: number;
+    combinedLeanScore: number;
+    dominantLabel: 'muhalif' | 'iktidar' | 'merkez' | 'belirsiz';
+    minoritySignal: boolean;
+    summary: string;
+}
+
+const SUPPORTING_ARTICLE_LIMIT_WITH_TWEETS = {
+    tr: 24,
+    default: 18,
+} as const;
+
+const GENERIC_SUMMARY_PATTERNS: RegExp[] = [
+    /bugun .*? onemli gelismeler yasandi/i,
+    /gundem yogun gecti/i,
+    /dikkat cek/i,
+    /one cik/i,
+    /gundemde yer aldi/i,
+    /yanki buldu|yanki uyandirdi/i,
+];
+
+function normalizeText(text: string): string {
+    return text.replace(/\s+/g, ' ').trim();
+}
+
+function getWordCount(text: string): number {
+    if (!text) return 0;
+    return normalizeText(text).split(' ').filter(Boolean).length;
+}
+
+function countTweetReferences(text: string): number {
+    if (!text) return 0;
+    return (text.match(/@\w+/g) || []).length;
+}
+
+function splitSentences(text: string): string[] {
+    const clean = normalizeText(text);
+    if (!clean) return [];
+    return clean
+        .split(/(?<=[.!?])\s+/)
+        .map(s => s.trim())
+        .filter(Boolean);
+}
+
+function normalizeForPattern(text: string): string {
+    return normalizeText(text)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+}
+
+function isGenericSummary(text: string): boolean {
+    const clean = normalizeForPattern(text);
+    if (!clean) return true;
+    return GENERIC_SUMMARY_PATTERNS.some(pattern => pattern.test(clean));
+}
+
+function buildFallbackSummary(
+    sections: DigestSection[],
+    topics: TopicItem[],
+    articles: ArticleInput[],
+): string {
+    const parts: string[] = [];
+
+    for (const section of sections) {
+        const firstSentence = splitSentences(section.summary)[0];
+        if (firstSentence) parts.push(firstSentence);
+        if (parts.length >= 6) break;
+    }
+
+    if (parts.length < 4) {
+        for (const topic of topics) {
+            const desc = normalizeText(topic.description);
+            if (!desc) continue;
+            parts.push(desc.endsWith('.') ? desc : `${desc}.`);
+            if (parts.length >= 6) break;
+        }
+    }
+
+    if (parts.length < 4) {
+        for (const article of articles) {
+            const title = normalizeText(article.translatedTitle);
+            const firstSentence = splitSentences(article.summary)[0];
+            if (title && firstSentence) {
+                parts.push(`${title}: ${firstSentence}`);
+            } else if (title) {
+                parts.push(`${title}.`);
+            }
+            if (parts.length >= 6) break;
+        }
+    }
+
+    return normalizeText(parts.join(' '));
+}
+
+function enforceSummaryQuality(
+    summary: string,
+    options: {
+        sections?: DigestSection[];
+        topics?: TopicItem[];
+        articles?: ArticleInput[];
+        tweets?: TweetInput[];
+        minWords: number;
+        minTweetRefs?: number;
+    }
+): string {
+    const cleanSummary = normalizeText(summary);
+    const sections = options.sections || [];
+    const topics = options.topics || [];
+    const articles = options.articles || [];
+    const tweets = options.tweets || [];
+
+    const buildTweetExamples = (minRefs: number): string => {
+        if (minRefs <= 0 || tweets.length === 0) return '';
+        const selected = tweets.slice(0, Math.min(Math.max(minRefs, 2), 5));
+        if (selected.length === 0) return '';
+        const examples = selected.map(t => {
+            const shortText = normalizeText(t.text).slice(0, 110).trim();
+            return `@${t.userName} "${shortText}${t.text.length > 110 ? '...' : ''}"`;
+        });
+        return `X'ten ornekler: ${examples.join('; ')}.`;
+    };
+
+    if (getWordCount(cleanSummary) >= options.minWords && !isGenericSummary(cleanSummary)) {
+        if (!options.minTweetRefs || countTweetReferences(cleanSummary) >= options.minTweetRefs) {
+            return cleanSummary;
+        }
+
+        const withTweets = normalizeText(`${cleanSummary} ${buildTweetExamples(options.minTweetRefs)}`);
+        if (countTweetReferences(withTweets) >= options.minTweetRefs) {
+            return withTweets;
+        }
+    }
+
+    const fallback = buildFallbackSummary(sections, topics, articles);
+    if (getWordCount(fallback) > getWordCount(cleanSummary)) {
+        return fallback;
+    }
+
+    let finalSummary = cleanSummary || fallback || 'Gunun ozeti olusturulamadi.';
+    if (options.minTweetRefs && countTweetReferences(finalSummary) < options.minTweetRefs) {
+        finalSummary = normalizeText(`${finalSummary} ${buildTweetExamples(options.minTweetRefs)}`);
+    }
+    return finalSummary;
+}
+
+function getDominantAlignmentLabel(score: number): 'muhalif' | 'iktidar' | 'merkez' | 'belirsiz' {
+    if (score <= -0.25) return 'muhalif';
+    if (score >= 0.25) return 'iktidar';
+    if (Math.abs(score) < 0.25) return 'merkez';
+    return 'belirsiz';
+}
+
+function getToneLabel(score: number): 'muhalif-ton' | 'iktidar-ton' | 'notr-ton' {
+    if (score <= -2) return 'muhalif-ton';
+    if (score >= 2) return 'iktidar-ton';
+    return 'notr-ton';
+}
+
+function buildAlignmentSummary(profile: ArticleAlignmentProfile): string {
+    const toneLabel = getToneLabel(profile.toneLeanScore * 5);
+    return `Etiket:${profile.dominantLabel} (m:${profile.oppositionSources}, i:${profile.proGovernmentSources}, k:${profile.centerSources}, b:${profile.unknownSources}, ton:${toneLabel})`;
+}
+
+async function getArticleAlignmentProfiles(
+    countryCode: CountryCode,
+    articles: ArticleInput[],
+): Promise<Map<string, ArticleAlignmentProfile>> {
+    const result = new Map<string, ArticleAlignmentProfile>();
+    if (articles.length === 0) return result;
+
+    const articleIds = articles.map(a => a.id).filter(Boolean);
+    if (articleIds.length === 0) return result;
+
+    const articleSourceTable = `${countryCode}_article_sources`;
+    const ids = sql.join(articleIds.map(id => sql`${id}`), sql`, `);
+
+    type RawProfile = {
+        articleId: string;
+        totalSources: number;
+        oppositionSources: number;
+        proGovernmentSources: number;
+        centerSources: number;
+        unknownSources: number;
+    };
+
+    try {
+        const rows = await db.all<RawProfile>(sql`
+            SELECT
+                src.article_id as articleId,
+                COUNT(*) as totalSources,
+                SUM(CASE WHEN rs.id IS NULL THEN 1 ELSE 0 END) as unknownSources,
+                SUM(CASE WHEN rs.gov_alignment_score <= -1 THEN 1 ELSE 0 END) as oppositionSources,
+                SUM(CASE WHEN rs.gov_alignment_score >= 1 THEN 1 ELSE 0 END) as proGovernmentSources,
+                SUM(CASE WHEN rs.id IS NOT NULL AND rs.gov_alignment_score = 0 THEN 1 ELSE 0 END) as centerSources
+            FROM ${sql.raw(articleSourceTable)} src
+            LEFT JOIN rss_sources rs
+              ON LOWER(TRIM(src.source_name)) = LOWER(TRIM(rs.source_name))
+             AND rs.country_code = ${countryCode}
+            WHERE src.article_id IN (${ids})
+            GROUP BY src.article_id
+        `);
+
+        const articleById = new Map(articles.map(a => [a.id, a]));
+        for (const row of rows) {
+            const article = articleById.get(row.articleId);
+            if (!article) continue;
+
+            const knownSources = Math.max(1, row.oppositionSources + row.proGovernmentSources + row.centerSources);
+            const sourceLeanScore = (row.proGovernmentSources - row.oppositionSources) / knownSources;
+            const toneLeanScore = Math.max(-1, Math.min(1, article.politicalTone / 5));
+            const combinedLeanScore = (sourceLeanScore * 0.7) + (toneLeanScore * 0.3);
+            const dominantLabel = getDominantAlignmentLabel(combinedLeanScore);
+            const minoritySignal = Math.abs(combinedLeanScore) >= 0.2
+                && Math.sign(sourceLeanScore || 0) !== Math.sign(toneLeanScore || 0)
+                && Math.abs(sourceLeanScore) >= 0.25
+                && Math.abs(toneLeanScore) >= 0.25;
+
+            const profile: ArticleAlignmentProfile = {
+                articleId: row.articleId,
+                totalSources: row.totalSources || article.sourceCount,
+                oppositionSources: row.oppositionSources || 0,
+                proGovernmentSources: row.proGovernmentSources || 0,
+                centerSources: row.centerSources || 0,
+                unknownSources: row.unknownSources || 0,
+                sourceLeanScore,
+                toneLeanScore,
+                combinedLeanScore,
+                dominantLabel,
+                minoritySignal,
+                summary: '',
+            };
+            profile.summary = buildAlignmentSummary(profile);
+            result.set(row.articleId, profile);
+        }
+    } catch (error) {
+        logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'Failed to compute article alignment profiles');
+    }
+
+    // Fallback profile for any article without source rows.
+    for (const article of articles) {
+        if (result.has(article.id)) continue;
+        const toneLeanScore = Math.max(-1, Math.min(1, article.politicalTone / 5));
+        const combinedLeanScore = toneLeanScore * 0.3;
+        const profile: ArticleAlignmentProfile = {
+            articleId: article.id,
+            totalSources: article.sourceCount,
+            oppositionSources: 0,
+            proGovernmentSources: 0,
+            centerSources: 0,
+            unknownSources: article.sourceCount,
+            sourceLeanScore: 0,
+            toneLeanScore,
+            combinedLeanScore,
+            dominantLabel: getDominantAlignmentLabel(combinedLeanScore),
+            minoritySignal: false,
+            summary: '',
+        };
+        profile.summary = buildAlignmentSummary(profile);
+        result.set(article.id, profile);
+    }
+
+    return result;
 }
 
 /**
@@ -72,9 +351,8 @@ interface ArticleInput {
 async function generateDefaultDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
-    period: Period,
 ): Promise<DigestResult> {
-    const periodLabel = period === 'morning' ? 'sabah' : 'akşam';
+    const periodLabel = 'günlük';
 
     // Tweets are primary — build them first and prominently
     const tweetBlock = tweets.length > 0
@@ -85,7 +363,7 @@ async function generateDefaultDigestWithAI(
 
     // Articles are supporting context
     const articleBlock = articles.length > 0
-        ? articles.map((a, i) => `${i + 1}. ${a.translatedTitle}: ${a.summary}`).join('\n')
+        ? articles.map((a, i) => `${i + 1}. [Kaynak sayisi: ${a.sourceCount}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n')
         : '';
 
     const sourceStats = `${tweets.length} tweet${articles.length > 0 ? ` ve ${articles.length} haber kaynağı` : ''}`;
@@ -99,7 +377,7 @@ ${tweetBlock || '(Tweet verisi yok)'}
 ${articleBlock || '(Haber verisi yok)'}
 
 JSON üret:
-1. summary (2-3 paragraf, 150-200 kelime):
+1. summary (tek paragraf, 4-6 cümle, 120-170 kelime):
    YASAK KALIPLAR — bunları kesinlikle kullanma:
    ✗ "Bugün önemli gelişmeler yaşandı"
    ✗ "Gündem yoğun geçti"
@@ -113,8 +391,16 @@ JSON üret:
    ✓ İlk cümle doğrudan bir olayla başlasın: "[İsim] [ne yaptı/ne açıkladı]."
    ✓ Örnek: "Dışişleri Bakanı Fidan, Gazze Yönetimi Başkanı Şaat'ı Ankara'da kabul etti."
    ✓ Her cümle yeni bir bilgi versin. Yorum veya değerlendirme ekleme, sadece olgu.
+   ✓ Toplam uzunluk 120 kelimenin altına düşmesin.
+   ✓ Summary içinde en az 2 örnek tweet alıntısı kullan: @kullanici "tweetten kısa alıntı".
 
 2. top_topics (3-5 konu): title + description (somut bilgi, klişe yok)
+
+KAYNAK ONEM KURALI:
+- [Kaynak sayisi] yuksek olan haberleri ana omurga olarak one cikar.
+- [Kaynak sayisi] dusuk olan haberlerden en az 1-2 tanesini mutlaka summary veya top_topics'te belirt.
+- Dusuk kaynakli haberleri "gizleniyor" diye kesin hukumle sunma; "sinirli sayida kaynakta yer aldi" gibi olgusal ifade kullan.
+- [Etiket:*] bilgisini kaynak dagilimi + haber tonu birlikte uretiyor. Etiketi ve tonu celisen haberleri not et (ornegin "kaynak dagilimi iktidar, ton muhalif"), ama yorum yapma.
 
 { "summary": "...", "top_topics": [{ "title": "...", "description": "..." }] }
 
@@ -126,7 +412,7 @@ Sadece JSON.`;
             messages: [
                 {
                     role: 'system',
-                    content: 'Profesyonel haber spikerisin. Sadece olgu yaz. Klişe/dolgu cümle YASAK. İlk cümle: [Kim] [ne yaptı]. Yorum ekleme. JSON döndür.',
+                    content: 'Profesyonel haber spikerisin. Sadece olgu yaz. Klişe/dolgu cümle YASAK. İlk cümle: [Kim] [ne yaptı]. Yorum ekleme. Tweet alıntılarını koru ve summary içinde örnek tweetlere yer ver. JSON döndür.',
                 },
                 { role: 'user', content: prompt },
             ],
@@ -147,10 +433,17 @@ Sadece JSON.`;
         return { title: topic.title || '', description: topic.description || '' };
     });
 
-    let summaryText = result.summary;
+    let summaryText = result.summary || result.summaryText;
     if (typeof summaryText !== 'string') {
         summaryText = summaryText ? JSON.stringify(summaryText) : 'Günün özeti oluşturulamadı.';
     }
+    summaryText = enforceSummaryQuality(summaryText, {
+        topics: topTopics,
+        articles,
+        tweets,
+        minWords: 90,
+        minTweetRefs: 2,
+    });
 
     return {
         summaryText: summaryText || 'Günün özeti oluşturulamadı.',
@@ -169,9 +462,8 @@ Sadece JSON.`;
 async function generateTRDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
-    period: Period,
 ): Promise<DigestResult> {
-    const periodLabel = period === 'morning' ? 'sabah' : 'akşam';
+    const periodLabel = 'günlük';
 
     // --- PRIMARY: Tweets grouped by engagement tiers ---
     const highEngagement = tweets.filter(t => t.likeCount >= 1000 || t.retweetCount >= 200);
@@ -196,7 +488,7 @@ async function generateTRDigestWithAI(
     const categoryBlocks = Object.entries(grouped)
         .sort((a, b) => b[1].length - a[1].length)
         .map(([cat, arts]) => {
-            const items = arts.map((a, i) => `  ${i + 1}. ${a.translatedTitle}: ${a.summary}`).join('\n');
+            const items = arts.map((a, i) => `  ${i + 1}. [Kaynak sayisi: ${a.sourceCount}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n');
             return `[${cat}] (${arts.length} haber)\n${items}`;
         })
         .join('\n\n');
@@ -211,7 +503,7 @@ ${categoryBlocks || '(Haber verisi yok)'}
 
 JSON:
 {
-  "summary": "2-3 cümle gündem özeti",
+  "summary": "4-6 cümlelik, 120-170 kelime gündem özeti",
   "sections": [{
     "category": "Kategori",
     "icon": "emoji",
@@ -245,8 +537,13 @@ DOĞRU YAZIM:
 
 KURALLAR:
 - 3-6 bölüm. Tweet bilgisi öncelikli.
+- summary: 4-6 cümle, 120-170 kelime.
+- summary içinde en az 3 örnek tweet alıntısı kullan: @kullanici "tweetten kısa alıntı".
+- Yüksek kaynak sayılı (yaygın) haberleri temel gündem yap.
+- Düşük kaynak sayılı haberlerden en az 1-2 tanesini mutlaka özet veya bölüm akışına dahil et.
+- [Etiket:*] bilgisini kullan: bu etiket kaynak dagilimi + haber tonu sentezidir. Etiket ve ton ayrisiyorsa "kaynak dagilimi ... ton ..." formatinda olgusal belirt.
 - tweetContext zorunlu.
-- tweets: her bölümde 2-3 ilgili tweet alıntısı (author, handle, text). Kaynak tweetlerden birebir al.
+- tweets: her bölümde 3-5 ilgili tweet alıntısı (author, handle, text). Kaynak tweetlerden birebir al.
 - highlights: 2-4 madde, her biri somut.
 - top_topics: 3-5 konu.
 - Türkçe, 500-700 kelime.
@@ -260,7 +557,7 @@ Sadece JSON.`;
             messages: [
                 {
                     role: 'system',
-                    content: 'Profesyonel haber spikerisin. Türkiye gündemini oluştur. Sadece olgu yaz — yorum, değerlendirme, klişe YASAK. Her cümle: [Kim] [ne yaptı]. "Önemli gelişmeler yaşandı", "dikkat çekti", "öne çıktı", "gündemde" gibi dolgu ifadeler kullanırsan başarısız sayılırsın. JSON döndür.',
+                    content: 'Profesyonel haber spikerisin. Türkiye gündemini oluştur. Sadece olgu yaz — yorum, değerlendirme, klişe YASAK. Her cümle: [Kim] [ne yaptı]. "Önemli gelişmeler yaşandı", "dikkat çekti", "öne çıktı", "gündemde" gibi dolgu ifadeler kullanırsan başarısız sayılırsın. Summary ve bölüm metinlerinde örnek tweet alıntılarına daha fazla yer ver. JSON döndür.',
                 },
                 { role: 'user', content: prompt },
             ],
@@ -298,10 +595,18 @@ Sadece JSON.`;
         return { title: topic.title || '', description: topic.description || '' };
     });
 
-    let summaryText = result.summary;
+    let summaryText = result.summary || result.summaryText;
     if (typeof summaryText !== 'string') {
         summaryText = summaryText ? JSON.stringify(summaryText) : 'Günün özeti oluşturulamadı.';
     }
+    summaryText = enforceSummaryQuality(summaryText, {
+        sections,
+        topics: topTopics,
+        articles,
+        tweets,
+        minWords: 100,
+        minTweetRefs: 3,
+    });
 
     return {
         summaryText: summaryText || 'Günün özeti oluşturulamadı.',
@@ -318,14 +623,13 @@ Sadece JSON.`;
 async function generateDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
-    period: Period,
     countryCode: CountryCode
 ): Promise<DigestResult> {
     try {
         if (countryCode === 'tr') {
-            return await generateTRDigestWithAI(articles, tweets, period);
+            return await generateTRDigestWithAI(articles, tweets);
         }
-        return await generateDefaultDigestWithAI(articles, tweets, period);
+        return await generateDefaultDigestWithAI(articles, tweets);
     } catch (error) {
         logger.error({ error, countryCode }, 'Digest AI generation failed');
         return { ...getDigestFallback(articles.length, true), tweetCount: 0 };
@@ -352,39 +656,89 @@ function isPromotionalTweet(text: string): boolean {
     return PROMO_KEYWORDS.some(kw => lower.includes(kw));
 }
 
+function getSupportingArticles(
+    articles: ArticleInput[],
+    countryCode: CountryCode,
+    tweetCount: number,
+    alignmentProfiles: Map<string, ArticleAlignmentProfile>
+): ArticleInput[] {
+    if (tweetCount <= 0) return articles;
+    const limit = countryCode === 'tr'
+        ? SUPPORTING_ARTICLE_LIMIT_WITH_TWEETS.tr
+        : SUPPORTING_ARTICLE_LIMIT_WITH_TWEETS.default;
+
+    if (articles.length <= limit) return articles;
+
+    const sortedBySourceCount = [...articles].sort((a, b) => b.sourceCount - a.sourceCount);
+    const highCoverageCount = Math.max(4, Math.floor(limit * 0.6));
+    const lowCoverageCount = Math.max(3, Math.floor(limit * 0.25));
+    const minorityCount = Math.max(2, Math.floor(limit * 0.15));
+
+    const highCoverage = sortedBySourceCount.slice(0, highCoverageCount);
+    const lowCoverage = [...sortedBySourceCount]
+        .reverse()
+        .filter(a => a.sourceCount <= 3)
+        .slice(0, lowCoverageCount);
+
+    let totalOpp = 0;
+    let totalPro = 0;
+    for (const article of articles) {
+        const profile = alignmentProfiles.get(article.id);
+        if (!profile) continue;
+        totalOpp += profile.oppositionSources;
+        totalPro += profile.proGovernmentSources;
+    }
+    const dominantSide: 'muhalif' | 'iktidar' | 'none' =
+        totalOpp === totalPro ? 'none' : (totalOpp > totalPro ? 'muhalif' : 'iktidar');
+
+    const minorityPerspective = sortedBySourceCount
+        .filter(article => {
+            const profile = alignmentProfiles.get(article.id);
+            if (!profile) return false;
+            if (profile.minoritySignal) return true;
+            if (dominantSide === 'none') return false;
+            return profile.dominantLabel !== dominantSide && profile.dominantLabel !== 'merkez' && profile.dominantLabel !== 'belirsiz';
+        })
+        .slice(0, minorityCount);
+
+    const selectedMap = new Map<string, ArticleInput>();
+    for (const item of highCoverage) {
+        selectedMap.set(`${item.translatedTitle}|${item.summary}`, item);
+    }
+    for (const item of lowCoverage) {
+        selectedMap.set(`${item.translatedTitle}|${item.summary}`, item);
+    }
+    for (const item of minorityPerspective) {
+        selectedMap.set(`${item.translatedTitle}|${item.summary}`, item);
+    }
+
+    for (const article of articles) {
+        if (selectedMap.size >= limit) break;
+        selectedMap.set(`${article.translatedTitle}|${article.summary}`, article);
+    }
+
+    return articles
+        .filter(a => selectedMap.has(`${a.translatedTitle}|${a.summary}`))
+        .slice(0, limit);
+}
+
 /**
  * Generate daily digest for a specific country and period
  */
 export async function generateDailyDigest(
     countryCode: CountryCode,
-    period: Period,
+    _period: Period | LegacyPeriod = 'daily',
     date?: Date
 ): Promise<{ id: string; success: boolean; error?: string }> {
     try {
+        const period: Period = 'daily';
         const tables = COUNTRY_TABLES[countryCode];
         const targetDate = date || new Date();
 
-        // Calculate time range based on period
-        let startTime: Date;
-        let endTime: Date;
-
-        if (period === 'morning') {
-            // Morning digest: 19:00 previous day to 07:00 today
-            startTime = new Date(targetDate);
-            startTime.setHours(7, 0, 0, 0);
-            startTime.setDate(startTime.getDate() - 1);
-            startTime.setHours(19, 0, 0, 0);
-
-            endTime = new Date(targetDate);
-            endTime.setHours(7, 0, 0, 0);
-        } else {
-            // Evening digest: 07:00 to 19:00 today
-            startTime = new Date(targetDate);
-            startTime.setHours(7, 0, 0, 0);
-
-            endTime = new Date(targetDate);
-            endTime.setHours(19, 0, 0, 0);
-        }
+        // Single daily digest: analyze last 24 hours.
+        const endTime = new Date(targetDate);
+        const startTime = new Date(endTime);
+        startTime.setHours(startTime.getHours() - 24);
 
         // TR gets more articles for richer sectioned digest
         const articleLimit = countryCode === 'tr' ? 80 : 50;
@@ -392,9 +746,12 @@ export async function generateDailyDigest(
         // Use raw SQL for date comparisons to avoid libsql type binding issues
         let articles = await db
             .select({
+                id: tables.articles.id,
                 translatedTitle: tables.articles.translatedTitle,
                 summary: tables.articles.summary,
                 categoryId: tables.articles.categoryId,
+                sourceCount: tables.articles.sourceCount,
+                politicalTone: tables.articles.politicalTone,
             })
             .from(tables.articles)
             .where(and(
@@ -402,6 +759,7 @@ export async function generateDailyDigest(
                 lte(tables.articles.publishedAt, endTime),
                 eq(tables.articles.isFiltered, false)
             ))
+            .orderBy(desc(tables.articles.publishedAt))
             .limit(articleLimit);
 
         // Fallback: if no articles in exact window, use most recent articles (last 7 days)
@@ -412,9 +770,12 @@ export async function generateDailyDigest(
 
             articles = await db
                 .select({
+                    id: tables.articles.id,
                     translatedTitle: tables.articles.translatedTitle,
                     summary: tables.articles.summary,
                     categoryId: tables.articles.categoryId,
+                    sourceCount: tables.articles.sourceCount,
+                    politicalTone: tables.articles.politicalTone,
                 })
                 .from(tables.articles)
                 .where(and(
@@ -436,8 +797,8 @@ export async function generateDailyDigest(
             const tweetTableName = `${countryCode}_tweets`;
             const tweetEnd = Math.floor(endTime.getTime() / 1000);
             const tweetStart = tweetEnd - (24 * 60 * 60); // 24 hours before endTime
-            const rawTweets = await db.all<{ text: string; user_name: string; display_name: string; like_count: number; retweet_count: number }>(
-                sql`SELECT text, user_name, display_name, like_count, retweet_count
+            const rawTweets = await db.all<{ text: string; user_name: string; display_name: string; profile_image_url: string | null; like_count: number; retweet_count: number }>(
+                sql`SELECT text, user_name, display_name, profile_image_url, like_count, retweet_count
                     FROM ${sql.raw(tweetTableName)}
                     WHERE tweeted_at >= ${tweetStart} AND tweeted_at <= ${tweetEnd}
                     ORDER BY like_count DESC
@@ -451,6 +812,7 @@ export async function generateDailyDigest(
                     text: t.text,
                     userName: t.user_name,
                     displayName: t.display_name,
+                    profileImageUrl: t.profile_image_url,
                     likeCount: t.like_count,
                     retweetCount: t.retweet_count,
                 }));
@@ -460,8 +822,28 @@ export async function generateDailyDigest(
             logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'Failed to fetch tweets for digest, continuing without');
         }
 
+        // X is primary source: when tweets exist, keep RSS as supporting context only.
+        const alignmentProfiles = await getArticleAlignmentProfiles(countryCode, articles);
+        const enrichedArticles = articles.map(article => {
+            const profile = alignmentProfiles.get(article.id);
+            return {
+                ...article,
+                alignmentSummary: profile?.summary || `Etiket:belirsiz (m:0, i:0, k:0, b:${article.sourceCount}, ton:${getToneLabel(article.politicalTone)})`,
+            };
+        });
+        const supportingArticles = getSupportingArticles(enrichedArticles, countryCode, tweets.length, alignmentProfiles);
+        logger.info({
+            countryCode,
+            period,
+            tweetCount: tweets.length,
+            totalArticles: enrichedArticles.length,
+            supportingArticles: supportingArticles.length,
+            xPrimary: tweets.length > 0,
+            labeledArticles: enrichedArticles.filter(a => a.alignmentSummary && !a.alignmentSummary.includes('belirsiz')).length,
+        }, 'Digest source priority applied');
+
         // Generate digest with AI
-        const digestResult = await generateDigestWithAI(articles, tweets, period, countryCode);
+        const digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode);
 
         // Format date string
         const digestDate = targetDate.toISOString().split('T')[0];
@@ -470,10 +852,8 @@ export async function generateDailyDigest(
         const existing = await db
             .select()
             .from(tables.digests)
-            .where(and(
-                eq(tables.digests.digestDate, digestDate),
-                eq(tables.digests.period, period)
-            ))
+            .where(eq(tables.digests.digestDate, digestDate))
+            .orderBy(desc(tables.digests.createdAt))
             .get();
 
         // Ensure all values are primitives for libsql local driver compatibility
@@ -501,7 +881,7 @@ export async function generateDailyDigest(
     } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
         const errStack = error instanceof Error ? error.stack : undefined;
-        logger.error({ error: errMsg, stack: errStack, countryCode, period }, 'Generate digest failed');
+        logger.error({ error: errMsg, stack: errStack, countryCode, period: 'daily' }, 'Generate digest failed');
         return { id: '', success: false, error: errMsg };
     }
 }
@@ -525,34 +905,40 @@ export async function getLatestDigest(countryCode: CountryCode) {
 /**
  * Get digest by date and period
  */
-export async function getDigestByDateAndPeriod(
+export async function getDigestByDate(
     countryCode: CountryCode,
     date: string,
-    period: Period
 ) {
     const tables = COUNTRY_TABLES[countryCode];
 
     const digest = await db
         .select()
         .from(tables.digests)
-        .where(and(
-            eq(tables.digests.digestDate, date),
-            eq(tables.digests.period, period)
-        ))
+        .where(eq(tables.digests.digestDate, date))
+        .orderBy(desc(tables.digests.createdAt))
         .get();
 
     return digest;
 }
 
+// Backward-compatible wrapper: period is ignored because digest is now daily.
+export async function getDigestByDateAndPeriod(
+    countryCode: CountryCode,
+    date: string,
+    _period: Period | LegacyPeriod
+) {
+    return getDigestByDate(countryCode, date);
+}
+
 /**
  * Generate digests for all countries
  */
-export async function generateAllDigests(period: Period) {
+export async function generateAllDigests(_period: Period | LegacyPeriod = 'daily') {
     const countries = Object.keys(COUNTRY_TABLES) as CountryCode[];
     const results = [];
 
     for (const country of countries) {
-        const result = await generateDailyDigest(country, period);
+        const result = await generateDailyDigest(country, 'daily');
         results.push({ country, ...result });
     }
 

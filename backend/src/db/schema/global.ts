@@ -64,6 +64,7 @@ export const twitter_accounts = sqliteTable('twitter_accounts', {
     countryCode: text('country_code').notNull(),
     userName: text('user_name').notNull(),
     displayName: text('display_name').notNull(),
+    profileImageUrl: text('profile_image_url'),
     accountType: text('account_type', {
         enum: ['government', 'news_agency', 'journalist', 'institution', 'political_party']
     }).notNull(),

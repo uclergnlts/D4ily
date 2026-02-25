@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { Bookmark, Lock, ArrowRight, ChevronLeft } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { useSavedArticles } from '../src/hooks/useInteraction';
@@ -18,7 +19,7 @@ export default function SavedArticlesScreen() {
             <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black">
                 {/* Header */}
                 <View className="px-4 py-3 flex-row items-center border-b border-zinc-100 dark:border-zinc-800">
-                    <TouchableOpacity onPress={() => router.back()} className="mr-3">
+                    <TouchableOpacity onPress={() => safeBack(router)} className="mr-3">
                         <ChevronLeft size={24} color="#71717a" />
                     </TouchableOpacity>
                     <Text className="text-lg font-bold text-zinc-900 dark:text-white">Kaydedilenler</Text>
@@ -56,7 +57,7 @@ export default function SavedArticlesScreen() {
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             {/* Header */}
             <View className="px-4 py-3 flex-row items-center bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 z-10">
-                <TouchableOpacity onPress={() => router.back()} className="mr-3">
+                <TouchableOpacity onPress={() => safeBack(router)} className="mr-3">
                     <ChevronLeft size={24} color="#18181b" />
                 </TouchableOpacity>
                 <Text className="text-lg font-bold text-zinc-900 dark:text-white">Kaydedilenler</Text>
@@ -92,3 +93,4 @@ export default function SavedArticlesScreen() {
         </SafeAreaView>
     );
 }
+

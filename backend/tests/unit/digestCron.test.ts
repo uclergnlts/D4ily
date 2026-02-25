@@ -40,15 +40,15 @@ describe('digestCron', () => {
 
             expect(result.success).toBe(true);
             expect(result.results).toEqual(mockResults);
-            expect(mockGenerateAllDigests).toHaveBeenCalledWith('morning');
+            expect(mockGenerateAllDigests).toHaveBeenCalledWith('daily');
         });
 
-        it('should trigger evening period correctly', async () => {
+        it('should normalize legacy period to daily', async () => {
             mockGenerateAllDigests.mockResolvedValue([{ success: true, country: 'tr' }]);
 
             await triggerDigestManually('evening');
 
-            expect(mockGenerateAllDigests).toHaveBeenCalledWith('evening');
+            expect(mockGenerateAllDigests).toHaveBeenCalledWith('daily');
         });
 
         it('should return failure when generateAllDigests throws', async () => {
@@ -85,20 +85,13 @@ describe('digestCron', () => {
     });
 
     describe('startDigestCron', () => {
-        it('should schedule two cron jobs (morning and evening)', async () => {
+        it('should schedule one daily cron job', async () => {
             const cron = await import('node-cron');
             const scheduleSpy = vi.spyOn(cron.default, 'schedule');
 
             startDigestCron();
 
-            expect(scheduleSpy).toHaveBeenCalledTimes(2);
-            // Morning at 07:00
-            expect(scheduleSpy).toHaveBeenCalledWith(
-                '0 7 * * *',
-                expect.any(Function),
-                expect.objectContaining({ timezone: 'Europe/Istanbul' })
-            );
-            // Evening at 19:00
+            expect(scheduleSpy).toHaveBeenCalledTimes(1);
             expect(scheduleSpy).toHaveBeenCalledWith(
                 '0 19 * * *',
                 expect.any(Function),
@@ -106,7 +99,7 @@ describe('digestCron', () => {
             );
         });
 
-        it('should return a cleanup function that stops both jobs', async () => {
+        it('should return a cleanup function that stops the job', async () => {
             const stopMock = vi.fn();
             const cron = await import('node-cron');
             vi.spyOn(cron.default, 'schedule').mockReturnValue({ stop: stopMock } as any);
@@ -114,7 +107,7 @@ describe('digestCron', () => {
             const cleanup = startDigestCron();
             cleanup();
 
-            expect(stopMock).toHaveBeenCalledTimes(2);
+            expect(stopMock).toHaveBeenCalledTimes(1);
         });
     });
 });

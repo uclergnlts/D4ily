@@ -4,18 +4,17 @@ import { View, Text } from 'react-native';
 interface DigestHeaderProps {
     title: string;
     date: string;
-    period: 'morning' | 'evening';
     summary: string;
     className?: string;
 }
 
-export const DigestHeader = React.memo(function DigestHeader({ title, date, period, summary, className }: DigestHeaderProps) {
+export const DigestHeader = React.memo(function DigestHeader({ title, date, summary, className }: DigestHeaderProps) {
     const dateObj = new Date(date);
     const formattedDate = !isNaN(dateObj.getTime())
         ? dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })
         : date;
 
-    const periodLabel = period === 'morning' ? 'SABAH OZETI' : 'AKSAM OZETI';
+    const periodLabel = 'GUNLUK OZET';
 
     return (
         <View className={`mx-4 mt-2 mb-6 ${className}`}>

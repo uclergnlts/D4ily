@@ -87,7 +87,8 @@
       "Bash(where:*)",
       "Bash(eas:*)",
       "Bash(npm uninstall:*)",
-      "Bash(npx expo start:*)"
+      "Bash(npx expo start:*)",
+      "WebFetch(domain:www.sozcu.com.tr)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"

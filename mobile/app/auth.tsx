@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { ChevronLeft, Mail, Lock, User, Check, Eye, EyeOff } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { authService } from '../src/api/services/authService';
@@ -42,7 +43,7 @@ export default function AuthScreen() {
             if (isLogin) {
                 const data = await authService.login(email, password);
                 await login(data.user, data.token);
-                router.back();
+                safeBack(router);
             } else {
                 const data = await authService.register(email, password, name);
                 await login(data.user, data.customToken);
@@ -69,7 +70,7 @@ export default function AuthScreen() {
                 const token = await getIdToken();
                 const appUser = firebaseUserToAppUser(firebaseUser);
                 await login(appUser, token || '');
-                router.back();
+                safeBack(router);
             }
         } catch (error: any) {
             Alert.alert('Hata', error.message || 'Social login başarısız');
@@ -87,7 +88,7 @@ export default function AuthScreen() {
                 {/* Header Actions */}
                 <View className="px-6 pt-12 pb-4 flex-row items-center justify-between z-10">
                     <TouchableOpacity
-                        onPress={() => router.back()}
+                        onPress={() => safeBack(router)}
                         className="w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 items-center justify-center shadow-sm"
                     >
                         <ChevronLeft size={24} color="#71717a" />
@@ -288,3 +289,4 @@ export default function AuthScreen() {
         </View>
     );
 }
+

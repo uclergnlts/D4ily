@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { sourceService } from '../src/api/services/sourceService';
 
@@ -34,7 +35,7 @@ export default function VoteSourceScreen() {
         try {
             await sourceService.voteSource(Number(sourceId), selectedScore);
             Alert.alert('Başarılı', 'Oyunuz kaydedildi!', [
-                { text: 'Tamam', onPress: () => router.back() }
+                { text: 'Tamam', onPress: () => safeBack(router) }
             ]);
         } catch (error: any) {
             Alert.alert('Hata', error.message || 'Oylama başarısız oldu.');
@@ -92,3 +93,4 @@ export default function VoteSourceScreen() {
         </View>
     );
 }
+

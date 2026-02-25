@@ -37,6 +37,9 @@ interface TwitterApiTweet {
     author: {
         userName: string;
         name: string;
+        profilePicture?: string;
+        profile_image_url?: string;
+        profileImageUrl?: string;
     };
 }
 
@@ -89,8 +92,36 @@ async function fetchUserTweets(userName: string): Promise<TwitterApiTweet[]> {
     return tweets;
 }
 
+function getAuthorProfileImageUrl(tweet: TwitterApiTweet | null | undefined): string | null {
+    if (!tweet?.author) return null;
+    return tweet.author.profilePicture
+        || tweet.author.profile_image_url
+        || tweet.author.profileImageUrl
+        || null;
+}
+
+async function ensureTwitterProfileColumns(): Promise<void> {
+    const countries = Object.keys(COUNTRY_TWEET_TABLES) as CountryCode[];
+    const statements = [
+        sql`ALTER TABLE twitter_accounts ADD COLUMN profile_image_url TEXT`,
+        ...countries.map(country =>
+            sql`ALTER TABLE ${sql.raw(`${country}_tweets`)} ADD COLUMN profile_image_url TEXT`
+        ),
+    ];
+
+    for (const statement of statements) {
+        try {
+            await db.run(statement);
+        } catch (error) {
+            const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+            if (message.includes('duplicate column') || message.includes('already exists')) continue;
+            logger.warn({ error }, 'Failed to ensure twitter profile image column');
+        }
+    }
+}
+
 async function scrapeTwitterAccount(
-    account: { id: number; userName: string; displayName: string },
+    account: { id: number; userName: string; displayName: string; profileImageUrl?: string | null },
     countryCode: CountryCode
 ): Promise<{ fetched: number; duplicates: number }> {
     const table = COUNTRY_TWEET_TABLES[countryCode];
@@ -98,6 +129,7 @@ async function scrapeTwitterAccount(
     let duplicates = 0;
 
     const tweets = await fetchUserTweets(account.userName);
+    const latestAuthorProfileImageUrl = getAuthorProfileImageUrl(tweets[0]) || account.profileImageUrl || null;
 
     for (const tweet of tweets) {
         if (!tweet.id || !tweet.text) continue;
@@ -108,12 +140,13 @@ async function scrapeTwitterAccount(
         const tableName = `${countryCode}_tweets`;
         const result = await db.run(sql`
             INSERT OR IGNORE INTO ${sql.raw(tableName)}
-            (id, account_id, user_name, display_name, text, lang, like_count, retweet_count, reply_count, view_count, tweeted_at, fetched_at, used_in_digest)
+            (id, account_id, user_name, display_name, profile_image_url, text, lang, like_count, retweet_count, reply_count, view_count, tweeted_at, fetched_at, used_in_digest)
             VALUES (
                 ${tweet.id},
                 ${account.id},
                 ${tweet.author?.userName || account.userName},
                 ${tweet.author?.name || account.displayName},
+                ${getAuthorProfileImageUrl(tweet) || latestAuthorProfileImageUrl},
                 ${tweet.text},
                 ${tweet.lang || null},
                 ${tweet.likeCount || 0},
@@ -136,7 +169,11 @@ async function scrapeTwitterAccount(
     // Update lastFetchedAt
     await db
         .update(twitter_accounts)
-        .set({ lastFetchedAt: new Date() })
+        .set({
+            displayName: tweets[0]?.author?.name || account.displayName,
+            profileImageUrl: latestAuthorProfileImageUrl,
+            lastFetchedAt: new Date(),
+        })
         .where(eq(twitter_accounts.id, account.id));
 
     return { fetched, duplicates };
@@ -149,6 +186,8 @@ export async function scrapeAllTwitterAccounts(): Promise<void> {
     }
 
     try {
+        await ensureTwitterProfileColumns();
+
         const accounts = await db
             .select()
             .from(twitter_accounts)
@@ -174,7 +213,12 @@ export async function scrapeAllTwitterAccounts(): Promise<void> {
                 }
 
                 const result = await scrapeTwitterAccount(
-                    { id: account.id, userName: account.userName, displayName: account.displayName },
+                    {
+                        id: account.id,
+                        userName: account.userName,
+                        displayName: account.displayName,
+                        profileImageUrl: account.profileImageUrl,
+                    },
                     countryCode
                 );
 

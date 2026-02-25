@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { ChevronRight, Award, Shield, BookOpen, ChevronLeft, User } from 'lucide-react-native';
 
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -69,7 +70,7 @@ export default function UserProfileScreen() {
     return (
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             <View className="px-4 py-2 flex-row items-center border-b border-zinc-100 dark:border-zinc-800">
-                <TouchableOpacity onPress={() => router.back()} className="p-2 -ml-2">
+                <TouchableOpacity onPress={() => safeBack(router)} className="p-2 -ml-2">
                     <ChevronLeft size={24} color="#18181b" />
                 </TouchableOpacity>
                 <Text className="text-lg font-bold ml-2">Profilim</Text>
@@ -155,3 +156,4 @@ export default function UserProfileScreen() {
         </SafeAreaView>
     );
 }
+

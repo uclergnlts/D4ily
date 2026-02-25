@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, Keyboard } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { safeBack } from '../../src/utils/navigation';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Mail } from 'lucide-react-native';
 import { authService } from '../../src/api/services/authService';
@@ -48,7 +49,7 @@ export default function VerifyEmailScreen() {
     return (
         <SafeAreaView className="flex-1 bg-white dark:bg-black p-6">
             <TouchableOpacity
-                onPress={() => router.back()}
+                onPress={() => safeBack(router)}
                 className="mb-8 w-10 h-10 rounded-full bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 items-center justify-center shadow-sm"
             >
                 <ChevronLeft size={24} color="#71717a" />
@@ -107,3 +108,4 @@ export default function VerifyEmailScreen() {
         </SafeAreaView>
     );
 }
+

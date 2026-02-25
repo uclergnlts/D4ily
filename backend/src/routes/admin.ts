@@ -412,19 +412,8 @@ admin.get('/categories', async (c) => {
  */
 admin.post('/cron/digest/run', async (c) => {
     try {
-        const body = await c.req.json().catch(() => ({}));
-        const period = body.period || 'morning';
-
-        if (period !== 'morning' && period !== 'evening') {
-            return c.json({
-                success: false,
-                error: 'Invalid period. Use "morning" or "evening"',
-            }, 400);
-        }
-
-        logger.info({ period }, 'Manual digest generation triggered by admin');
-
-        const result = await triggerDigestManually(period);
+        logger.info({ period: 'daily' }, 'Manual digest generation triggered by admin');
+        const result = await triggerDigestManually('daily');
 
         return c.json({
             success: true,
@@ -475,7 +464,7 @@ admin.get('/cron/status', async (c) => {
                 status: 'active',
             },
             digest: {
-                schedule: '07:00 and 19:00 daily',
+                schedule: '19:00 daily',
                 status: 'active',
             },
             weekly: {

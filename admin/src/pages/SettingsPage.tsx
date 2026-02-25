@@ -82,32 +82,17 @@ export function SettingsPage() {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="p-4 border rounded-lg">
-                <h4 className="font-medium mb-2">Morning Digest</h4>
+                <h4 className="font-medium mb-2">Daily Digest</h4>
                 <p className="text-sm text-gray-500 mb-4">
-                  Generate morning digest for all countries
+                  Generate daily digest for all countries
                 </p>
                 <Button
-                  onClick={() => runDigestMutation.mutate('morning')}
+                  onClick={() => runDigestMutation.mutate()}
                   isLoading={runDigestMutation.isPending}
                   className="w-full"
                 >
                   <Calendar className="h-4 w-4 mr-2" />
-                  Run Morning Digest
-                </Button>
-              </div>
-
-              <div className="p-4 border rounded-lg">
-                <h4 className="font-medium mb-2">Evening Digest</h4>
-                <p className="text-sm text-gray-500 mb-4">
-                  Generate evening digest for all countries
-                </p>
-                <Button
-                  onClick={() => runDigestMutation.mutate('evening')}
-                  isLoading={runDigestMutation.isPending}
-                  className="w-full"
-                >
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Run Evening Digest
+                  Run Daily Digest
                 </Button>
               </div>
 

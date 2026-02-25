@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { safeBack } from '../../src/utils/navigation';
 import { ChevronLeft, Rss, Globe, ChevronDown, ChevronUp } from 'lucide-react-native';
 
 interface RssSource {
@@ -423,7 +424,7 @@ export default function SourcesScreen() {
             <Stack.Screen options={{ headerShown: false }} />
             <SafeAreaView className="flex-1">
                 <View className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex-row items-center bg-white dark:bg-zinc-900">
-                    <TouchableOpacity onPress={() => router.back()} className="mr-4">
+                    <TouchableOpacity onPress={() => safeBack(router)} className="mr-4">
                         <ChevronLeft size={24} color="#006FFF" />
                     </TouchableOpacity>
                     <View className="flex-1 items-center flex-row">
@@ -500,3 +501,4 @@ export default function SourcesScreen() {
         </View>
     );
 }
+

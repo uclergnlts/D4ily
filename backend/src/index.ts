@@ -169,10 +169,8 @@ if (env.NODE_ENV !== 'production') {
     });
 
     app.post('/dev/digest', async (c) => {
-        const body = await c.req.json().catch(() => ({}));
-        const period = body.period || 'evening';
-        logger.info({ period }, 'DEV: Manual digest trigger');
-        const result = await triggerDigestManually(period);
+        logger.info({ period: 'daily' }, 'DEV: Manual digest trigger');
+        const result = await triggerDigestManually('daily');
         return c.json({ success: true, data: result });
     });
 
@@ -196,15 +194,13 @@ app.post('/ops/scrape', async (c) => {
 
 app.post('/ops/digest', async (c) => {
     const { triggerDigestManually } = await import('./cron/digestCron.js');
-    const body = await c.req.json().catch(() => ({}));
-    const period = (body as any).period || 'evening';
-    logger.info({ period }, 'OPS: Manual digest trigger');
-    triggerDigestManually(period).then((result) => {
+    logger.info({ period: 'daily' }, 'OPS: Manual digest trigger');
+    triggerDigestManually('daily').then((result) => {
         logger.info({ result }, 'OPS: Digest completed');
     }).catch((err) => {
         logger.error({ error: err }, 'OPS: Digest failed');
     });
-    return c.json({ success: true, message: `Digest (${period}) started in background` });
+    return c.json({ success: true, message: 'Daily digest started in background' });
 });
 
 app.post('/ops/tweets', async (c) => {

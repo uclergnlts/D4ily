@@ -94,7 +94,7 @@ export function createDailyDigestsTable(countryCode: string) {
     return sqliteTable(tableName, {
         id: text('id').primaryKey(),
         countryCode: text('country_code').notNull(),
-        period: text('period', { enum: ['morning', 'evening'] }).notNull(),
+        period: text('period', { enum: ['daily', 'morning', 'evening'] }).notNull(),
         digestDate: text('digest_date').notNull(), // YYYY-MM-DD
         summaryText: text('summary_text').notNull(),
         topTopics: text('top_topics', { mode: 'json' }).notNull(),
@@ -115,6 +115,7 @@ export function createTweetsTable(countryCode: string) {
         accountId: integer('account_id').notNull(),
         userName: text('user_name').notNull(),
         displayName: text('display_name').notNull(),
+        profileImageUrl: text('profile_image_url'),
         text: text('text').notNull(),
         lang: text('lang'),
         likeCount: integer('like_count').notNull().default(0),

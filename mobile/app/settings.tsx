@@ -3,6 +3,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { ChevronLeft, Bell, Moon, Shield, FileText, Mail, ChevronRight, Sparkles } from 'lucide-react-native';
 
 import { useThemeStore } from '../src/store/useThemeStore';
@@ -74,7 +75,7 @@ export default function SettingsScreen() {
             {/* Header */}
             <View className="px-4 py-3 flex-row items-center bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800">
                 <TouchableOpacity
-                    onPress={() => router.back()}
+                    onPress={() => safeBack(router)}
                     className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full"
                 >
                     <ChevronLeft size={24} color="#18181b" />
@@ -145,3 +146,4 @@ export default function SettingsScreen() {
         </SafeAreaView>
     );
 }
+

@@ -11,7 +11,7 @@ export function useCronStatus() {
 
 export function useRunDigest() {
   return useMutation({
-    mutationFn: (period: 'morning' | 'evening') => cronService.runDigest(period),
+    mutationFn: () => cronService.runDigest(),
     onSuccess: (data) => {
       toast.success(`Created ${data.digestsCreated} digests`);
     },

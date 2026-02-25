@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Switch, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { safeBack } from '../../src/utils/navigation';
 import { ChevronLeft, Bell, Zap, BookOpen, Clock, Users } from 'lucide-react-native';
 import { useAuthStore } from '../../src/store/useAuthStore';
 
@@ -109,7 +110,7 @@ export default function NotificationsScreen() {
     return (
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
             <View className="px-4 py-3 flex-row items-center bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800">
-                <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3">
+                <TouchableOpacity onPress={() => safeBack(router)} className="w-10 h-10 items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-full mr-3">
                     <ChevronLeft size={24} color="#18181b" />
                 </TouchableOpacity>
                 <Text className="text-lg font-bold text-zinc-900 dark:text-white">Bildirim Ayarları</Text>
@@ -179,3 +180,4 @@ export default function NotificationsScreen() {
         </SafeAreaView>
     );
 }
+

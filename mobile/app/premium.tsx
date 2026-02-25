@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 import { ChevronLeft, Heart, Coffee, Globe, Users, RefreshCw, Check } from 'lucide-react-native';
 import { usePremium } from '../src/hooks/usePremium';
 import { PurchasesPackage } from 'react-native-purchases';
@@ -78,7 +79,7 @@ export default function SupportScreen() {
             <SafeAreaView className="flex-1">
                 {/* Header */}
                 <View className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-800 flex-row items-center bg-white dark:bg-zinc-900">
-                    <TouchableOpacity onPress={() => router.back()} className="mr-4">
+                    <TouchableOpacity onPress={() => safeBack(router)} className="mr-4">
                         <ChevronLeft size={24} color="#006FFF" />
                     </TouchableOpacity>
                     <View className="flex-1 items-center flex-row">
@@ -329,3 +330,4 @@ export default function SupportScreen() {
         </View>
     );
 }
+

@@ -15,8 +15,8 @@ function formatDate(dateStr: string): string {
     return date.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' });
 }
 
-function getPeriodLabel(period: string): string {
-    return period === 'morning' ? 'Sabah' : 'Akşam';
+function getPeriodLabel(_period: string): string {
+    return 'Günlük';
 }
 
 // Group topics by date
