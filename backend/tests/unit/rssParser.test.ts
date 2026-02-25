@@ -178,8 +178,9 @@ describe('parseRSSFeed', () => {
                 'https://example.com/rss',
                 expect.objectContaining({
                     headers: expect.objectContaining({
-                        'User-Agent': 'NewsAggregator/1.0',
+                        'User-Agent': 'Mozilla/5.0 (compatible; NewsAggregator/1.0)',
                     }),
+                    redirect: 'follow',
                 })
             );
         });
