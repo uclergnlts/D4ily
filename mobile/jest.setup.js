@@ -71,6 +71,15 @@ jest.mock('@shopify/flash-list', () => {
     };
 });
 
+// Mock moti/interactions (ESM in node_modules breaks Jest CJS parsing in CI)
+jest.mock('moti/interactions', () => {
+    const React = require('react');
+    const { Pressable } = require('react-native');
+    return {
+        MotiPressable: React.forwardRef((props, ref) => React.createElement(Pressable, { ...props, ref }, props.children)),
+    };
+});
+
 // Mock lucide-react-native icons
 jest.mock('lucide-react-native', () => {
     const mockIcon = 'Icon';
