@@ -69,6 +69,14 @@ export interface DigestSection {
     icon: string;
     summary: string;
     highlights: string[];
+    counterNarrative?: string;
+    uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+    timeline?: {
+        before: string;
+        now: string;
+        next: string;
+    };
+    importanceScore?: number;
     tweetContext?: string;
     tweets?: SectionTweet[];
 }
@@ -84,6 +92,16 @@ export interface DailyDigest {
         title: string;
         description: string;
         articleId?: string;
+        whyImportant?: string;
+        uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+        counterNarrative?: string;
+        timeline?: {
+            before: string;
+            now: string;
+            next: string;
+        };
+        importanceScore?: number;
+        importanceTier?: 'yuksek' | 'orta' | 'dusuk';
     }[];
     sections?: DigestSection[];
     socialHighlights?: SectionTweet[];

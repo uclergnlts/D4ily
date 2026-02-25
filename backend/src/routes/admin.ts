@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
-import { rss_sources, categories, users, tr_articles, de_articles, us_articles, uk_articles, fr_articles, es_articles, it_articles, ru_articles, tr_article_sources, de_article_sources, us_article_sources } from '../db/schema/index.js';
+import {
+    rss_sources, categories, users,
+    tr_articles, de_articles, us_articles, uk_articles, fr_articles, es_articles, it_articles, ru_articles,
+    tr_article_sources, de_article_sources, us_article_sources,
+    tr_daily_digests, de_daily_digests, us_daily_digests, uk_daily_digests, fr_daily_digests, es_daily_digests, it_daily_digests, ru_daily_digests,
+} from '../db/schema/index.js';
 import { eq, desc, sql, and, gte, lte, inArray } from 'drizzle-orm';
 import { scrapeSource } from '../services/scraper/scraperService.js';
 import { logger } from '../config/logger.js';
@@ -27,6 +32,17 @@ const articleSourceTables = {
     de: de_article_sources,
     us: us_article_sources,
 };
+
+const digestTables = {
+    tr: tr_daily_digests,
+    de: de_daily_digests,
+    us: us_daily_digests,
+    uk: uk_daily_digests,
+    fr: fr_daily_digests,
+    es: es_daily_digests,
+    it: it_daily_digests,
+    ru: ru_daily_digests,
+} as const;
 
 const admin = new Hono();
 
@@ -545,6 +561,79 @@ admin.get('/stats', async (c) => {
         return c.json({
             success: false,
             error: error instanceof Error ? error.message : 'Failed to get stats',
+        }, 500);
+    }
+});
+
+/**
+ * GET /admin/digest-quality
+ * Digest quality metrics (importance / uncertainty / coverage)
+ */
+admin.get('/digest-quality', async (c) => {
+    try {
+        const country = (c.req.query('country') || 'tr') as keyof typeof digestTables;
+        const days = Math.min(Math.max(parseInt(c.req.query('days') || '7', 10), 1), 30);
+
+        if (!(country in digestTables)) {
+            return c.json({ success: false, error: 'Invalid country code' }, 400);
+        }
+
+        const table = digestTables[country];
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - days);
+        const cutoffStr = cutoff.toISOString().split('T')[0];
+
+        const digests = await db
+            .select({
+                id: table.id,
+                digestDate: table.digestDate,
+                topTopics: table.topTopics,
+                sections: table.sections,
+            })
+            .from(table)
+            .where(gte(table.digestDate, cutoffStr))
+            .orderBy(desc(table.createdAt))
+            .limit(50);
+
+        let topicCount = 0;
+        let importanceSum = 0;
+        let withCounterNarrative = 0;
+        let withTimeline = 0;
+        const uncertainty = { Kesin: 0, Muhtemel: 0, Gelisiyor: 0 } as Record<'Kesin' | 'Muhtemel' | 'Gelisiyor', number>;
+
+        for (const digest of digests) {
+            const topics = typeof digest.topTopics === 'string' ? JSON.parse(digest.topTopics || '[]') : (digest.topTopics || []);
+            for (const topic of topics) {
+                if (!topic || !topic.title) continue;
+                topicCount++;
+                if (typeof topic.importanceScore === 'number') importanceSum += topic.importanceScore;
+                if (topic.counterNarrative || topic.counter_narrative) withCounterNarrative++;
+                if (topic.timeline?.before || topic.timeline_before) withTimeline++;
+                const level = topic.uncertaintyLevel || topic.uncertainty_level;
+                if (level === 'Kesin' || level === 'Muhtemel' || level === 'Gelisiyor') {
+                    uncertainty[level as 'Kesin' | 'Muhtemel' | 'Gelisiyor']++;
+                }
+            }
+        }
+
+        return c.json({
+            success: true,
+            data: {
+                country,
+                days,
+                digests: digests.length,
+                topics: topicCount,
+                avgImportanceScore: topicCount > 0 ? Number((importanceSum / topicCount).toFixed(3)) : 0,
+                counterNarrativeCoverage: topicCount > 0 ? Number((withCounterNarrative / topicCount).toFixed(3)) : 0,
+                timelineCoverage: topicCount > 0 ? Number((withTimeline / topicCount).toFixed(3)) : 0,
+                uncertaintyDistribution: uncertainty,
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Get digest quality failed');
+        return c.json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to get digest quality',
         }, 500);
     }
 });

@@ -6,6 +6,10 @@ interface Topic {
     title: string;
     description: string;
     articleId?: string;
+    whyImportant?: string;
+    uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+    counterNarrative?: string;
+    importanceScore?: number;
 }
 
 interface DigestTopicListProps {
@@ -41,6 +45,17 @@ export const DigestTopicList = React.memo(function DigestTopicList({ topics, onT
                             <Text className="text-sm text-zinc-500 leading-5" numberOfLines={2}>
                                 {topic.description}
                             </Text>
+                            {topic.whyImportant ? (
+                                <Text className="text-xs text-zinc-600 dark:text-zinc-300 mt-2" numberOfLines={2}>
+                                    Neden onemli: {topic.whyImportant}
+                                </Text>
+                            ) : null}
+                            {topic.uncertaintyLevel ? (
+                                <Text className="text-[11px] text-zinc-400 mt-1">
+                                    Belirsizlik: {topic.uncertaintyLevel}
+                                    {typeof topic.importanceScore === 'number' ? ` · Önem: %${Math.round(topic.importanceScore * 100)}` : ''}
+                                </Text>
+                            ) : null}
                         </View>
                         {topic.articleId && (
                             <ArrowRight size={16} color="#006FFF" className="ml-2" />

@@ -42,6 +42,17 @@ type Period = 'daily';
 interface TopicItem {
     title: string;
     description: string;
+    articleId?: string;
+    whyImportant?: string;
+    uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+    counterNarrative?: string;
+    timeline?: {
+        before: string;
+        now: string;
+        next: string;
+    };
+    importanceScore?: number;
+    importanceTier?: 'yuksek' | 'orta' | 'dusuk';
 }
 
 interface TweetInput {
@@ -49,8 +60,22 @@ interface TweetInput {
     userName: string;
     displayName: string;
     profileImageUrl?: string | null;
+    accountType?: 'government' | 'news_agency' | 'journalist' | 'institution' | 'political_party' | null;
+    qualityScore?: number;
+    engagementScore?: number;
     likeCount: number;
     retweetCount: number;
+}
+
+interface DigestTelemetry {
+    promptVariant: 'A' | 'B';
+    rawArticleCount: number;
+    dedupedArticleCount: number;
+    selectedArticleCount: number;
+    rawTweetCount: number;
+    selectedTweetCount: number;
+    highImportanceCount: number;
+    minorityIncludedCount: number;
 }
 
 interface DigestResult {
@@ -59,6 +84,7 @@ interface DigestResult {
     sections: DigestSection[];
     articleCount: number;
     tweetCount: number;
+    telemetry?: DigestTelemetry;
 }
 
 interface ArticleInput {
@@ -68,6 +94,11 @@ interface ArticleInput {
     categoryId: number | null;
     sourceCount: number;
     politicalTone: number;
+    publishedAt: Date;
+    reliabilityScore?: number;
+    uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+    importanceScore?: number;
+    importanceTier?: 'yuksek' | 'orta' | 'dusuk';
     alignmentSummary?: string;
 }
 
@@ -81,6 +112,7 @@ interface ArticleAlignmentProfile {
     sourceLeanScore: number;
     toneLeanScore: number;
     combinedLeanScore: number;
+    avgReliabilityScore: number;
     dominantLabel: 'muhalif' | 'iktidar' | 'merkez' | 'belirsiz';
     minoritySignal: boolean;
     summary: string;
@@ -99,6 +131,134 @@ const GENERIC_SUMMARY_PATTERNS: RegExp[] = [
     /gundemde yer aldi/i,
     /yanki buldu|yanki uyandirdi/i,
 ];
+
+const SENSATIONAL_TWEET_KEYWORDS = [
+    'son dakika', 'şok', 'inanilmaz', 'inanılmaz', 'yikildi', 'yıkıldı', 'patladi', 'patladı',
+    'skandal', 'ifsa', 'ifşa', 'yalanlandi', 'yalanlandı', 'hemen izle', 'click', 'tikla', 'tıkla',
+];
+
+const STOPWORDS = new Set([
+    've', 'ile', 'ama', 'fakat', 'icin', 'için', 'bu', 'su', 'şu', 'bir', 'de', 'da', 'veya', 'ya',
+    'the', 'and', 'for', 'from', 'that', 'this', 'are', 'was', 'you',
+]);
+
+function clamp(value: number, min: number, max: number): number {
+    return Math.max(min, Math.min(max, value));
+}
+
+function safeNumber(value: unknown, fallback = 0): number {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+        const parsed = Number(value);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return fallback;
+}
+
+function normalizeTokenText(text: string): string {
+    return normalizeText(text)
+        .toLowerCase()
+        .replace(/[^a-z0-9çğıöşü\s]/gi, ' ');
+}
+
+function getTokenSet(text: string): Set<string> {
+    const tokens = normalizeTokenText(text).split(/\s+/).filter(Boolean);
+    return new Set(tokens.filter(token => token.length >= 3 && !STOPWORDS.has(token)));
+}
+
+function jaccardSimilarity(a: Set<string>, b: Set<string>): number {
+    if (a.size === 0 || b.size === 0) return 0;
+    let intersection = 0;
+    for (const token of a) {
+        if (b.has(token)) intersection++;
+    }
+    const union = a.size + b.size - intersection;
+    return union > 0 ? intersection / union : 0;
+}
+
+function computeTweetEngagementScore(tweet: TweetInput): number {
+    const weighted = (tweet.likeCount || 0) + ((tweet.retweetCount || 0) * 2);
+    return clamp(Math.log10(weighted + 1) / 6, 0, 1);
+}
+
+function computeTweetQualityScore(tweet: TweetInput): number {
+    const text = normalizeText(tweet.text || '');
+    if (!text) return 0;
+
+    let score = computeTweetEngagementScore(tweet) * 0.55;
+
+    if (tweet.accountType === 'government' || tweet.accountType === 'news_agency' || tweet.accountType === 'institution') {
+        score += 0.2;
+    } else if (tweet.accountType === 'journalist') {
+        score += 0.1;
+    }
+
+    if (/\d/.test(text)) score += 0.08;
+    if (text.length >= 80 && text.length <= 380) score += 0.08;
+    if (/(acikladi|açıkladı|duyurdu|belirtti|rapor|veri|resmi|official|statement|update)/i.test(text)) score += 0.08;
+    if (/[!?]{3,}/.test(text)) score -= 0.1;
+    if (SENSATIONAL_TWEET_KEYWORDS.some(k => text.toLowerCase().includes(k))) score -= 0.15;
+
+    return clamp(score, 0, 1);
+}
+
+function dedupeTweetsSemantically(tweets: TweetInput[]): TweetInput[] {
+    const kept: TweetInput[] = [];
+    const tokenSets: Set<string>[] = [];
+
+    for (const tweet of tweets) {
+        const currentTokens = getTokenSet(tweet.text);
+        let duplicate = false;
+        for (let i = 0; i < kept.length; i++) {
+            const sim = jaccardSimilarity(currentTokens, tokenSets[i]);
+            if (sim >= 0.82) {
+                duplicate = true;
+                break;
+            }
+        }
+        if (!duplicate) {
+            kept.push(tweet);
+            tokenSets.push(currentTokens);
+        }
+    }
+
+    return kept;
+}
+
+function dedupeArticlesSemantically(articles: ArticleInput[]): ArticleInput[] {
+    const kept: ArticleInput[] = [];
+    const titleTokens: Set<string>[] = [];
+    const summaryTokens: Set<string>[] = [];
+
+    const ordered = [...articles].sort((a, b) => {
+        const importanceDelta = (b.importanceScore || 0) - (a.importanceScore || 0);
+        if (importanceDelta !== 0) return importanceDelta;
+        return b.publishedAt.getTime() - a.publishedAt.getTime();
+    });
+
+    for (const article of ordered) {
+        const currentTitleTokens = getTokenSet(article.translatedTitle);
+        const currentSummaryTokens = getTokenSet(article.summary);
+        let duplicate = false;
+
+        for (let i = 0; i < kept.length; i++) {
+            const titleSim = jaccardSimilarity(currentTitleTokens, titleTokens[i]);
+            const summarySim = jaccardSimilarity(currentSummaryTokens, summaryTokens[i]);
+            if (titleSim >= 0.78 || summarySim >= 0.84) {
+                duplicate = true;
+                break;
+            }
+        }
+
+        if (!duplicate) {
+            kept.push(article);
+            titleTokens.push(currentTitleTokens);
+            summaryTokens.push(currentSummaryTokens);
+        }
+    }
+
+    return kept;
+}
 
 function normalizeText(text: string): string {
     return text.replace(/\s+/g, ' ').trim();
@@ -225,6 +385,192 @@ function enforceSummaryQuality(
     return finalSummary;
 }
 
+function normalizeUncertaintyLevel(value: unknown): 'Kesin' | 'Muhtemel' | 'Gelisiyor' {
+    const raw = normalizeText(String(value || '')).toLowerCase();
+    if (raw.includes('kesin')) return 'Kesin';
+    if (raw.includes('muht')) return 'Muhtemel';
+    if (raw.includes('geli') || raw.includes('develop')) return 'Gelisiyor';
+    return 'Muhtemel';
+}
+
+function getImportanceTier(score: number): 'yuksek' | 'orta' | 'dusuk' {
+    if (score >= 0.72) return 'yuksek';
+    if (score >= 0.45) return 'orta';
+    return 'dusuk';
+}
+
+function pickPromptVariant(countryCode: CountryCode, date: Date): 'A' | 'B' {
+    const key = `${countryCode}-${date.toISOString().slice(0, 10)}`;
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) {
+        hash = ((hash << 5) - hash) + key.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash) % 2 === 0 ? 'A' : 'B';
+}
+
+function determineUncertaintyLevel(
+    sourceCount: number,
+    reliabilityScore: number,
+    engagementScore: number,
+): 'Kesin' | 'Muhtemel' | 'Gelisiyor' {
+    if (sourceCount >= 8 && reliabilityScore >= 0.55 && engagementScore >= 0.2) {
+        return 'Kesin';
+    }
+    if (sourceCount >= 3 || engagementScore >= 0.15) {
+        return 'Muhtemel';
+    }
+    return 'Gelisiyor';
+}
+
+function computeArticleImportanceScores(
+    articles: ArticleInput[],
+    tweets: TweetInput[],
+    alignmentProfiles: Map<string, ArticleAlignmentProfile>,
+    endTime: Date,
+): ArticleInput[] {
+    if (articles.length === 0) return articles;
+
+    const maxSourceCount = Math.max(...articles.map(a => Math.max(1, a.sourceCount)));
+    const tweetSignals = tweets.map(tweet => ({
+        tweet,
+        tokens: getTokenSet(tweet.text),
+        engagement: computeTweetEngagementScore(tweet),
+        quality: safeNumber(tweet.qualityScore, 0),
+    }));
+
+    return articles.map(article => {
+        const profile = alignmentProfiles.get(article.id);
+        const articleTokens = getTokenSet(article.translatedTitle);
+
+        let matchedEngagement = 0;
+        for (const signal of tweetSignals) {
+            const similarity = jaccardSimilarity(articleTokens, signal.tokens);
+            if (similarity >= 0.16) {
+                matchedEngagement = Math.max(matchedEngagement, (signal.engagement * 0.65) + (signal.quality * 0.35));
+            }
+        }
+
+        const sourceCoverageScore = clamp(Math.log1p(article.sourceCount) / Math.log1p(maxSourceCount), 0, 1);
+        const hoursOld = clamp((endTime.getTime() - article.publishedAt.getTime()) / (1000 * 60 * 60), 0, 72);
+        const recencyScore = clamp(1 - (hoursOld / 24), 0, 1);
+
+        const reliabilityRaw = safeNumber(profile?.avgReliabilityScore, safeNumber(article.reliabilityScore, 0.5));
+        const reliabilityScore = reliabilityRaw > 1 ? clamp(reliabilityRaw / 5, 0, 1) : clamp(reliabilityRaw, 0, 1);
+        const minorityBoost = profile?.minoritySignal ? 0.08 : 0;
+        const importanceScore = clamp(
+            (sourceCoverageScore * 0.38) +
+            (matchedEngagement * 0.27) +
+            (recencyScore * 0.2) +
+            (reliabilityScore * 0.15) +
+            minorityBoost,
+            0,
+            1,
+        );
+
+        const uncertaintyLevel = determineUncertaintyLevel(article.sourceCount, reliabilityScore, matchedEngagement);
+        return {
+            ...article,
+            reliabilityScore,
+            importanceScore,
+            importanceTier: getImportanceTier(importanceScore),
+            uncertaintyLevel,
+        };
+    });
+}
+
+function buildTopicFallbacks(articles: ArticleInput[], count = 5): TopicItem[] {
+    return [...articles]
+        .sort((a, b) => (b.importanceScore || 0) - (a.importanceScore || 0))
+        .slice(0, count)
+        .map(article => ({
+            title: article.translatedTitle,
+            description: normalizeText(article.summary).slice(0, 180),
+            articleId: article.id,
+            whyImportant: article.importanceTier === 'yuksek'
+                ? 'Yuksek kaynak yogunlugu ve hizli yayilim nedeniyle ana gundem etkisi yaratiyor.'
+                : article.importanceTier === 'orta'
+                    ? 'Birden fazla kaynakta yer buldugu ve etkisinin surmesi beklendigi icin izleniyor.'
+                    : 'Sinirli kaynakta yer alsa da farkli bir perspektif sundugu icin izlenmeli.',
+            uncertaintyLevel: article.uncertaintyLevel || 'Muhtemel',
+            counterNarrative: 'Ayni olay farkli kaynaklarda farkli vurgu ile aktariliyor; birincil aciklamalar izleniyor.',
+            timeline: {
+                before: 'Ilk sinyal sinirli sayida kaynakta goruldu.',
+                now: 'Gelisme guncel akisa girdi ve teyit adimi suruyor.',
+                next: 'Yetkili aciklamalar ve saha verisi takip edilecek.',
+            },
+            importanceScore: safeNumber(article.importanceScore, 0),
+            importanceTier: article.importanceTier || 'orta',
+        }));
+}
+
+function normalizeTopicItems(rawTopics: any[], articles: ArticleInput[]): TopicItem[] {
+    const byTitle = new Map(articles.map(article => [normalizeForPattern(article.translatedTitle), article]));
+    const topics: TopicItem[] = [];
+
+    for (const rawTopic of rawTopics || []) {
+        const topicObj = typeof rawTopic === 'string'
+            ? { title: rawTopic, description: '' }
+            : rawTopic || {};
+
+        const title = normalizeText(String(topicObj.title || ''));
+        if (!title) continue;
+
+        const matchedArticle = byTitle.get(normalizeForPattern(title))
+            || articles.find(article => normalizeForPattern(title).includes(normalizeForPattern(article.translatedTitle).slice(0, 16)));
+
+        const uncertaintyLevel = normalizeUncertaintyLevel(topicObj.uncertainty_level || topicObj.uncertaintyLevel || matchedArticle?.uncertaintyLevel);
+        const importanceScore = clamp(safeNumber(topicObj.importance_score ?? topicObj.importanceScore, matchedArticle?.importanceScore ?? 0.5), 0, 1);
+        const importanceTier = (topicObj.importance_tier || topicObj.importanceTier || matchedArticle?.importanceTier || getImportanceTier(importanceScore)) as 'yuksek' | 'orta' | 'dusuk';
+
+        topics.push({
+            title,
+            description: normalizeText(String(topicObj.description || matchedArticle?.summary || '')),
+            articleId: topicObj.articleId || matchedArticle?.id,
+            whyImportant: normalizeText(String(topicObj.why_important || topicObj.whyImportant || '')),
+            uncertaintyLevel,
+            counterNarrative: normalizeText(String(topicObj.counter_narrative || topicObj.counterNarrative || '')),
+            timeline: {
+                before: normalizeText(String(topicObj.timeline?.before || topicObj.timeline_before || '')),
+                now: normalizeText(String(topicObj.timeline?.now || topicObj.timeline_now || '')),
+                next: normalizeText(String(topicObj.timeline?.next || topicObj.timeline_next || '')),
+            },
+            importanceScore,
+            importanceTier,
+        });
+    }
+
+    const filtered: TopicItem[] = topics
+        .filter(topic => topic.title && topic.description)
+        .slice(0, 5)
+        .map(topic => ({
+            ...topic,
+            whyImportant: topic.whyImportant || 'Bu gelisme ekonomik, siyasal veya kurumsal etkisi nedeniyle gunluk ajandayi etkiliyor.',
+            counterNarrative: topic.counterNarrative || 'Farkli kaynaklarda olayin neden-sonuc iliskisi farkli cerceveleniyor.',
+            timeline: {
+                before: topic.timeline?.before || 'Gelisme once sinirli sinyal olarak goruldu.',
+                now: topic.timeline?.now || 'Su anda birden fazla kaynakta teyit sureci devam ediyor.',
+                next: topic.timeline?.next || 'Sonraki adimda resmi aciklama ve sahadaki veriler izlenecek.',
+            },
+        }));
+
+    if (filtered.length >= 3) return filtered;
+
+    const fallbackTopics = buildTopicFallbacks(articles, 5);
+    const merged: TopicItem[] = [...filtered];
+    for (const fallback of fallbackTopics) {
+        if (merged.some(topic => normalizeForPattern(topic.title) === normalizeForPattern(fallback.title))) continue;
+        merged.push(fallback);
+        if (merged.length >= 5) break;
+    }
+
+    return merged;
+}
+
+function buildConfidenceNote(telemetry: DigestTelemetry): string {
+    return `Guven notu: ${telemetry.selectedArticleCount} haber, ${telemetry.selectedTweetCount} X paylasimi ve ${telemetry.minorityIncludedCount} azinlik-perspektifli baslik analiz edildi.`;
+}
+
 function getDominantAlignmentLabel(score: number): 'muhalif' | 'iktidar' | 'merkez' | 'belirsiz' {
     if (score <= -0.25) return 'muhalif';
     if (score >= 0.25) return 'iktidar';
@@ -240,7 +586,7 @@ function getToneLabel(score: number): 'muhalif-ton' | 'iktidar-ton' | 'notr-ton'
 
 function buildAlignmentSummary(profile: ArticleAlignmentProfile): string {
     const toneLabel = getToneLabel(profile.toneLeanScore * 5);
-    return `Etiket:${profile.dominantLabel} (m:${profile.oppositionSources}, i:${profile.proGovernmentSources}, k:${profile.centerSources}, b:${profile.unknownSources}, ton:${toneLabel})`;
+    return `Etiket:${profile.dominantLabel} (m:${profile.oppositionSources}, i:${profile.proGovernmentSources}, k:${profile.centerSources}, b:${profile.unknownSources}, ton:${toneLabel}, guven:${Math.round(profile.avgReliabilityScore * 100)}%)`;
 }
 
 async function getArticleAlignmentProfiles(
@@ -263,6 +609,7 @@ async function getArticleAlignmentProfiles(
         proGovernmentSources: number;
         centerSources: number;
         unknownSources: number;
+        avgReliabilityScore: number | null;
     };
 
     try {
@@ -273,7 +620,8 @@ async function getArticleAlignmentProfiles(
                 SUM(CASE WHEN rs.id IS NULL THEN 1 ELSE 0 END) as unknownSources,
                 SUM(CASE WHEN rs.gov_alignment_score <= -1 THEN 1 ELSE 0 END) as oppositionSources,
                 SUM(CASE WHEN rs.gov_alignment_score >= 1 THEN 1 ELSE 0 END) as proGovernmentSources,
-                SUM(CASE WHEN rs.id IS NOT NULL AND rs.gov_alignment_score = 0 THEN 1 ELSE 0 END) as centerSources
+                SUM(CASE WHEN rs.id IS NOT NULL AND rs.gov_alignment_score = 0 THEN 1 ELSE 0 END) as centerSources,
+                AVG(CASE WHEN rs.reliability_score IS NOT NULL THEN rs.reliability_score ELSE NULL END) as avgReliabilityScore
             FROM ${sql.raw(articleSourceTable)} src
             LEFT JOIN rss_sources rs
               ON LOWER(TRIM(src.source_name)) = LOWER(TRIM(rs.source_name))
@@ -307,6 +655,7 @@ async function getArticleAlignmentProfiles(
                 sourceLeanScore,
                 toneLeanScore,
                 combinedLeanScore,
+                avgReliabilityScore: clamp(safeNumber(row.avgReliabilityScore, 2.5) / 5, 0, 1),
                 dominantLabel,
                 minoritySignal,
                 summary: '',
@@ -333,6 +682,7 @@ async function getArticleAlignmentProfiles(
             sourceLeanScore: 0,
             toneLeanScore,
             combinedLeanScore,
+            avgReliabilityScore: clamp(safeNumber(article.reliabilityScore, 0.5), 0, 1),
             dominantLabel: getDominantAlignmentLabel(combinedLeanScore),
             minoritySignal: false,
             summary: '',
@@ -348,72 +698,39 @@ async function getArticleAlignmentProfiles(
  * Generate daily digest for non-TR countries
  * Tweets are the PRIMARY source, RSS articles provide supporting context.
  */
+
+
+/**
+ * Generate detailed sectioned digest for Turkey
+ * Tweets are the PRIMARY source — they set the agenda.
+ * RSS articles provide depth and context.
+ */
 async function generateDefaultDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
+    promptVariant: 'A' | 'B',
 ): Promise<DigestResult> {
-    const periodLabel = 'günlük';
+    const periodLabel = 'gunluk';
+    const sourceStats = `${tweets.length} tweet${articles.length > 0 ? ` ve ${articles.length} haber` : ''}`;
+    const narrativeStyle = promptVariant === 'A'
+        ? 'Ritim A: acilis cumlesi ana habere direkt girsin.'
+        : 'Ritim B: acilis sahadan sinyal ile baslasin.';
 
-    // Tweets are primary — build them first and prominently
     const tweetBlock = tweets.length > 0
-        ? tweets.map((t, i) =>
-            `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" [❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)}]`
-        ).join('\n')
-        : '';
+        ? tweets.map((t, i) => `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" [L ${formatCount(t.likeCount)}, RT ${formatCount(t.retweetCount)}]`).join('\n')
+        : '(Tweet verisi yok)';
 
-    // Articles are supporting context
     const articleBlock = articles.length > 0
-        ? articles.map((a, i) => `${i + 1}. [Kaynak sayisi: ${a.sourceCount}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n')
-        : '';
+        ? articles.map((a, i) => `${i + 1}. [Kaynak:${a.sourceCount}] [Onem:${Math.round((a.importanceScore || 0) * 100)}] [Belirsizlik:${a.uncertaintyLevel || 'Muhtemel'}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n')
+        : '(Haber verisi yok)';
 
-    const sourceStats = `${tweets.length} tweet${articles.length > 0 ? ` ve ${articles.length} haber kaynağı` : ''}`;
-
-    const prompt = `${sourceStats} ile ${periodLabel} bültenini oluştur.
-
-=== X (Twitter) — Birincil Kaynak ===
-${tweetBlock || '(Tweet verisi yok)'}
-
-=== Haber Siteleri — Destekleyici ===
-${articleBlock || '(Haber verisi yok)'}
-
-JSON üret:
-1. summary (tek paragraf, 4-6 cümle, 120-170 kelime):
-   YASAK KALIPLAR — bunları kesinlikle kullanma:
-   ✗ "Bugün önemli gelişmeler yaşandı"
-   ✗ "Gündem yoğun geçti"
-   ✗ "Dikkat çekici gelişmeler"
-   ✗ "...öne çıkıyor/öne çıktı"
-   ✗ "...dikkat çekti/dikkat çekiyor"
-   ✗ "...gündemde yer aldı/gündemde"
-   ✗ "...yankı buldu/yankı uyandırdı"
-
-   DOĞRU YAZIM:
-   ✓ İlk cümle doğrudan bir olayla başlasın: "[İsim] [ne yaptı/ne açıkladı]."
-   ✓ Örnek: "Dışişleri Bakanı Fidan, Gazze Yönetimi Başkanı Şaat'ı Ankara'da kabul etti."
-   ✓ Her cümle yeni bir bilgi versin. Yorum veya değerlendirme ekleme, sadece olgu.
-   ✓ Toplam uzunluk 120 kelimenin altına düşmesin.
-   ✓ Summary içinde en az 2 örnek tweet alıntısı kullan: @kullanici "tweetten kısa alıntı".
-
-2. top_topics (3-5 konu): title + description (somut bilgi, klişe yok)
-
-KAYNAK ONEM KURALI:
-- [Kaynak sayisi] yuksek olan haberleri ana omurga olarak one cikar.
-- [Kaynak sayisi] dusuk olan haberlerden en az 1-2 tanesini mutlaka summary veya top_topics'te belirt.
-- Dusuk kaynakli haberleri "gizleniyor" diye kesin hukumle sunma; "sinirli sayida kaynakta yer aldi" gibi olgusal ifade kullan.
-- [Etiket:*] bilgisini kaynak dagilimi + haber tonu birlikte uretiyor. Etiketi ve tonu celisen haberleri not et (ornegin "kaynak dagilimi iktidar, ton muhalif"), ama yorum yapma.
-
-{ "summary": "...", "top_topics": [{ "title": "...", "description": "..." }] }
-
-Sadece JSON.`;
+    const prompt = `${sourceStats} ile ${periodLabel} bulteni olustur.\n${narrativeStyle}\n\n=== X (Twitter) - Birincil Kaynak ===\n${tweetBlock}\n\n=== Haber Siteleri - Destekleyici ===\n${articleBlock}\n\nJSON:\n{\n  \"summary\": \"4-6 cumle, 120-170 kelime\",\n  \"top_topics\": [{\n    \"title\": \"...\",\n    \"description\": \"...\",\n    \"why_important\": \"...\",\n    \"uncertainty_level\": \"Kesin|Muhtemel|Gelisiyor\",\n    \"counter_narrative\": \"...\",\n    \"timeline\": { \"before\": \"...\", \"now\": \"...\", \"next\": \"...\" },\n    \"importance_score\": 0.74\n  }]\n}\n\nKurallar:\n- Yorum yapma, sadece olgu yaz.\n- summary icinde en az 2 tweet alintisi ver.\n- Dusuk kaynakli 1-2 haberi de dahil et.\n\nSadece JSON.`;
 
     const result = await aiChatCompletion<any>(
         {
             model: 'gpt-4o-mini',
             messages: [
-                {
-                    role: 'system',
-                    content: 'Profesyonel haber spikerisin. Sadece olgu yaz. Klişe/dolgu cümle YASAK. İlk cümle: [Kim] [ne yaptı]. Yorum ekleme. Tweet alıntılarını koru ve summary içinde örnek tweetlere yer ver. JSON döndür.',
-                },
+                { role: 'system', content: 'Profesyonel haber spikerisin. Kisa, net, olgusal yaz. JSON dondur.' },
                 { role: 'user', content: prompt },
             ],
             response_format: { type: 'json_object' },
@@ -424,19 +741,16 @@ Sadece JSON.`;
             useQuickClient: false,
             skipCircuitBreaker: true,
             fallback: () => getDigestFallback(articles.length, true),
-            maxContentLength: 40000,
+            maxContentLength: 45000,
         }
     );
 
-    const topTopics = (result.top_topics || []).map((topic: any) => {
-        if (typeof topic === 'string') return { title: topic, description: '' };
-        return { title: topic.title || '', description: topic.description || '' };
-    });
-
+    const topTopics = normalizeTopicItems((result.top_topics || result.topTopics || []), articles);
     let summaryText = result.summary || result.summaryText;
     if (typeof summaryText !== 'string') {
-        summaryText = summaryText ? JSON.stringify(summaryText) : 'Günün özeti oluşturulamadı.';
+        summaryText = summaryText ? JSON.stringify(summaryText) : 'Gunun ozeti olusturulamadi.';
     }
+
     summaryText = enforceSummaryQuality(summaryText, {
         topics: topTopics,
         articles,
@@ -445,42 +759,53 @@ Sadece JSON.`;
         minTweetRefs: 2,
     });
 
+    const telemetry: DigestTelemetry = {
+        promptVariant,
+        rawArticleCount: articles.length,
+        dedupedArticleCount: articles.length,
+        selectedArticleCount: articles.length,
+        rawTweetCount: tweets.length,
+        selectedTweetCount: tweets.length,
+        highImportanceCount: articles.filter(a => a.importanceTier === 'yuksek').length,
+        minorityIncludedCount: articles.filter(a => (a.alignmentSummary || '').includes('Etiket:muhalif') || (a.alignmentSummary || '').includes('Etiket:iktidar')).length,
+    };
+
+    if (!normalizeForPattern(summaryText).includes('guven notu')) {
+        summaryText = normalizeText(`${summaryText} ${buildConfidenceNote(telemetry)}`);
+    }
+
     return {
-        summaryText: summaryText || 'Günün özeti oluşturulamadı.',
+        summaryText: summaryText || 'Gunun ozeti olusturulamadi.',
         topTopics,
         sections: [],
         articleCount: articles.length,
         tweetCount: tweets.length,
+        telemetry,
     };
 }
 
-/**
- * Generate detailed sectioned digest for Turkey
- * Tweets are the PRIMARY source — they set the agenda.
- * RSS articles provide depth and context.
- */
 async function generateTRDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
+    promptVariant: 'A' | 'B',
 ): Promise<DigestResult> {
-    const periodLabel = 'günlük';
+    const narrativeStyle = promptVariant === 'A'
+        ? 'Ritim A: ana gundemi ac, sonra kategori akisini buyut.'
+        : 'Ritim B: saha sinyali -> kurum tepkisi -> sonraki adim zinciri kur.';
 
-    // --- PRIMARY: Tweets grouped by engagement tiers ---
     const highEngagement = tweets.filter(t => t.likeCount >= 1000 || t.retweetCount >= 200);
     const medEngagement = tweets.filter(t => t.likeCount < 1000 && t.retweetCount < 200);
-
     const formatTweet = (t: TweetInput, i: number) =>
-        `  ${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" [❤️ ${formatCount(t.likeCount)}, 🔄 ${formatCount(t.retweetCount)}]`;
+        `${i + 1}. @${t.userName} (${t.displayName}): "${t.text}" [L ${formatCount(t.likeCount)}, RT ${formatCount(t.retweetCount)}]`;
 
     const tweetBlock = [
-        highEngagement.length > 0 ? `[Yüksek Etkileşim]\n${highEngagement.map(formatTweet).join('\n')}` : '',
-        medEngagement.length > 0 ? `[Diğer Önemli Paylaşımlar]\n${medEngagement.map(formatTweet).join('\n')}` : '',
-    ].filter(Boolean).join('\n\n');
+        highEngagement.length > 0 ? `[Yuksek Etkilesim]\n${highEngagement.map(formatTweet).join('\n')}` : '',
+        medEngagement.length > 0 ? `[Diger Onemli Paylasimlar]\n${medEngagement.map(formatTweet).join('\n')}` : '',
+    ].filter(Boolean).join('\n\n') || '(Tweet verisi yok)';
 
-    // --- SUPPORTING: Articles grouped by category ---
     const grouped: Record<string, ArticleInput[]> = {};
     for (const article of articles) {
-        const catName = article.categoryId ? (CATEGORY_NAMES[article.categoryId] || 'Gündem') : 'Gündem';
+        const catName = article.categoryId ? (CATEGORY_NAMES[article.categoryId] || 'Gundem') : 'Gundem';
         if (!grouped[catName]) grouped[catName] = [];
         grouped[catName].push(article);
     }
@@ -488,77 +813,18 @@ async function generateTRDigestWithAI(
     const categoryBlocks = Object.entries(grouped)
         .sort((a, b) => b[1].length - a[1].length)
         .map(([cat, arts]) => {
-            const items = arts.map((a, i) => `  ${i + 1}. [Kaynak sayisi: ${a.sourceCount}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n');
+            const items = arts.map((a, i) => `${i + 1}. [Kaynak:${a.sourceCount}] [Onem:${Math.round((a.importanceScore || 0) * 100)}] [Belirsizlik:${a.uncertaintyLevel || 'Muhtemel'}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n');
             return `[${cat}] (${arts.length} haber)\n${items}`;
         })
-        .join('\n\n');
+        .join('\n\n') || '(Haber verisi yok)';
 
-    const prompt = `${tweets.length} tweet ve ${articles.length} haber ile Türkiye ${periodLabel} bülteni oluştur.
-
-=== X (Twitter) — Birincil Kaynak ===
-${tweetBlock || '(Tweet verisi yok)'}
-
-=== Haber Siteleri — Destekleyici ===
-${categoryBlocks || '(Haber verisi yok)'}
-
-JSON:
-{
-  "summary": "4-6 cümlelik, 120-170 kelime gündem özeti",
-  "sections": [{
-    "category": "Kategori",
-    "icon": "emoji",
-    "summary": "En az 80 kelime. [Kim] [ne yaptı] ile başla.",
-    "highlights": ["Gelişme 1", "Gelişme 2"],
-    "tweetContext": "Öne çıkan tweet alıntısı",
-    "tweets": [
-      { "author": "Görünen Ad", "handle": "@kullanici", "text": "Tweet metni (tam alıntı)" },
-      { "author": "Başka Kişi", "handle": "@diger", "text": "İlgili tweet" }
-    ]
-  }],
-  "top_topics": [{ "title": "...", "description": "..." }]
-}
-
-YASAK KALIPLAR — bunları kesinlikle kullanma:
-✗ "Bugün Türkiye'de önemli gelişmeler yaşandı"
-✗ "Gündem yoğun geçti" / "Gündemde yer aldı"
-✗ "Dikkat çekici gelişmeler" / "Dikkat çekti"
-✗ "...öne çıkıyor" / "...öne çıktı"
-✗ "...yankı buldu" / "...yankı uyandırdı"
-✗ "Bu durum, ...açısından önem taşıyor"
-✗ "Bu bağlamda" / "Diğer yandan" / "Ayrıca" (paragraf açılışında)
-✗ "...endişelerini artırıyor" / "...tartışmaları beraberinde getirdi"
-
-DOĞRU YAZIM:
-✓ Her cümle [Kim/Ne] [ne yaptı/ne oldu] formatında olsun.
-✓ Örnek: "Erdoğan, BAE Devlet Başkanı ile telefonda Gazze'yi görüştü."
-✓ Örnek: "İzmir'de fırtına sahildeki iş yerlerini su bastı, yollar göle döndü."
-✓ Yorum ve değerlendirme ekleme, sadece olgu bildir.
-✓ Her cümle yeni bilgi taşısın, tekrar yapma.
-
-KURALLAR:
-- 3-6 bölüm. Tweet bilgisi öncelikli.
-- summary: 4-6 cümle, 120-170 kelime.
-- summary içinde en az 3 örnek tweet alıntısı kullan: @kullanici "tweetten kısa alıntı".
-- Yüksek kaynak sayılı (yaygın) haberleri temel gündem yap.
-- Düşük kaynak sayılı haberlerden en az 1-2 tanesini mutlaka özet veya bölüm akışına dahil et.
-- [Etiket:*] bilgisini kullan: bu etiket kaynak dagilimi + haber tonu sentezidir. Etiket ve ton ayrisiyorsa "kaynak dagilimi ... ton ..." formatinda olgusal belirt.
-- tweetContext zorunlu.
-- tweets: her bölümde 3-5 ilgili tweet alıntısı (author, handle, text). Kaynak tweetlerden birebir al.
-- highlights: 2-4 madde, her biri somut.
-- top_topics: 3-5 konu.
-- Türkçe, 500-700 kelime.
-- icon: 🏛️/💰/⚽/🌍/🛡️/💻/🏥/⚡/🎭/📰/🗺️
-
-Sadece JSON.`;
+    const prompt = `${tweets.length} tweet ve ${articles.length} haber ile Turkiye gunluk bulteni olustur.\n${narrativeStyle}\n\n=== X (Twitter) - Birincil Kaynak ===\n${tweetBlock}\n\n=== Haber Siteleri - Destekleyici ===\n${categoryBlocks}\n\nJSON:\n{\n  \"summary\": \"4-6 cumle, 120-170 kelime\",\n  \"sections\": [{\n    \"category\": \"Kategori\",\n    \"icon\": \"emoji\",\n    \"summary\": \"En az 80 kelime\",\n    \"highlights\": [\"...\"],\n    \"counterNarrative\": \"...\",\n    \"uncertaintyLevel\": \"Muhtemel\",\n    \"timeline\": { \"before\": \"...\", \"now\": \"...\", \"next\": \"...\" },\n    \"importanceScore\": 0.8,\n    \"tweetContext\": \"...\",\n    \"tweets\": [{ \"author\": \"...\", \"handle\": \"@...\", \"text\": \"...\" }]\n  }],\n  \"top_topics\": [{\n    \"title\": \"...\",\n    \"description\": \"...\",\n    \"why_important\": \"...\",\n    \"uncertainty_level\": \"Kesin|Muhtemel|Gelisiyor\",\n    \"counter_narrative\": \"...\",\n    \"timeline\": { \"before\": \"...\", \"now\": \"...\", \"next\": \"...\" },\n    \"importance_score\": 0.8\n  }]\n}\n\nKurallar:\n- summary icinde en az 3 tweet alintisi ver.\n- yuksek kaynakli haberleri omurga yap.\n- dusuk kaynakli 1-2 haberi mutlaka ekle.\n\nSadece JSON.`;
 
     const result = await aiChatCompletion<any>(
         {
             model: 'gpt-4o-mini',
             messages: [
-                {
-                    role: 'system',
-                    content: 'Profesyonel haber spikerisin. Türkiye gündemini oluştur. Sadece olgu yaz — yorum, değerlendirme, klişe YASAK. Her cümle: [Kim] [ne yaptı]. "Önemli gelişmeler yaşandı", "dikkat çekti", "öne çıktı", "gündemde" gibi dolgu ifadeler kullanırsan başarısız sayılırsın. Summary ve bölüm metinlerinde örnek tweet alıntılarına daha fazla yer ver. JSON döndür.',
-                },
+                { role: 'system', content: 'Profesyonel haber spikerisin. Yorum yapma, olgusal yaz, JSON dondur.' },
                 { role: 'user', content: prompt },
             ],
             response_format: { type: 'json_object' },
@@ -569,16 +835,27 @@ Sadece JSON.`;
             useQuickClient: false,
             skipCircuitBreaker: true,
             fallback: () => getDigestFallback(articles.length, true),
-            maxContentLength: 60000,
+            maxContentLength: 70000,
         }
     );
 
-    // Parse sections
     const sections: DigestSection[] = (result.sections || []).map((s: any) => ({
         category: String(s.category || ''),
-        icon: String(s.icon || '📰'),
+        icon: String(s.icon || '??'),
         summary: String(s.summary || ''),
         highlights: Array.isArray(s.highlights) ? s.highlights.map(String) : [],
+        counterNarrative: s.counterNarrative ? String(s.counterNarrative) : 'Ayni olaya farkli kaynaklar farkli vurgu yapti.',
+        uncertaintyLevel: s.uncertaintyLevel ? normalizeUncertaintyLevel(s.uncertaintyLevel) : 'Muhtemel',
+        timeline: s.timeline ? {
+            before: String(s.timeline.before || ''),
+            now: String(s.timeline.now || ''),
+            next: String(s.timeline.next || ''),
+        } : {
+            before: 'Gelisme once sinirli sinyal olarak goruldu.',
+            now: 'Su anda birden fazla kaynakta teyit sureci suruyor.',
+            next: 'Resmi aciklamalar ve saha verisi takip edilecek.',
+        },
+        importanceScore: s.importanceScore ? clamp(safeNumber(s.importanceScore), 0, 1) : 0.6,
         tweetContext: s.tweetContext ? String(s.tweetContext) : undefined,
         tweets: Array.isArray(s.tweets)
             ? s.tweets.map((t: any) => ({
@@ -589,16 +866,12 @@ Sadece JSON.`;
             : undefined,
     })).filter((s: DigestSection) => s.category && s.summary);
 
-    // Parse top_topics
-    const topTopics = (result.top_topics || []).map((topic: any) => {
-        if (typeof topic === 'string') return { title: topic, description: '' };
-        return { title: topic.title || '', description: topic.description || '' };
-    });
-
+    const topTopics = normalizeTopicItems((result.top_topics || result.topTopics || []), articles);
     let summaryText = result.summary || result.summaryText;
     if (typeof summaryText !== 'string') {
-        summaryText = summaryText ? JSON.stringify(summaryText) : 'Günün özeti oluşturulamadı.';
+        summaryText = summaryText ? JSON.stringify(summaryText) : 'Gunun ozeti olusturulamadi.';
     }
+
     summaryText = enforceSummaryQuality(summaryText, {
         sections,
         topics: topTopics,
@@ -608,28 +881,41 @@ Sadece JSON.`;
         minTweetRefs: 3,
     });
 
+    const telemetry: DigestTelemetry = {
+        promptVariant,
+        rawArticleCount: articles.length,
+        dedupedArticleCount: articles.length,
+        selectedArticleCount: articles.length,
+        rawTweetCount: tweets.length,
+        selectedTweetCount: tweets.length,
+        highImportanceCount: articles.filter(a => a.importanceTier === 'yuksek').length,
+        minorityIncludedCount: articles.filter(a => (a.alignmentSummary || '').includes('Etiket:muhalif') || (a.alignmentSummary || '').includes('Etiket:iktidar')).length,
+    };
+    if (!normalizeForPattern(summaryText).includes('guven notu')) {
+        summaryText = normalizeText(`${summaryText} ${buildConfidenceNote(telemetry)}`);
+    }
+
     return {
-        summaryText: summaryText || 'Günün özeti oluşturulamadı.',
+        summaryText: summaryText || 'Gunun ozeti olusturulamadi.',
         topTopics,
         sections,
         articleCount: articles.length,
         tweetCount: tweets.length,
+        telemetry,
     };
 }
 
-/**
- * Generate daily digest with AI — routes to TR-specific or default prompt
- */
 async function generateDigestWithAI(
     articles: ArticleInput[],
     tweets: TweetInput[],
-    countryCode: CountryCode
+    countryCode: CountryCode,
+    promptVariant: 'A' | 'B'
 ): Promise<DigestResult> {
     try {
         if (countryCode === 'tr') {
-            return await generateTRDigestWithAI(articles, tweets);
+            return await generateTRDigestWithAI(articles, tweets, promptVariant);
         }
-        return await generateDefaultDigestWithAI(articles, tweets);
+        return await generateDefaultDigestWithAI(articles, tweets, promptVariant);
     } catch (error) {
         logger.error({ error, countryCode }, 'Digest AI generation failed');
         return { ...getDigestFallback(articles.length, true), tweetCount: 0 };
@@ -642,12 +928,11 @@ function formatCount(n: number): string {
     return String(n);
 }
 
-// Keywords that indicate a promotional/ad tweet (case-insensitive match)
 const PROMO_KEYWORDS = [
-    'reklam', 'kampanya', 'indirim', 'fırsat', 'hediye', 'çekiliş',
-    'kazan', 'promosyon', 'sponsor', 'tanıtım', 'lansman',
-    'uygulamayı indir', 'hemen katıl', 'hemen al', 'son gün',
-    'tıkla', 'link bio', 'linktree', 'bit.ly', 'goo.gl',
+    'reklam', 'kampanya', 'indirim', 'firsat', 'hediye', 'cekilis',
+    'kazan', 'promosyon', 'sponsor', 'tanitim', 'lansman',
+    'uygulamayi indir', 'hemen katil', 'hemen al', 'son gun',
+    'tikla', 'link bio', 'linktree', 'bit.ly', 'goo.gl',
     'ad', 'sponsored', 'giveaway', 'promo', 'discount', 'sale',
 ];
 
@@ -655,7 +940,6 @@ function isPromotionalTweet(text: string): boolean {
     const lower = text.toLowerCase();
     return PROMO_KEYWORDS.some(kw => lower.includes(kw));
 }
-
 function getSupportingArticles(
     articles: ArticleInput[],
     countryCode: CountryCode,
@@ -669,13 +953,17 @@ function getSupportingArticles(
 
     if (articles.length <= limit) return articles;
 
-    const sortedBySourceCount = [...articles].sort((a, b) => b.sourceCount - a.sourceCount);
+    const sortedByPriority = [...articles].sort((a, b) => {
+        const importanceDelta = safeNumber(b.importanceScore, 0) - safeNumber(a.importanceScore, 0);
+        if (importanceDelta !== 0) return importanceDelta;
+        return b.sourceCount - a.sourceCount;
+    });
     const highCoverageCount = Math.max(4, Math.floor(limit * 0.6));
     const lowCoverageCount = Math.max(3, Math.floor(limit * 0.25));
     const minorityCount = Math.max(2, Math.floor(limit * 0.15));
 
-    const highCoverage = sortedBySourceCount.slice(0, highCoverageCount);
-    const lowCoverage = [...sortedBySourceCount]
+    const highCoverage = sortedByPriority.slice(0, highCoverageCount);
+    const lowCoverage = [...sortedByPriority]
         .reverse()
         .filter(a => a.sourceCount <= 3)
         .slice(0, lowCoverageCount);
@@ -691,7 +979,7 @@ function getSupportingArticles(
     const dominantSide: 'muhalif' | 'iktidar' | 'none' =
         totalOpp === totalPro ? 'none' : (totalOpp > totalPro ? 'muhalif' : 'iktidar');
 
-    const minorityPerspective = sortedBySourceCount
+    const minorityPerspective = sortedByPriority
         .filter(article => {
             const profile = alignmentProfiles.get(article.id);
             if (!profile) return false;
@@ -752,6 +1040,7 @@ export async function generateDailyDigest(
                 categoryId: tables.articles.categoryId,
                 sourceCount: tables.articles.sourceCount,
                 politicalTone: tables.articles.politicalTone,
+                publishedAt: tables.articles.publishedAt,
             })
             .from(tables.articles)
             .where(and(
@@ -776,6 +1065,7 @@ export async function generateDailyDigest(
                     categoryId: tables.articles.categoryId,
                     sourceCount: tables.articles.sourceCount,
                     politicalTone: tables.articles.politicalTone,
+                    publishedAt: tables.articles.publishedAt,
                 })
                 .from(tables.articles)
                 .where(and(
@@ -797,26 +1087,51 @@ export async function generateDailyDigest(
             const tweetTableName = `${countryCode}_tweets`;
             const tweetEnd = Math.floor(endTime.getTime() / 1000);
             const tweetStart = tweetEnd - (24 * 60 * 60); // 24 hours before endTime
-            const rawTweets = await db.all<{ text: string; user_name: string; display_name: string; profile_image_url: string | null; like_count: number; retweet_count: number }>(
-                sql`SELECT text, user_name, display_name, profile_image_url, like_count, retweet_count
-                    FROM ${sql.raw(tweetTableName)}
-                    WHERE tweeted_at >= ${tweetStart} AND tweeted_at <= ${tweetEnd}
-                    ORDER BY like_count DESC
-                    LIMIT 50`
+            const rawTweets = await db.all<{
+                text: string;
+                user_name: string;
+                display_name: string;
+                profile_image_url: string | null;
+                like_count: number;
+                retweet_count: number;
+                account_type: 'government' | 'news_agency' | 'journalist' | 'institution' | 'political_party' | null;
+            }>(
+                sql`SELECT tw.text, tw.user_name, tw.display_name, tw.profile_image_url, tw.like_count, tw.retweet_count, acc.account_type
+                    FROM ${sql.raw(tweetTableName)} tw
+                    LEFT JOIN twitter_accounts acc
+                      ON acc.id = tw.account_id
+                     AND acc.country_code = ${countryCode}
+                    WHERE tw.tweeted_at >= ${tweetStart} AND tw.tweeted_at <= ${tweetEnd}
+                    ORDER BY (tw.like_count + tw.retweet_count * 2) DESC
+                    LIMIT 80`
             );
-            // Filter out promotional/ad tweets
-            tweets = rawTweets
-                .filter(t => !isPromotionalTweet(t.text))
-                .slice(0, 30)
-                .map(t => ({
+            const mappedTweets = rawTweets.map(t => {
+                const base: TweetInput = {
                     text: t.text,
                     userName: t.user_name,
                     displayName: t.display_name,
                     profileImageUrl: t.profile_image_url,
+                    accountType: t.account_type,
                     likeCount: t.like_count,
                     retweetCount: t.retweet_count,
-                }));
-            logger.info({ countryCode, tweetCount: tweets.length, rawCount: rawTweets.length }, 'Tweets fetched for digest (filtered)');
+                };
+                base.engagementScore = computeTweetEngagementScore(base);
+                base.qualityScore = computeTweetQualityScore(base);
+                return base;
+            });
+            tweets = dedupeTweetsSemantically(mappedTweets)
+                .filter(t => !isPromotionalTweet(t.text))
+                .filter(t => safeNumber(t.qualityScore, 0) >= 0.32)
+                .sort((a, b) => safeNumber(b.qualityScore, 0) - safeNumber(a.qualityScore, 0))
+                .slice(0, 30);
+            logger.info({
+                countryCode,
+                tweetCount: tweets.length,
+                rawCount: rawTweets.length,
+                avgTweetQuality: tweets.length > 0
+                    ? Number((tweets.reduce((acc, t) => acc + safeNumber(t.qualityScore, 0), 0) / tweets.length).toFixed(3))
+                    : 0,
+            }, 'Tweets fetched for digest (quality-filtered)');
         } catch (error) {
             // Tweet table might not exist yet — graceful fallback
             logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'Failed to fetch tweets for digest, continuing without');
@@ -831,19 +1146,24 @@ export async function generateDailyDigest(
                 alignmentSummary: profile?.summary || `Etiket:belirsiz (m:0, i:0, k:0, b:${article.sourceCount}, ton:${getToneLabel(article.politicalTone)})`,
             };
         });
-        const supportingArticles = getSupportingArticles(enrichedArticles, countryCode, tweets.length, alignmentProfiles);
+        const scoredArticles = computeArticleImportanceScores(enrichedArticles, tweets, alignmentProfiles, endTime);
+        const dedupedArticles = dedupeArticlesSemantically(scoredArticles);
+        const supportingArticles = getSupportingArticles(dedupedArticles, countryCode, tweets.length, alignmentProfiles);
+        const promptVariant = pickPromptVariant(countryCode, targetDate);
         logger.info({
             countryCode,
             period,
             tweetCount: tweets.length,
             totalArticles: enrichedArticles.length,
+            dedupedArticles: dedupedArticles.length,
             supportingArticles: supportingArticles.length,
             xPrimary: tweets.length > 0,
+            promptVariant,
             labeledArticles: enrichedArticles.filter(a => a.alignmentSummary && !a.alignmentSummary.includes('belirsiz')).length,
         }, 'Digest source priority applied');
 
         // Generate digest with AI
-        const digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode);
+        const digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode, promptVariant);
 
         // Format date string
         const digestDate = targetDate.toISOString().split('T')[0];
@@ -944,3 +1264,5 @@ export async function generateAllDigests(_period: Period | LegacyPeriod = 'daily
 
     return results;
 }
+
+

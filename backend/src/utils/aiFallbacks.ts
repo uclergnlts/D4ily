@@ -57,6 +57,14 @@ export interface DigestSection {
     icon: string;
     summary: string;
     highlights: string[];
+    counterNarrative?: string;
+    uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+    timeline?: {
+        before: string;
+        now: string;
+        next: string;
+    };
+    importanceScore?: number;
     tweetContext?: string;
     tweets?: SectionTweet[];
 }
