@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -76,10 +76,10 @@ function ReliabilityStars({ score, count, interactive, onRate }: {
                         onPress={() => onRate?.(star)}
                         onPressIn={() => interactive && setHoverRating(star)}
                         onPressOut={() => interactive && setHoverRating(0)}
-                        animate={useMemo(() => ({ hovered, pressed }) => {
+                        animate={({ pressed }) => {
                             'worklet';
                             return { scale: pressed ? 0.8 : 1 };
-                        }, [])}
+                        }}
                     >
                         <Star
                             size={interactive ? 24 : 16}
@@ -118,12 +118,12 @@ function SourceCard({ source, onAlignmentVote, onReliabilityVote }: {
             {/* @ts-ignore */}
             <MotiPressable
                 onPress={toggleExpand}
-                animate={useMemo(() => ({ hovered, pressed }) => {
+                animate={({ pressed }) => {
                     'worklet';
                     return {
                         scale: pressed ? 0.98 : 1,
                     };
-                }, [])}
+                }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
                 className="bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-5 mb-4 border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none"
             >
@@ -262,10 +262,10 @@ export default function AnalysisScreen() {
                     <MotiPressable
                         onPress={toggleSideMenu}
                         className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle"
-                        animate={useMemo(() => ({ hovered, pressed }) => {
+                        animate={({ pressed }) => {
                             'worklet';
                             return { scale: pressed ? 0.9 : 1 };
-                        }, [])}
+                        }}
                     >
                         <Menu size={22} color={isDark ? "#ffffff" : "#18181b"} />
                     </MotiPressable>

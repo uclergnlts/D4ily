@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Search, LineChart, Newspaper, Scale, Map } from 'lucide-react-native';
 import { useThemeStore } from '../../src/store/useThemeStore';
-import { Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 
 export default function TabLayout() {
   const activeScheme = useThemeStore(state => state.activeScheme);

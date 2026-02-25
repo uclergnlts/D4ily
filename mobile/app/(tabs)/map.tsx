@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { safeBack } from '../../src/utils/navigation';
 import { ChevronLeft } from 'lucide-react-native';
-import { View, Text, Pressable, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Globe } from '../../src/components/map/Globe';
 import { CountryTooltip } from '../../src/components/map/CountryTooltip';
