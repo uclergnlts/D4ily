@@ -10,36 +10,31 @@ import {
   ChevronDown,
   ChevronRight,
   Plus,
+  FileText,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../lib/utils';
-
-const countries = [
-  { code: 'tr', name: 'Turkey', flag: '🇹🇷' },
-  { code: 'de', name: 'Germany', flag: '🇩🇪' },
-  { code: 'us', name: 'USA', flag: '🇺🇸' },
-];
+import { COUNTRIES } from '../../types';
 
 export function Sidebar() {
   const { signOut } = useAuthStore();
   const location = useLocation();
   const [sourcesOpen, setSourcesOpen] = useState(true);
   const [articlesOpen, setArticlesOpen] = useState(false);
+  const [digestsOpen, setDigestsOpen] = useState(false);
 
   const isSourcesActive = location.pathname.startsWith('/sources');
   const isArticlesActive = location.pathname.startsWith('/articles');
+  const isDigestsActive = location.pathname.startsWith('/digests');
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-900 text-white flex flex-col">
-      {/* Logo */}
       <div className="p-6 border-b border-gray-800">
         <h1 className="text-xl font-bold">D4ily Admin</h1>
         <p className="text-sm text-gray-400 mt-1">News Platform</p>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {/* Dashboard */}
         <NavLink
           to="/"
           end
@@ -56,7 +51,6 @@ export function Sidebar() {
           <span>Dashboard</span>
         </NavLink>
 
-        {/* Sources - Expandable */}
         <div>
           <button
             onClick={() => setSourcesOpen(!sourcesOpen)}
@@ -79,7 +73,7 @@ export function Sidebar() {
           </button>
           {sourcesOpen && (
             <div className="ml-4 mt-1 space-y-1">
-              {countries.map((country) => (
+              {COUNTRIES.map((country) => (
                 <NavLink
                   key={country.code}
                   to={`/sources/${country.code}`}
@@ -114,7 +108,6 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Articles - Expandable */}
         <div>
           <button
             onClick={() => setArticlesOpen(!articlesOpen)}
@@ -137,7 +130,7 @@ export function Sidebar() {
           </button>
           {articlesOpen && (
             <div className="ml-4 mt-1 space-y-1">
-              {countries.map((country) => (
+              {COUNTRIES.map((country) => (
                 <NavLink
                   key={country.code}
                   to={`/articles/${country.code}`}
@@ -158,7 +151,49 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* Users */}
+        <div>
+          <button
+            onClick={() => setDigestsOpen(!digestsOpen)}
+            className={cn(
+              'flex items-center justify-between w-full px-4 py-3 rounded-lg transition-colors',
+              isDigestsActive
+                ? 'bg-gray-800 text-white'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="h-5 w-5" />
+              <span>Digests</span>
+            </div>
+            {digestsOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+          {digestsOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              {COUNTRIES.map((country) => (
+                <NavLink
+                  key={country.code}
+                  to={`/digests/${country.code}`}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 px-4 py-2 rounded-lg transition-colors text-sm',
+                      isActive
+                        ? 'bg-primary-600 text-white'
+                        : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                    )
+                  }
+                >
+                  <span>{country.flag}</span>
+                  <span>{country.name}</span>
+                </NavLink>
+              ))}
+            </div>
+          )}
+        </div>
+
         <NavLink
           to="/users"
           className={({ isActive }) =>
@@ -174,7 +209,6 @@ export function Sidebar() {
           <span>Users</span>
         </NavLink>
 
-        {/* Settings */}
         <NavLink
           to="/settings"
           className={({ isActive }) =>
@@ -191,7 +225,6 @@ export function Sidebar() {
         </NavLink>
       </nav>
 
-      {/* Logout */}
       <div className="p-4 border-t border-gray-800">
         <button
           onClick={signOut}

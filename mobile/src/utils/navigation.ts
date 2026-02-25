@@ -1,10 +1,12 @@
 import type { Href, Router } from 'expo-router';
 
 export function safeBack(router: Router, fallback: Href = '/(tabs)') {
-    if (router.canGoBack()) {
-        router.back();
+    // Prefer stack-aware dismiss to avoid GO_BACK warnings when no back action exists.
+    if (router.canDismiss()) {
+        router.dismiss();
         return;
     }
 
-    router.replace(fallback);
+    // Pop to a known screen if possible, otherwise replace with fallback.
+    router.dismissTo(fallback);
 }

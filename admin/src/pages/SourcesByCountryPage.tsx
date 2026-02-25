@@ -14,24 +14,18 @@ import {
   useDeleteSource,
   useScrapeSource,
 } from '../hooks/useSources';
-import type { RssSource, CreateSourceForm, CountryCode } from '../types';
+import { COUNTRIES, type RssSource, type CreateSourceForm, type CountryCode } from '../types';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { createColumnHelper } from '@tanstack/react-table';
 import { Plus, RefreshCw, Pencil, Trash2, Play } from 'lucide-react';
 
-const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
-  tr: { name: 'Turkey', flag: '🇹🇷' },
-  de: { name: 'Germany', flag: '🇩🇪' },
-  us: { name: 'USA', flag: '🇺🇸' },
-};
-
 const sourceSchema = z.object({
   sourceName: z.string().min(1, 'Source name is required'),
   sourceLogoUrl: z.string().url().optional().or(z.literal('')),
   rssUrl: z.string().url().optional().or(z.literal('')),
-  countryCode: z.enum(['tr', 'de', 'us']),
+  countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']),
   isActive: z.boolean(),
   scrapeIntervalMinutes: z.coerce.number().int().positive(),
 });
@@ -46,7 +40,7 @@ export function SourcesByCountryPage() {
   const [editingSource, setEditingSource] = useState<RssSource | null>(null);
 
   const country = countryCode as CountryCode;
-  const countryInfo = COUNTRY_INFO[country] || { name: country?.toUpperCase(), flag: '🌍' };
+  const countryInfo = COUNTRIES.find((c) => c.code === country) || { name: country?.toUpperCase() || 'Unknown', flag: '??' };
 
   const { data: allSources, isLoading } = useSources();
   const createMutation = useCreateSource();
@@ -267,7 +261,7 @@ export function SourcesByCountryPage() {
             label="Source Name"
             {...register('sourceName')}
             error={errors.sourceName?.message}
-            placeholder="e.g., CNN, BBC, Hürriyet"
+            placeholder="e.g., CNN, BBC, Hurriyet"
           />
           <Input
             label="Logo URL"
@@ -322,3 +316,4 @@ export function SourcesByCountryPage() {
     </div>
   );
 }
+

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { ChevronDown, ChevronUp, MessageCircle } from 'lucide-react-native';
-import type { DigestSection } from '../../types';
+import type { DigestSection, SectionTweet } from '../../types';
 
 interface DigestSectionListProps {
     sections: DigestSection[];
@@ -9,12 +9,38 @@ interface DigestSectionListProps {
 }
 
 export const DigestSectionList = React.memo(function DigestSectionList({ sections, className }: DigestSectionListProps) {
-    const [expandedIndex, setExpandedIndex] = useState<number | null>(0); // First section open by default
+    const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+    const [tweetExpansion, setTweetExpansion] = useState<Record<number, boolean>>({});
 
     if (!sections || sections.length === 0) return null;
 
     const toggleSection = (index: number) => {
         setExpandedIndex(prev => prev === index ? null : index);
+    };
+
+    const toggleTweets = (index: number) => {
+        setTweetExpansion(prev => ({ ...prev, [index]: !prev[index] }));
+    };
+
+    const renderAvatar = (tweet: SectionTweet) => {
+        const avatar = typeof tweet.profileImageUrl === 'string' ? tweet.profileImageUrl.trim() : '';
+        const fallback = (tweet.author?.trim()?.charAt(0) || tweet.handle?.replace('@', '').charAt(0) || 'X').toUpperCase();
+
+        if (avatar) {
+            return (
+                <Image
+                    source={{ uri: avatar }}
+                    className="w-7 h-7 rounded-full"
+                    resizeMode="cover"
+                />
+            );
+        }
+
+        return (
+            <View className="w-7 h-7 rounded-full bg-zinc-900 dark:bg-white items-center justify-center">
+                <Text className="text-white dark:text-zinc-900 text-[10px] font-bold">{fallback}</Text>
+            </View>
+        );
     };
 
     return (
@@ -29,13 +55,15 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
             <View className="px-4 gap-3">
                 {sections.map((section, index) => {
                     const isExpanded = expandedIndex === index;
+                    const isTweetExpanded = !!tweetExpansion[index];
+                    const tweets = section.tweets || [];
+                    const visibleTweets = isTweetExpanded ? tweets : tweets.slice(0, 4);
 
                     return (
                         <View
                             key={index}
                             className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 shadow-sm overflow-hidden"
                         >
-                            {/* Header - always visible */}
                             <TouchableOpacity
                                 onPress={() => toggleSection(index)}
                                 className="flex-row items-center justify-between p-4"
@@ -43,12 +71,19 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
                             >
                                 <View className="flex-row items-center gap-3 flex-1">
                                     <Text className="text-xl">{section.icon}</Text>
-                                    <Text
-                                        className="text-[16px] text-zinc-900 dark:text-white"
-                                        style={{ fontFamily: 'DMSans_700Bold' }}
-                                    >
-                                        {section.category}
-                                    </Text>
+                                    <View className="flex-1">
+                                        <Text
+                                            className="text-[16px] text-zinc-900 dark:text-white"
+                                            style={{ fontFamily: 'DMSans_700Bold' }}
+                                        >
+                                            {section.category}
+                                        </Text>
+                                        {typeof section.importanceScore === 'number' && (
+                                            <Text className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5" style={{ fontFamily: 'DMSans_500Medium' }}>
+                                                Onem skoru: %{Math.round(section.importanceScore * 100)}
+                                            </Text>
+                                        )}
+                                    </View>
                                 </View>
                                 {isExpanded
                                     ? <ChevronUp size={20} color="#a1a1aa" />
@@ -56,10 +91,8 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
                                 }
                             </TouchableOpacity>
 
-                            {/* Expanded content */}
                             {isExpanded && (
                                 <View className="px-4 pb-4">
-                                    {/* Section summary */}
                                     <Text
                                         className="text-[15px] text-zinc-600 dark:text-zinc-300 mb-3"
                                         style={{ fontFamily: 'DMSans_400Regular', lineHeight: 24 }}
@@ -67,7 +100,6 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
                                         {section.summary}
                                     </Text>
 
-                                    {/* Highlights */}
                                     {section.highlights.length > 0 && (
                                         <View className="mb-3 gap-2">
                                             {section.highlights.map((highlight, hIdx) => (
@@ -84,21 +116,18 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
                                         </View>
                                     )}
 
-                                    {/* Tweet references */}
-                                    {section.tweets && section.tweets.length > 0 ? (
+                                    {tweets.length > 0 ? (
                                         <View className="gap-2">
-                                            {section.tweets.map((tweet, tIdx) => (
+                                            {visibleTweets.map((tweet, tIdx) => (
                                                 <View key={tIdx} className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3">
                                                     <View className="flex-row items-center gap-2 mb-1.5">
-                                                        <View className="w-5 h-5 rounded-full bg-zinc-900 dark:bg-white items-center justify-center">
-                                                            <Text className="text-white dark:text-zinc-900 text-[9px] font-bold">𝕏</Text>
-                                                        </View>
+                                                        {renderAvatar(tweet)}
                                                         <Text
-                                                            className="text-[12px] text-zinc-900 dark:text-zinc-200"
+                                                            className="text-[12px] text-zinc-900 dark:text-zinc-200 flex-1"
                                                             style={{ fontFamily: 'DMSans_700Bold' }}
                                                             numberOfLines={1}
                                                         >
-                                                            {tweet.author}
+                                                            {tweet.author || tweet.handle}
                                                         </Text>
                                                         <Text
                                                             className="text-[11px] text-zinc-400"
@@ -111,12 +140,19 @@ export const DigestSectionList = React.memo(function DigestSectionList({ section
                                                     <Text
                                                         className="text-[13px] text-zinc-600 dark:text-zinc-300"
                                                         style={{ fontFamily: 'DMSans_400Regular', lineHeight: 20 }}
-                                                        numberOfLines={3}
                                                     >
                                                         {tweet.text}
                                                     </Text>
                                                 </View>
                                             ))}
+
+                                            {tweets.length > 4 && (
+                                                <TouchableOpacity onPress={() => toggleTweets(index)} className="self-start mt-1" activeOpacity={0.8}>
+                                                    <Text className="text-[12px] text-blue-600 dark:text-blue-400" style={{ fontFamily: 'DMSans_700Bold' }}>
+                                                        {isTweetExpanded ? 'Daha az goster' : `${tweets.length - 4} tweet daha goster`}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     ) : section.tweetContext ? (
                                         <View className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-3 flex-row items-start gap-2">

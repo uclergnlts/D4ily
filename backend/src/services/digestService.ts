@@ -155,6 +155,10 @@ function safeNumber(value: unknown, fallback = 0): number {
     return fallback;
 }
 
+function normalizeHandle(value: string): string {
+    return value.replace(/^@+/, '').trim().toLowerCase();
+}
+
 function normalizeTokenText(text: string): string {
     return normalizeText(text)
         .toLowerCase()
@@ -839,6 +843,23 @@ async function generateTRDigestWithAI(
         }
     );
 
+    const tweetAvatarByHandle = new Map<string, string>();
+    const tweetAvatarByAuthor = new Map<string, string>();
+    for (const tweet of tweets) {
+        const profileImage = typeof tweet.profileImageUrl === 'string' ? tweet.profileImageUrl.trim() : '';
+        if (!profileImage) continue;
+
+        const handleKey = normalizeHandle(tweet.userName || '');
+        if (handleKey && !tweetAvatarByHandle.has(handleKey)) {
+            tweetAvatarByHandle.set(handleKey, profileImage);
+        }
+
+        const authorKey = String(tweet.displayName || '').trim().toLowerCase();
+        if (authorKey && !tweetAvatarByAuthor.has(authorKey)) {
+            tweetAvatarByAuthor.set(authorKey, profileImage);
+        }
+    }
+
     const sections: DigestSection[] = (result.sections || []).map((s: any) => ({
         category: String(s.category || ''),
         icon: String(s.icon || '??'),
@@ -858,11 +879,29 @@ async function generateTRDigestWithAI(
         importanceScore: s.importanceScore ? clamp(safeNumber(s.importanceScore), 0, 1) : 0.6,
         tweetContext: s.tweetContext ? String(s.tweetContext) : undefined,
         tweets: Array.isArray(s.tweets)
-            ? s.tweets.map((t: any) => ({
-                author: String(t.author || ''),
-                handle: String(t.handle || ''),
-                text: String(t.text || ''),
-            })).filter((t: any) => t.text)
+            ? s.tweets.map((t: any) => {
+                const author = String(t.author || '').trim();
+                const handle = String(t.handle || '').trim();
+                const text = String(t.text || '').trim();
+                const handleKey = normalizeHandle(handle);
+                const authorKey = author.toLowerCase();
+                const directProfileImage = typeof t.profileImageUrl === 'string'
+                    ? t.profileImageUrl.trim()
+                    : typeof t.profile_image_url === 'string'
+                        ? t.profile_image_url.trim()
+                        : '';
+                const profileImageUrl = directProfileImage
+                    || tweetAvatarByHandle.get(handleKey)
+                    || tweetAvatarByAuthor.get(authorKey)
+                    || null;
+
+                return {
+                    author,
+                    handle,
+                    text,
+                    profileImageUrl,
+                };
+            }).filter((t: any) => t.text)
             : undefined,
     })).filter((s: DigestSection) => s.category && s.summary);
 

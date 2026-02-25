@@ -6,14 +6,13 @@ import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { useSources } from '../hooks/useSources';
+import { COUNTRIES } from '../types';
 import { Plus, Database, AlertTriangle } from 'lucide-react';
 
-// Currently supported countries (hardcoded for now)
-const SUPPORTED_COUNTRIES = [
-  { code: 'tr', name: 'Turkey', flag: '🇹🇷', language: 'Turkish' },
-  { code: 'de', name: 'Germany', flag: '🇩🇪', language: 'German' },
-  { code: 'us', name: 'USA', flag: '🇺🇸', language: 'English' },
-];
+const SUPPORTED_COUNTRIES = COUNTRIES.map((country) => ({
+  ...country,
+  language: 'Configured',
+}));
 
 export function ManageCountriesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -45,9 +44,8 @@ export function ManageCountriesPage() {
             <div>
               <h3 className="font-medium text-amber-800">Adding New Countries</h3>
               <p className="text-sm text-amber-700 mt-1">
-                Adding a new country requires database migrations to create article tables.
-                Currently, the system supports: Turkey (TR), Germany (DE), and USA (US).
-                Contact the development team to add new countries.
+                The platform currently supports all configured countries in the backend tables.
+                Use this page to monitor source coverage and route to source management per country.
               </p>
             </div>
           </CardContent>
@@ -179,7 +177,7 @@ export function ManageCountriesPage() {
               />
               <Input
                 label="Flag Emoji"
-                placeholder="e.g., 🇫🇷, 🇯🇵, 🇧🇷"
+                placeholder="e.g., FR, JP, BR"
                 value={newCountry.flag}
                 onChange={(e) => setNewCountry({ ...newCountry, flag: e.target.value })}
               />
@@ -213,3 +211,4 @@ export function ManageCountriesPage() {
     </div>
   );
 }
+

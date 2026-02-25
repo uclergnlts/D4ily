@@ -6,6 +6,7 @@ import { useScrapeAllSources } from '../hooks/useSources';
 import { useRunDigest } from '../hooks/useCron';
 import { formatUptime } from '../lib/utils';
 import { Users, Rss, Newspaper, Clock, RefreshCw, FileText, Globe } from 'lucide-react';
+import { COUNTRIES } from '../types';
 
 export function DashboardPage() {
   const { data: stats, isLoading } = useDashboard();
@@ -39,11 +40,11 @@ export function DashboardPage() {
     },
   ];
 
-  const articlesByCountry = [
-    { country: 'Turkey', flag: '🇹🇷', count: stats?.articles?.tr ?? 0 },
-    { country: 'Germany', flag: '🇩🇪', count: stats?.articles?.de ?? 0 },
-    { country: 'USA', flag: '🇺🇸', count: stats?.articles?.us ?? 0 },
-  ];
+  const articlesByCountry = COUNTRIES.map((country) => ({
+    country: country.name,
+    flag: country.flag,
+    count: stats?.articles?.[country.code] ?? 0,
+  }));
 
   return (
     <div>
@@ -128,3 +129,4 @@ export function DashboardPage() {
     </div>
   );
 }
+

@@ -62,6 +62,7 @@ export interface SectionTweet {
     author: string;
     handle: string;
     text: string;
+    profileImageUrl?: string | null;
 }
 
 export interface DigestSection {
@@ -105,6 +106,7 @@ export interface DailyDigest {
     }[];
     sections?: DigestSection[];
     socialHighlights?: SectionTweet[];
+    comments?: Comment[];
     articleCount: number;
     createdAt: string;
 }

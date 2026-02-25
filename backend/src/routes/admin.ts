@@ -58,7 +58,7 @@ const createSourceSchema = z.object({
     sourceName: z.string().min(1, 'Source name is required'),
     sourceLogoUrl: z.string().url('Invalid logo URL').optional().default(''),
     rssUrl: z.string().url('Valid RSS URL is required').optional(),
-    countryCode: z.enum(['tr', 'de', 'us']),
+    countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']),
     isActive: z.boolean().default(true),
     scrapeIntervalMinutes: z.number().int().positive().default(30),
 });
@@ -67,7 +67,7 @@ const updateSourceSchema = z.object({
     sourceName: z.string().min(1).optional(),
     sourceLogoUrl: z.string().url().optional(),
     rssUrl: z.string().url().optional(),
-    countryCode: z.enum(['tr', 'de', 'us']).optional(),
+    countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']).optional(),
     isActive: z.boolean().optional(),
     scrapeIntervalMinutes: z.number().int().positive().optional(),
 });
@@ -117,7 +117,7 @@ admin.post('/scrape/:sourceId', scrapeRateLimiter, async (c) => {
             source.sourceName,
             source.sourceLogoUrl,
             source.rssUrl,
-            source.countryCode as 'tr' | 'de' | 'us'
+            source.countryCode as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru'
         );
 
         return c.json({
@@ -197,7 +197,7 @@ admin.post('/scrape-all', scrapeRateLimiter, async (c) => {
                     source.sourceName,
                     source.sourceLogoUrl,
                     source.rssUrl,
-                    source.countryCode as 'tr' | 'de' | 'us'
+                    source.countryCode as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru'
                 );
 
                 totalProcessed += result.processed;

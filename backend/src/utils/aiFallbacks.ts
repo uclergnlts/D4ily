@@ -50,6 +50,7 @@ export interface SectionTweet {
     author: string;
     handle: string;
     text: string;
+    profileImageUrl?: string | null;
 }
 
 export interface DigestSection {

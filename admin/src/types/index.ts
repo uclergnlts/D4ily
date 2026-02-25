@@ -13,7 +13,7 @@ export interface User {
 // Source types
 export interface RssSource {
   id: number;
-  countryCode: 'tr' | 'de' | 'us';
+  countryCode: CountryCode;
   sourceName: string;
   sourceLogoUrl: string;
   rssUrl: string | null;
@@ -99,12 +99,7 @@ export interface DashboardStats {
   categories: {
     total: number;
   };
-  articles: {
-    tr: number;
-    de: number;
-    us: number;
-    total: number;
-  };
+  articles: Record<CountryCode | 'total', number>;
   serverUptime: number;
 }
 
@@ -122,6 +117,76 @@ export interface CronStatus {
     schedule: string;
     status: 'active' | 'inactive';
   };
+}
+
+export interface DigestQualityMetrics {
+  country: CountryCode;
+  days: number;
+  digests: number;
+  topics: number;
+  avgImportanceScore: number;
+  counterNarrativeCoverage: number;
+  timelineCoverage: number;
+  uncertaintyDistribution: {
+    Kesin: number;
+    Muhtemel: number;
+    Gelisiyor: number;
+  };
+}
+
+export interface DigestTopic {
+  title: string;
+  description: string;
+  articleId?: string;
+  whyImportant?: string;
+  uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+  counterNarrative?: string;
+  timeline?: {
+    before: string;
+    now: string;
+    next: string;
+  };
+  importanceScore?: number;
+  importanceTier?: 'yuksek' | 'orta' | 'dusuk';
+}
+
+export interface SectionTweet {
+  author: string;
+  handle: string;
+  text: string;
+  profileImageUrl?: string | null;
+}
+
+export interface DigestSection {
+  category: string;
+  icon?: string;
+  summary: string;
+  highlights?: string[];
+  counterNarrative?: string;
+  uncertaintyLevel?: 'Kesin' | 'Muhtemel' | 'Gelisiyor';
+  timeline?: {
+    before: string;
+    now: string;
+    next: string;
+  };
+  importanceScore?: number;
+  tweetContext?: string;
+  tweets?: SectionTweet[];
+}
+
+export interface DailyDigestAdmin {
+  id: string;
+  countryCode: CountryCode;
+  period: 'daily';
+  date: string;
+  title: string;
+  summary: string;
+  topTopics: DigestTopic[];
+  sections?: DigestSection[];
+  socialHighlights?: SectionTweet[];
+  articleCount: number;
+  tweetCount?: number;
+  createdAt: string;
 }
 
 // API Response types
@@ -148,7 +213,7 @@ export interface CreateSourceForm {
   sourceName: string;
   sourceLogoUrl?: string;
   rssUrl?: string;
-  countryCode: 'tr' | 'de' | 'us';
+  countryCode: CountryCode;
   isActive: boolean;
   scrapeIntervalMinutes: number;
 }
@@ -157,7 +222,7 @@ export interface UpdateSourceForm {
   sourceName?: string;
   sourceLogoUrl?: string;
   rssUrl?: string;
-  countryCode?: 'tr' | 'de' | 'us';
+  countryCode?: CountryCode;
   isActive?: boolean;
   scrapeIntervalMinutes?: number;
 }
@@ -168,10 +233,16 @@ export interface UpdateUserForm {
 }
 
 // Country type
-export type CountryCode = 'tr' | 'de' | 'us';
+export type CountryCode = 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
 export const COUNTRIES: { code: CountryCode; name: string; flag: string }[] = [
-  { code: 'tr', name: 'Turkey', flag: '🇹🇷' },
-  { code: 'de', name: 'Germany', flag: '🇩🇪' },
-  { code: 'us', name: 'USA', flag: '🇺🇸' },
+  { code: 'tr', name: 'Turkey', flag: 'TR' },
+  { code: 'de', name: 'Germany', flag: 'DE' },
+  { code: 'us', name: 'United States', flag: 'US' },
+  { code: 'uk', name: 'United Kingdom', flag: 'UK' },
+  { code: 'fr', name: 'France', flag: 'FR' },
+  { code: 'es', name: 'Spain', flag: 'ES' },
+  { code: 'it', name: 'Italy', flag: 'IT' },
+  { code: 'ru', name: 'Russia', flag: 'RU' },
 ];
+

@@ -1,0 +1,36 @@
+import apiClient from '../client';
+import type { ApiResponse, CountryCode, DailyDigestAdmin, DigestQualityMetrics } from '../../types';
+
+export const digestService = {
+  getQuality: async (country: CountryCode, days = 7): Promise<DigestQualityMetrics> => {
+    const response = await apiClient.get<ApiResponse<DigestQualityMetrics>>(
+      `/admin/digest-quality?country=${country}&days=${days}`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch digest quality metrics');
+    }
+
+    return response.data.data;
+  },
+
+  getDigests: async (country: CountryCode): Promise<DailyDigestAdmin[]> => {
+    const response = await apiClient.get<ApiResponse<DailyDigestAdmin[]>>(`/digest/${country}`);
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch digests');
+    }
+
+    return response.data.data;
+  },
+
+  getDigestById: async (country: CountryCode, digestId: string): Promise<DailyDigestAdmin> => {
+    const response = await apiClient.get<ApiResponse<DailyDigestAdmin>>(`/digest/${country}/${digestId}`);
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch digest');
+    }
+
+    return response.data.data;
+  },
+};

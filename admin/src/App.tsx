@@ -10,6 +10,7 @@ import { SourcesByCountryPage } from './pages/SourcesByCountryPage';
 import { ManageCountriesPage } from './pages/ManageCountriesPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { DigestsByCountryPage } from './pages/DigestsByCountryPage';
 
 function App() {
   return (
@@ -27,6 +28,8 @@ function App() {
             <Route path="/articles" element={<Navigate to="/articles/tr" replace />} />
             <Route path="/articles/:countryCode" element={<ArticlesByCountryPage />} />
             {/* Other routes */}
+            <Route path="/digests" element={<Navigate to="/digests/tr" replace />} />
+            <Route path="/digests/:countryCode" element={<DigestsByCountryPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>

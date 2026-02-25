@@ -1,4 +1,3 @@
- 
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,25 +10,33 @@ import { useUserProfile, useUserReputation } from '../src/hooks/useUser';
 import { ReputationCard } from '../src/components/profile/ReputationCard';
 import { StatsOverview } from '../src/components/profile/StatsOverview';
 import { ProfileHeader } from '../src/components/profile/ProfileHeader';
+import { useThemeStore } from '../src/store/useThemeStore';
 
-const SettingsItem = ({ icon: Icon, label, onPress, showChevron = true }: any) => (
+const SettingsItem = ({ icon: Icon, label, onPress, showChevron = true, isFirst = false, isLast = false }: any) => (
     <TouchableOpacity
-        className="flex-row items-center p-4 bg-white dark:bg-zinc-900 active:bg-zinc-50 dark:active:bg-zinc-800/50"
+        className={`flex-row items-center px-5 py-4 bg-surface-light-elevated dark:bg-surface-dark-elevated active:bg-surface-light-subtle dark:active:bg-surface-dark-subtle transition-colors
+            ${!isLast ? 'border-b border-border-light dark:border-border-dark' : ''}
+            ${isFirst ? 'rounded-t-3xl' : ''}
+            ${isLast ? 'rounded-b-3xl' : ''}
+        `}
         onPress={onPress}
+        activeOpacity={0.7}
     >
-        <View className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center mr-3">
-            <Icon size={18} color="#71717a" />
+        <View className="w-9 h-9 rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle items-center justify-center mr-4">
+            <Icon size={18} color="#71717A" />
         </View>
-        <Text className="flex-1 text-base font-medium text-zinc-900 dark:text-white">
+        <Text className="flex-1 text-body-lg font-sans-medium text-zinc-900 dark:text-white">
             {label}
         </Text>
-        {showChevron && <ChevronRight size={18} color="#d4d4d8" />}
+        {showChevron && <ChevronRight size={20} color="#A1A1AA" />}
     </TouchableOpacity>
 );
 
 export default function UserProfileScreen() {
     const { user, logout } = useAuthStore();
     const router = useRouter();
+    const activeScheme = useThemeStore(state => state.activeScheme);
+    const isDark = activeScheme === 'dark';
 
     const { data: profile, isLoading: isProfileLoading } = useUserProfile();
     const { data: reputation, isLoading: isReputationLoading } = useUserReputation();
@@ -42,7 +49,6 @@ export default function UserProfileScreen() {
                 style: 'destructive',
                 onPress: async () => {
                     await logout();
-                    // router.replace('/'); // Optional
                 }
             }
         ]);
@@ -50,17 +56,16 @@ export default function UserProfileScreen() {
 
     if (!user) {
         return (
-            // Should ideally redirect or show generic
-            <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black items-center justify-center p-8">
-                <Text>Lütfen giriş yapın.</Text>
+            <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark items-center justify-center p-8">
+                <Text className="text-body-lg font-sans-medium text-zinc-500">Lütfen giriş yapın.</Text>
             </SafeAreaView>
         );
     }
 
     if (isProfileLoading || isReputationLoading) {
         return (
-            <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black items-center justify-center">
-                <ActivityIndicator size="large" color="#006FFF" />
+            <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark items-center justify-center">
+                <ActivityIndicator size="large" color="#0A66C2" />
             </SafeAreaView>
         );
     }
@@ -68,18 +73,25 @@ export default function UserProfileScreen() {
     const accuracy = reputation?.accuracyPercentage || 0;
 
     return (
-        <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
-            <View className="px-4 py-2 flex-row items-center border-b border-zinc-100 dark:border-zinc-800">
-                <TouchableOpacity onPress={() => safeBack(router)} className="p-2 -ml-2">
-                    <ChevronLeft size={24} color="#18181b" />
+        <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark" edges={['top']}>
+            {/* Header */}
+            <View className="px-5 pt-4 pb-4 flex-row items-center justify-between border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark z-10">
+                <TouchableOpacity
+                    onPress={() => safeBack(router)}
+                    className="w-11 h-11 items-center justify-center bg-surface-light-subtle dark:bg-surface-dark-subtle rounded-full active:scale-95 transition-transform"
+                >
+                    <ChevronLeft size={24} color={isDark ? '#FFFFFF' : '#18181B'} />
                 </TouchableOpacity>
-                <Text className="text-lg font-bold ml-2">Profilim</Text>
+                <Text className="text-display-lg font-display-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
+                    Profilim
+                </Text>
+                <View className="w-11 h-11" />
             </View>
 
-            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
 
                 {/* Header */}
-                <View className="px-6 pt-4 pb-6">
+                <View className="px-5 pt-6 pb-6">
                     <ProfileHeader
                         user={{
                             email: user.email,
@@ -110,50 +122,49 @@ export default function UserProfileScreen() {
 
                 {/* Badges Section */}
                 <View className="mb-8">
-                    <Text className="px-6 text-lg font-bold text-zinc-900 dark:text-white mb-4">
+                    <Text className="px-6 text-body-lg font-sans-black tracking-tight text-zinc-900 dark:text-white mb-4">
                         Rozet Koleksiyonu
                     </Text>
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={{ paddingHorizontal: 20 }}
-                        className="gap-3"
+                        contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
                     >
-                        <View className="bg-white dark:bg-zinc-900/50 p-4 rounded-2xl border-2 border-primary w-36 items-center shadow-sm">
-                            <View className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-full mb-3">
-                                <Award size={28} color="#006FFF" />
+                        <View className="bg-surface-light-elevated dark:bg-surface-dark-elevated p-5 rounded-3xl border border-primary w-40 items-center shadow-sm shadow-zinc-200/50 dark:shadow-none">
+                            <View className="bg-primary-50 dark:bg-primary-900/30 p-4 rounded-full mb-4">
+                                <Award size={28} color="#0A66C2" />
                             </View>
-                            <Text className="font-bold text-zinc-900 dark:text-white text-center text-sm mb-1">İlk Adım</Text>
-                            <Text className="text-[10px] text-zinc-400 text-center font-medium">Hesap oluşturuldu</Text>
+                            <Text className="font-sans-bold text-zinc-900 dark:text-white text-center text-body-md mb-1">İlk Adım</Text>
+                            <Text className="text-body-xs text-zinc-500 text-center font-sans tracking-wide">Hesap oluşturuldu</Text>
                         </View>
 
-                        <View className="bg-zinc-100 dark:bg-zinc-900/50 p-4 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 w-36 items-center opacity-60">
-                            <View className="bg-zinc-200 dark:bg-zinc-800 p-3 rounded-full mb-3">
-                                <Shield size={28} color="#a1a1aa" />
+                        <View className="bg-surface-light-subtle dark:bg-surface-dark-subtle p-5 rounded-3xl border border-dashed border-border-light dark:border-border-dark w-40 items-center opacity-60">
+                            <View className="bg-border-light dark:bg-border-dark p-4 rounded-full mb-4">
+                                <Shield size={28} color="#A1A1AA" />
                             </View>
-                            <Text className="font-bold text-zinc-500 text-center text-sm mb-1">Doğruluk Bekçisi</Text>
-                            <Text className="text-[10px] text-zinc-500 text-center font-medium">50 doğru oy ver</Text>
+                            <Text className="font-sans-bold text-zinc-500 text-center text-body-md mb-1">Doğruluk Bekçisi</Text>
+                            <Text className="text-body-xs text-zinc-500 text-center font-sans tracking-wide">50 doğru oy ver</Text>
                         </View>
                     </ScrollView>
                 </View>
 
                 {/* Settings Group */}
-                <View className="mx-5 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-100 dark:border-zinc-800 overflow-hidden shadow-sm">
+                <View className="mx-5 bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl border border-border-light dark:border-border-dark overflow-hidden shadow-sm shadow-zinc-200/50 dark:shadow-none mb-4">
                     <SettingsItem
                         icon={User}
                         label="Profili Düzenle"
                         onPress={() => router.push('/profile/edit')}
+                        isFirst={true}
                     />
                     <SettingsItem
                         icon={BookOpen}
                         label="Hakkında"
                         onPress={() => Alert.alert('Bilgi', 'D4ily v1.0.0 (Beta)')}
+                        isLast={true}
                     />
-                    {/* Add more settings items here */}
                 </View>
 
             </ScrollView>
         </SafeAreaView>
     );
 }
-

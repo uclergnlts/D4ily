@@ -67,7 +67,7 @@ function transformDigestResponse(digest: any) {
     const sections: any[] = safeJsonParse(digest.sections, []);
 
     // Collect all section tweets into a flat socialHighlights array
-    const socialHighlights: { author: string; handle: string; text: string }[] = [];
+    const socialHighlights: { author: string; handle: string; text: string; profileImageUrl?: string | null }[] = [];
     if (Array.isArray(sections)) {
         for (const section of sections) {
             if (Array.isArray(section.tweets)) {
@@ -77,6 +77,7 @@ function transformDigestResponse(digest: any) {
                             author: tweet.author || '',
                             handle: tweet.handle || '',
                             text: tweet.text,
+                            profileImageUrl: tweet.profileImageUrl || tweet.profile_image_url || null,
                         });
                     }
                 }

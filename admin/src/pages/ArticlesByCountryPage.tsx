@@ -7,24 +7,18 @@ import { Badge } from '../components/ui/Badge';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
 import { useArticles, useDeleteArticle } from '../hooks/useArticles';
-import type { Article, CountryCode } from '../types';
+import { COUNTRIES, type Article, type CountryCode } from '../types';
 import { createColumnHelper } from '@tanstack/react-table';
 import { formatDate, truncate, getSentimentColor, getPoliticalToneLabel, getPoliticalToneColor } from '../lib/utils';
 import { ChevronLeft, ChevronRight, Trash2, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
-
-const COUNTRY_INFO: Record<string, { name: string; flag: string }> = {
-  tr: { name: 'Turkey', flag: '🇹🇷' },
-  de: { name: 'Germany', flag: '🇩🇪' },
-  us: { name: 'USA', flag: '🇺🇸' },
-};
 
 const columnHelper = createColumnHelper<Article>();
 
 export function ArticlesByCountryPage() {
   const { countryCode } = useParams<{ countryCode: string }>();
   const country = (countryCode || 'tr') as CountryCode;
-  const countryInfo = COUNTRY_INFO[country] || { name: country?.toUpperCase(), flag: '🌍' };
+  const countryInfo = COUNTRIES.find((c) => c.code === country) || { name: country?.toUpperCase() || 'Unknown', flag: '??' };
 
   const [page, setPage] = useState(1);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
@@ -258,3 +252,4 @@ export function ArticlesByCountryPage() {
     </div>
   );
 }
+
