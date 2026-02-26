@@ -106,12 +106,30 @@ export async function adminMiddleware(c: Context, next: Next) {
         const token = authHeader.substring(7);
         const decodedToken = await adminAuth.verifyIdToken(token);
 
-        // Check admin role in database
-        const user = await db
+        // Check admin role in database by Firebase UID first
+        let user = await db
             .select()
             .from(users)
             .where(eq(users.id, decodedToken.uid))
             .get();
+
+        // Backward compatibility for Firebase project migrations:
+        // if UID changed, try to resolve by verified email.
+        if (!user && decodedToken.email) {
+            user = await db
+                .select()
+                .from(users)
+                .where(eq(users.email, decodedToken.email))
+                .get();
+
+            if (user) {
+                logger.warn({
+                    tokenUid: decodedToken.uid,
+                    dbUserId: user.id,
+                    email: decodedToken.email,
+                }, 'Admin auth matched user by email due UID mismatch');
+            }
+        }
 
         if (!user) {
             return c.json({
@@ -130,7 +148,7 @@ export async function adminMiddleware(c: Context, next: Next) {
 
         // Attach user to context with role
         c.set('user', {
-            uid: decodedToken.uid,
+            uid: user.id,
             email: decodedToken.email,
             emailVerified: decodedToken.email_verified || false,
             userRole: user.userRole,

@@ -244,12 +244,43 @@ authRoute.post('/sync', authMiddleware, async (c) => {
     try {
         const authUser = c.get('user') as AuthUser;
 
-        // Check if user exists
+        // Check if user exists by UID
         let user = await db
             .select()
             .from(users)
             .where(eq(users.id, authUser.uid))
             .get();
+
+        // Backward compatibility: if Firebase UID changed between projects,
+        // recover existing account by email instead of creating a duplicate.
+        if (!user && authUser.email) {
+            user = await db
+                .select()
+                .from(users)
+                .where(eq(users.email, authUser.email))
+                .get();
+
+            if (user) {
+                const firebaseUser = await auth!.getUser(authUser.uid);
+                const updatedUser = await db
+                    .update(users)
+                    .set({
+                        name: firebaseUser.displayName || user.name,
+                        avatarUrl: firebaseUser.photoURL || user.avatarUrl,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(users.id, user.id))
+                    .returning()
+                    .get();
+
+                user = updatedUser || user;
+                logger.warn({
+                    tokenUid: authUser.uid,
+                    dbUserId: user.id,
+                    email: authUser.email,
+                }, 'User sync matched existing account by email due UID mismatch');
+            }
+        }
 
         if (!user) {
             // Get Firebase user data
