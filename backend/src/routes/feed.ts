@@ -18,18 +18,14 @@ import {
     ru_articles,
     ru_article_sources,
     categories,
-    articleReactions,
-    bookmarks,
     rss_sources,
 } from '../db/schema/index.js';
-import { eq, desc, and, inArray } from 'drizzle-orm';
+import { eq, desc, and, inArray, sql } from 'drizzle-orm';
 import { handleError } from '../utils/errors.js';
 import { countrySchema, paginationSchema } from '../utils/schemas.js';
-import { cacheGet, cacheSet } from '../config/redis.js';
+import { cacheGet, cacheSet, cacheInvalidate } from '../config/redis.js';
 import { logger } from '../config/logger.js';
-import type { ApiResponse, EmotionalAnalysisResponse } from '../types/index.js';
-import { z } from 'zod';
-import { optionalAuthMiddleware, AuthUser } from '../middleware/auth.js';
+import type { EmotionalAnalysisResponse } from '../types/index.js';
 import { findPerspectives, getBalancedFeed } from '../services/perspectivesService.js';
 import { getAlignmentLabel } from '../utils/alignment.js';
 import {
@@ -43,6 +39,9 @@ import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
 const CACHE_TTL = 1800;           // 30 minutes fresh cache
 const STALE_TTL = 3600;           // 60 minutes stale cache (serve while revalidating)
 const QUERY_TIMEOUT = 8000;       // 8 seconds query timeout (leaving 2s buffer for 10s request timeout)
+const FEED_ROUTE_BUDGET_MS = 600;
+const ARTICLE_ROUTE_BUDGET_MS = 400;
+const PERSPECTIVES_ROUTE_BUDGET_MS = 1200;
 
 /**
  * Execute a database query with timeout protection
@@ -114,11 +113,7 @@ async function getCacheWithSWR<T>(
     return { data, isStale: false };
 }
 
-type Variables = {
-    user?: AuthUser;
-};
-
-const app = new Hono<{ Variables: Variables }>();
+const app = new Hono();
 
 const COUNTRY_TABLES = {
     tr: { articles: tr_articles, sources: tr_article_sources },
@@ -135,6 +130,7 @@ const COUNTRY_TABLES = {
 // Supports ?balanced=true for balanced feed across political spectrum
 app.get('/:country', async (c) => {
     try {
+        const routeStart = Date.now();
         const countryParam = c.req.param('country');
         const balanced = c.req.query('balanced') === 'true';
 
@@ -184,23 +180,33 @@ app.get('/:country', async (c) => {
                     }
                 );
 
-                return c.json({
+                const response = c.json({
                     success: true,
                     data,
                     cached: true,
                     stale: isStale,
                 });
+                response.headers.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=600');
+                response.headers.set('Server-Timing', `feed;dur=${Date.now() - routeStart}`);
+                const duration = Date.now() - routeStart;
+                if (duration > FEED_ROUTE_BUDGET_MS) {
+                    logger.warn({ duration, budgetMs: FEED_ROUTE_BUDGET_MS, path: c.req.path }, 'Feed route exceeded budget');
+                }
+                return response;
             } catch (error) {
                 // Try to get stale cache on error
                 const staleCache = await cacheGet<{ data: any }>(cacheKey + ':swr');
                 if (staleCache) {
                     logger.warn({ cacheKey }, 'Serving stale cache due to error');
-                    return c.json({
+                    const response = c.json({
                         success: true,
                         data: staleCache.data,
                         cached: true,
                         stale: true,
                     });
+                    response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=600');
+                    response.headers.set('Server-Timing', `feed;dur=${Date.now() - routeStart}`);
+                    return response;
                 }
                 throw error;
             }
@@ -327,23 +333,33 @@ app.get('/:country', async (c) => {
         try {
             const { data, isStale } = await getCacheWithSWR(cacheKey, fetchFeed);
 
-            return c.json({
+            const response = c.json({
                 success: true,
                 data,
                 cached: isStale ? true : undefined,
                 stale: isStale || undefined,
             });
+            response.headers.set('Cache-Control', 'public, max-age=90, stale-while-revalidate=600');
+            response.headers.set('Server-Timing', `feed;dur=${Date.now() - routeStart}`);
+            const duration = Date.now() - routeStart;
+            if (duration > FEED_ROUTE_BUDGET_MS) {
+                logger.warn({ duration, budgetMs: FEED_ROUTE_BUDGET_MS, path: c.req.path }, 'Feed route exceeded budget');
+            }
+            return response;
         } catch (error) {
             // Try to get stale cache on error (graceful degradation)
             const staleCache = await cacheGet<{ data: any }>(cacheKey + ':swr');
             if (staleCache) {
                 logger.warn({ cacheKey }, 'Serving stale cache due to error');
-                return c.json({
+                const response = c.json({
                     success: true,
                     data: staleCache.data,
                     cached: true,
                     stale: true,
                 });
+                response.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=600');
+                response.headers.set('Server-Timing', `feed;dur=${Date.now() - routeStart}`);
+                return response;
             }
             throw error;
         }
@@ -352,12 +368,12 @@ app.get('/:country', async (c) => {
     }
 });
 
-// GET /feed/:country/:articleId - Get article detail
-app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
+// GET /feed/:country/:articleId - Get article detail (cacheable, side-effect free)
+app.get('/:country/:articleId', async (c) => {
     try {
+        const routeStart = Date.now();
         const countryParam = c.req.param('country');
         const articleId = c.req.param('articleId');
-        const user = c.get('user') as AuthUser | undefined;
 
         // Validate country
         const countryValidation = countrySchema.safeParse(countryParam);
@@ -369,8 +385,19 @@ app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
         }
 
         const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
+        const detailCacheKey = `article:detail:${country}:${articleId}`;
+        const cached = await cacheGet<any>(detailCacheKey);
+        if (cached) {
+            const response = c.json({
+                success: true,
+                data: cached,
+                cached: true,
+            });
+            response.headers.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=900');
+            response.headers.set('Server-Timing', `article;dur=${Date.now() - routeStart}`);
+            return response;
+        }
 
-        // Get article with detailContent (don't cache to ensure fresh view count)
         const tables = COUNTRY_TABLES[country];
         const articles = await db
             .select({
@@ -414,14 +441,11 @@ app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
         }
 
         const article = articles[0];
-
-        // Get sources
         const sources = await db
             .select()
             .from(tables.sources)
             .where(eq(tables.sources.articleId, articleId));
 
-        // Get category
         let categoryInfo = null;
         if (article.categoryId) {
             const categoryResult = await db
@@ -435,65 +459,70 @@ app.get('/:country/:articleId', optionalAuthMiddleware, async (c) => {
             }
         }
 
-        // Get user reaction status if authenticated
-        let userReaction = null;
-        let isBookmarked = false;
-
-        if (user) {
-            const reaction = await db
-                .select()
-                .from(articleReactions)
-                .where(and(
-                    eq(articleReactions.userId, user.uid),
-                    eq(articleReactions.articleId, articleId)
-                ))
-                .get();
-
-            const bookmark = await db
-                .select()
-                .from(bookmarks)
-                .where(and(
-                    eq(bookmarks.userId, user.uid),
-                    eq(bookmarks.articleId, articleId)
-                ))
-                .get();
-
-            userReaction = reaction?.reactionType || null;
-            isBookmarked = !!bookmark;
-        }
-
-        // Increment view count
-        await db.update(tables.articles)
-            .set({ viewCount: article.viewCount + 1 })
-            .where(eq(tables.articles.id, articleId));
-
-        // Ensure detailContent is populated - fallback to summary if null (backward compatibility)
-        const articleWithDetail = {
+        const responseBody = {
             ...article,
             detailContent: article.detailContent || article.summary,
-        };
-
-        const response = {
-            ...articleWithDetail,
-            viewCount: article.viewCount + 1, // Return updated count
             sources,
             category: categoryInfo,
-            userReaction,
-            isBookmarked,
         };
+
+        await cacheSet(detailCacheKey, responseBody, 900);
+
+        const response = c.json({
+            success: true,
+            data: responseBody,
+        });
+        response.headers.set('Cache-Control', 'public, max-age=120, stale-while-revalidate=900');
+        response.headers.set('Server-Timing', `article;dur=${Date.now() - routeStart}`);
+        const duration = Date.now() - routeStart;
+        if (duration > ARTICLE_ROUTE_BUDGET_MS) {
+            logger.warn({ duration, budgetMs: ARTICLE_ROUTE_BUDGET_MS, path: c.req.path }, 'Article detail route exceeded budget');
+        }
+        return response;
+    } catch (error) {
+        return handleError(c, error, 'Failed to fetch article');
+    }
+});
+
+// POST /feed/:country/:articleId/view - Increment view count asynchronously
+app.post('/:country/:articleId/view', async (c) => {
+    try {
+        const countryParam = c.req.param('country');
+        const articleId = c.req.param('articleId');
+
+        const countryValidation = countrySchema.safeParse(countryParam);
+        if (!countryValidation.success) {
+            return c.json({
+                success: false,
+                error: 'Invalid country code',
+            }, 400);
+        }
+
+        const country = countryValidation.data as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
+        const tables = COUNTRY_TABLES[country];
+
+        await db
+            .update(tables.articles)
+            .set({
+                viewCount: sql`${tables.articles.viewCount} + 1`,
+            })
+            .where(eq(tables.articles.id, articleId));
+
+        await cacheInvalidate(`article:detail:${country}:${articleId}`);
 
         return c.json({
             success: true,
-            data: response,
+            data: { articleId, viewed: true },
         });
     } catch (error) {
-        return handleError(c, error, 'Failed to fetch article');
+        return handleError(c, error, 'Failed to record view');
     }
 });
 
 // GET /feed/:country/:articleId/perspectives - Get different perspectives on the same story
 app.get('/:country/:articleId/perspectives', async (c) => {
     try {
+        const routeStart = Date.now();
         const countryParam = c.req.param('country');
         const articleId = c.req.param('articleId');
 
@@ -513,11 +542,14 @@ app.get('/:country/:articleId/perspectives', async (c) => {
         const cached = await cacheGet<any>(cacheKey);
 
         if (cached) {
-            return c.json({
+            const response = c.json({
                 success: true,
                 data: cached,
                 cached: true,
             });
+            response.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
+            response.headers.set('Server-Timing', `perspectives;dur=${Date.now() - routeStart}`);
+            return response;
         }
 
         // Find perspectives
@@ -533,10 +565,17 @@ app.get('/:country/:articleId/perspectives', async (c) => {
         // Cache for 30 minutes (perspectives don't change often)
         await cacheSet(cacheKey, perspectives, 1800);
 
-        return c.json({
+        const response = c.json({
             success: true,
             data: perspectives,
         });
+        response.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
+        response.headers.set('Server-Timing', `perspectives;dur=${Date.now() - routeStart}`);
+        const duration = Date.now() - routeStart;
+        if (duration > PERSPECTIVES_ROUTE_BUDGET_MS) {
+            logger.warn({ duration, budgetMs: PERSPECTIVES_ROUTE_BUDGET_MS, path: c.req.path }, 'Perspectives route exceeded budget');
+        }
+        return response;
     } catch (error) {
         return handleError(c, error, 'Failed to fetch perspectives');
     }
@@ -564,11 +603,13 @@ app.get('/:country/:articleId/analysis', async (c) => {
         const cached = await cacheGet<EmotionalAnalysisResponse>(cacheKey);
 
         if (cached) {
-            return c.json({
+            const response = c.json({
                 success: true,
                 data: cached,
                 cached: true,
             });
+            response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600');
+            return response;
         }
 
         // Get article
@@ -632,10 +673,12 @@ app.get('/:country/:articleId/analysis', async (c) => {
         // Cache for 1 hour (analysis doesn't change)
         await cacheSet(cacheKey, analysisResponse, 3600);
 
-        return c.json({
+        const response = c.json({
             success: true,
             data: analysisResponse,
         });
+        response.headers.set('Cache-Control', 'public, max-age=600, stale-while-revalidate=3600');
+        return response;
     } catch (error) {
         return handleError(c, error, 'Failed to fetch article analysis');
     }

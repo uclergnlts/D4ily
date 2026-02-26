@@ -88,7 +88,8 @@
       "Bash(eas:*)",
       "Bash(npm uninstall:*)",
       "Bash(npx expo start:*)",
-      "WebFetch(domain:www.sozcu.com.tr)"
+      "WebFetch(domain:www.sozcu.com.tr)",
+      "Bash(grep -n \"const.*=.*function\\\\|export default function\\\\|export const\" /c/Users/ucler/Desktop/D4ily/mobile/src/components/*.tsx)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"

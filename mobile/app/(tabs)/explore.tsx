@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Keyboard } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Search, X, TrendingUp, Newspaper, Users, Hash, Menu, Bell } from 'lucide-react-native';
 import { useAppStore } from '../../src/store/useAppStore';
+import { safePush } from '../../src/utils/navigation';
 
 import { useSearch, useSearchSuggestions, useTrending } from '../../src/hooks/useSearch';
 import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
@@ -22,7 +23,7 @@ const TAB_OPTIONS: { key: SearchTab; label: string; icon: React.ElementType }[] 
 
 export default function ExploreScreen() {
     const router = useRouter();
-    const { selectedCountry } = useAppStore();
+    const { selectedCountry, toggleSideMenu } = useAppStore();
     const activeScheme = useThemeStore(state => state.activeScheme);
     const isDark = activeScheme === 'dark';
 
@@ -44,17 +45,17 @@ export default function ExploreScreen() {
         return () => clearTimeout(timer);
     }, [searchText]);
 
-    const handleSuggestionPress = (suggestion: string) => {
+    const handleSuggestionPress = useCallback((suggestion: string) => {
         setSearchText(suggestion);
         setDebouncedQuery(suggestion);
         setShowSuggestions(false);
         Keyboard.dismiss();
-    };
+    }, []);
 
-    const handleTextChange = (text: string) => {
+    const handleTextChange = useCallback((text: string) => {
         setSearchText(text);
         setShowSuggestions(text.trim().length >= 2);
-    };
+    }, []);
 
     // Extract results based on response shape
     const articles: SearchArticle[] = searchResults?.results?.articles || [];
@@ -68,7 +69,7 @@ export default function ExploreScreen() {
                 {/* Header: Menu - Title - Bell */}
                 <View className="flex-row items-center justify-between mb-6 mt-2">
                     <TouchableOpacity
-                        onPress={() => useAppStore.getState().toggleSideMenu()}
+                        onPress={toggleSideMenu}
                         className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
                     >
                         <Menu size={22} color={isDark ? "#ffffff" : "#18181b"} />
@@ -79,7 +80,7 @@ export default function ExploreScreen() {
                     </Text>
 
                     <TouchableOpacity
-                        onPress={() => router.push('/notifications')}
+                        onPress={() => safePush(router, '/notifications' as any)}
                         className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
                     >
                         <Bell size={20} color={isDark ? "#ffffff" : "#18181b"} />
@@ -192,10 +193,10 @@ export default function ExploreScreen() {
                                     {articles.map((article, i) => (
                                         <Animated.View key={article.id} entering={getEntryAnimation(i)}>
                                             <TouchableOpacity
-                                                onPress={() => router.push({
+                                                onPress={() => safePush(router, {
                                                     pathname: '/article/[id]',
                                                     params: { id: article.id.toString(), country: article.country },
-                                                })}
+                                                } as any)}
                                                 className="bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-5 mb-4 border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none active:scale-95 transition-transform"
                                                 activeOpacity={0.7}
                                             >

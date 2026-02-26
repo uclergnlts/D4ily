@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
@@ -6,7 +6,7 @@ import { useDigestDetail } from '../../src/hooks/useDigest';
 import { useTrackReading } from '../../src/hooks/useHistory';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, Share2 } from 'lucide-react-native';
-import { safeBack } from '../../src/utils/navigation';
+import { safeBack, safePush } from '../../src/utils/navigation';
 import { DigestHeader } from '../../src/components/digest/DigestHeader';
 import { DigestSectionList } from '../../src/components/digest/DigestSectionList';
 import { DigestTopicList } from '../../src/components/digest/DigestTopicList';
@@ -25,25 +25,20 @@ export default function DigestDetailScreen() {
     const countryCode = country || 'tr';
     const trackReading = useTrackReading();
     const [feedbackVisible, setFeedbackVisible] = useState(false);
+    const hasTracked = useRef(false);
 
     const { data: digest, isLoading } = useDigestDetail(countryCode, id!);
 
-    // Track reading history
+    // Track reading history — fire only once per id
     useEffect(() => {
-        if (id && countryCode) {
+        if (id && countryCode && !hasTracked.current) {
+            hasTracked.current = true;
             trackReading.mutate({ articleId: id, countryCode });
         }
-    }, [id, countryCode, trackReading]);
-
-    if (isLoading || !digest) {
-        return (
-            <View className="flex-1 bg-surface-light dark:bg-surface-dark items-center justify-center">
-                <ActivityIndicator size="large" color="#0A66C2" />
-            </View>
-        );
-    }
+    }, [id, countryCode]);
 
     const handleShare = async () => {
+        if (!digest) return;
         try {
             await Share.share({
                 message: `${digest.title}\n\n${digest.summary}\n\nD4ily uygulamasında oku.`,
@@ -86,6 +81,24 @@ export default function DigestDetailScreen() {
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
                 >
                     <ScrollView className="flex-1" showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+                        {isLoading || !digest ? (
+                            <View className="px-5 pt-4">
+                                <View className="bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-6 border border-border-light dark:border-border-dark mb-5">
+                                    <View className="w-32 h-4 bg-zinc-100 dark:bg-zinc-800 rounded-full mb-3" />
+                                    <View className="w-full h-7 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-2" />
+                                    <View className="w-3/4 h-7 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-5" />
+                                    <View className="w-full h-4 bg-zinc-100 dark:bg-zinc-800 rounded mb-2" />
+                                    <View className="w-full h-4 bg-zinc-100 dark:bg-zinc-800 rounded mb-2" />
+                                    <View className="w-2/3 h-4 bg-zinc-100 dark:bg-zinc-800 rounded" />
+                                </View>
+                                <View className="bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-6 border border-border-light dark:border-border-dark mb-5">
+                                    <View className="w-40 h-5 bg-zinc-100 dark:bg-zinc-800 rounded-lg mb-4" />
+                                    <View className="w-full h-4 bg-zinc-100 dark:bg-zinc-800 rounded mb-2" />
+                                    <View className="w-full h-4 bg-zinc-100 dark:bg-zinc-800 rounded mb-2" />
+                                    <View className="w-1/2 h-4 bg-zinc-100 dark:bg-zinc-800 rounded" />
+                                </View>
+                            </View>
+                        ) : (<>
                         {/* Header Card */}
                         <DigestHeader
                             title={digest.title}
@@ -120,10 +133,10 @@ export default function DigestDetailScreen() {
                         {/* Top Topics */}
                         <DigestTopicList
                             topics={digest.topTopics}
-                            onTopicPress={(articleId) => router.push({
+                            onTopicPress={(articleId) => safePush(router, {
                                 pathname: '/article/[id]',
                                 params: { id: articleId }
-                            })}
+                            } as any)}
                             className="mb-6"
                         />
 
@@ -146,6 +159,7 @@ export default function DigestDetailScreen() {
 
                         {/* Feedback */}
                         <FeedbackButton onPress={() => setFeedbackVisible(true)} />
+                        </>)}
                     </ScrollView>
                 </KeyboardAvoidingView>
             </SafeAreaView>

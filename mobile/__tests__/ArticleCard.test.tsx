@@ -1,5 +1,6 @@
 import React from 'react';
 import { render } from '@testing-library/react-native/pure';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArticleCard } from '../src/components/article/ArticleCard';
 import { Article } from '../src/types';
 
@@ -28,7 +29,19 @@ const mockArticle: Article = {
 
 describe('ArticleCard', () => {
     it('renders correctly', () => {
-        const { getByText } = render(<ArticleCard article={mockArticle} />);
+        const queryClient = new QueryClient({
+            defaultOptions: {
+                queries: {
+                    retry: false,
+                },
+            },
+        });
+
+        const { getByText } = render(
+            <QueryClientProvider client={queryClient}>
+                <ArticleCard article={mockArticle} />
+            </QueryClientProvider>
+        );
 
         expect(getByText('Test Article Translated')).toBeTruthy();
         expect(getByText('This is a test summary')).toBeTruthy();

@@ -23,7 +23,7 @@ import {
     rss_sources,
     articlePerspectives,
 } from '../db/schema/index.js';
-import { eq, and, gte, lte, ne, sql, desc } from 'drizzle-orm';
+import { eq, and, gte, lte, ne, sql, desc, inArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { getAlignmentLabel, AlignmentLabel } from '../utils/alignment.js';
 
@@ -340,54 +340,64 @@ export async function findPerspectives(
         .limit(maxResults);
 
     if (cachedPerspectives.length > 0) {
-        // Return cached perspectives
-        const perspectives = await Promise.all(
-            cachedPerspectives.map(async (p) => {
-                const relatedArticles = await db
-                    .select()
-                    .from(tables.articles)
-                    .where(eq(tables.articles.id, p.relatedArticleId))
-                    .limit(1);
+        const relatedArticleIds = Array.from(new Set(cachedPerspectives.map(p => p.relatedArticleId)));
+        const [relatedArticles, relatedPrimarySources] = await Promise.all([
+            db
+                .select()
+                .from(tables.articles)
+                .where(inArray(tables.articles.id, relatedArticleIds)),
+            db
+                .select()
+                .from(tables.sources)
+                .where(and(
+                    inArray(tables.sources.articleId, relatedArticleIds),
+                    eq(tables.sources.isPrimary, true)
+                )),
+        ]);
 
-                if (relatedArticles.length === 0) return null;
-                const relatedArticle = relatedArticles[0];
+        const sourceNames = Array.from(new Set(relatedPrimarySources.map(source => source.sourceName)));
+        const sourceInfos = sourceNames.length > 0
+            ? await db
+                .select()
+                .from(rss_sources)
+                .where(and(
+                    eq(rss_sources.countryCode, countryCode),
+                    inArray(rss_sources.sourceName, sourceNames)
+                ))
+            : [];
 
-                const relatedSources = await db
-                    .select()
-                    .from(tables.sources)
-                    .where(and(
-                        eq(tables.sources.articleId, p.relatedArticleId),
-                        eq(tables.sources.isPrimary, true)
-                    ))
-                    .limit(1);
+        const relatedArticleById = new Map(relatedArticles.map(item => [item.id, item]));
+        const relatedPrimarySourceByArticleId = new Map<string, typeof relatedPrimarySources[number]>();
+        for (const source of relatedPrimarySources) {
+            if (!relatedPrimarySourceByArticleId.has(source.articleId)) {
+                relatedPrimarySourceByArticleId.set(source.articleId, source);
+            }
+        }
+        const sourceInfoByName = new Map(sourceInfos.map(item => [item.sourceName, item]));
 
-                const relatedSource = relatedSources[0];
-                if (!relatedSource) return null;
+        const perspectives = cachedPerspectives.map((p) => {
+            const relatedArticle = relatedArticleById.get(p.relatedArticleId);
+            const relatedSource = relatedPrimarySourceByArticleId.get(p.relatedArticleId);
+            if (!relatedArticle || !relatedSource) return null;
 
-                const relatedSourceInfo = await db
-                    .select()
-                    .from(rss_sources)
-                    .where(eq(rss_sources.sourceName, relatedSource.sourceName))
-                    .get();
+            const relatedSourceInfo = sourceInfoByName.get(relatedSource.sourceName);
+            const govScore = relatedSourceInfo?.govAlignmentScore ?? 0;
+            const confidence = relatedSourceInfo?.govAlignmentConfidence ?? 0.5;
 
-                const govScore = relatedSourceInfo?.govAlignmentScore ?? 0;
-                const confidence = relatedSourceInfo?.govAlignmentConfidence ?? 0.5;
-
-                return {
-                    articleId: p.relatedArticleId,
-                    title: relatedArticle.translatedTitle,
-                    summary: relatedArticle.summary,
-                    sourceName: relatedSource.sourceName,
-                    sourceLogoUrl: relatedSource.sourceLogoUrl,
-                    sourceUrl: relatedSource.sourceUrl,
-                    govAlignmentScore: govScore,
-                    govAlignmentLabel: getAlignmentLabel(govScore, confidence),
-                    publishedAt: relatedArticle.publishedAt,
-                    similarityScore: p.similarityScore,
-                    matchedEntities: (p.matchedEntities as string[]) || [],
-                };
-            })
-        );
+            return {
+                articleId: p.relatedArticleId,
+                title: relatedArticle.translatedTitle,
+                summary: relatedArticle.summary,
+                sourceName: relatedSource.sourceName,
+                sourceLogoUrl: relatedSource.sourceLogoUrl,
+                sourceUrl: relatedSource.sourceUrl,
+                govAlignmentScore: govScore,
+                govAlignmentLabel: getAlignmentLabel(govScore, confidence),
+                publishedAt: relatedArticle.publishedAt,
+                similarityScore: p.similarityScore,
+                matchedEntities: (p.matchedEntities as string[]) || [],
+            };
+        });
 
         const result = {
             mainArticle: {
@@ -443,6 +453,33 @@ export async function findPerspectives(
     const mainText = `${mainArticle.translatedTitle}. ${mainArticle.summary}`;
     const mainEntities = await extractEntities(mainText);
 
+    const candidateIds = candidates.map(candidate => candidate.id);
+    const candidatePrimarySources = await db
+        .select()
+        .from(tables.sources)
+        .where(and(
+            inArray(tables.sources.articleId, candidateIds),
+            eq(tables.sources.isPrimary, true)
+        ));
+    const candidateSourceByArticleId = new Map<string, typeof candidatePrimarySources[number]>();
+    for (const source of candidatePrimarySources) {
+        if (!candidateSourceByArticleId.has(source.articleId)) {
+            candidateSourceByArticleId.set(source.articleId, source);
+        }
+    }
+
+    const candidateSourceNames = Array.from(new Set(candidatePrimarySources.map(source => source.sourceName)));
+    const candidateSourceInfos = candidateSourceNames.length > 0
+        ? await db
+            .select()
+            .from(rss_sources)
+            .where(and(
+                eq(rss_sources.countryCode, countryCode),
+                inArray(rss_sources.sourceName, candidateSourceNames)
+            ))
+        : [];
+    const candidateSourceInfoByName = new Map(candidateSourceInfos.map(info => [info.sourceName, info]));
+
     // 5. Score each candidate
     const scoredCandidates: {
         article: typeof candidates[0];
@@ -455,28 +492,13 @@ export async function findPerspectives(
     }[] = [];
 
     for (const candidate of candidates) {
-        // Get candidate source
-        const candidateSources = await db
-            .select()
-            .from(tables.sources)
-            .where(and(
-                eq(tables.sources.articleId, candidate.id),
-                eq(tables.sources.isPrimary, true)
-            ))
-            .limit(1);
-
-        const candidateSource = candidateSources[0];
+        const candidateSource = candidateSourceByArticleId.get(candidate.id);
         if (!candidateSource) continue;
 
         // Skip same source
         if (candidateSource.sourceName === mainSource.sourceName) continue;
 
-        // Get source alignment info
-        const candidateSourceInfo = await db
-            .select()
-            .from(rss_sources)
-            .where(eq(rss_sources.sourceName, candidateSource.sourceName))
-            .get();
+        const candidateSourceInfo = candidateSourceInfoByName.get(candidateSource.sourceName);
 
         // Extract entities
         const candidateText = `${candidate.translatedTitle}. ${candidate.summary}`;
@@ -612,6 +634,7 @@ export async function getBalancedFeed(
     const proGovSources = sources.filter(s => s.govAlignmentScore >= 2).map(s => s.sourceName);
     const mixedSources = sources.filter(s => s.govAlignmentScore > -2 && s.govAlignmentScore < 2).map(s => s.sourceName);
     const antiGovSources = sources.filter(s => s.govAlignmentScore <= -2).map(s => s.sourceName);
+    const sourceInfoByName = new Map(sources.map(source => [source.sourceName, source]));
 
     // Helper to get articles from specific sources
     async function getArticlesFromSources(sourceNames: string[], articleLimit: number) {
@@ -622,24 +645,33 @@ export async function getBalancedFeed(
             .from(tables.articles)
             .where(eq(tables.articles.isFiltered, false))
             .orderBy(desc(tables.articles.publishedAt))
-            .limit(100); // Get more to filter
+            .limit(100)
+            .offset(offset); // Get more to filter
+
+        const articleIds = articles.map(article => article.id);
+        const primarySources = articleIds.length > 0
+            ? await db
+                .select()
+                .from(tables.sources)
+                .where(and(
+                    inArray(tables.sources.articleId, articleIds),
+                    eq(tables.sources.isPrimary, true)
+                ))
+            : [];
+        const primarySourceByArticleId = new Map<string, typeof primarySources[number]>();
+        for (const source of primarySources) {
+            if (!primarySourceByArticleId.has(source.articleId)) {
+                primarySourceByArticleId.set(source.articleId, source);
+            }
+        }
 
         const result = [];
         for (const article of articles) {
             if (result.length >= articleLimit) break;
 
-            const articleSources = await db
-                .select()
-                .from(tables.sources)
-                .where(and(
-                    eq(tables.sources.articleId, article.id),
-                    eq(tables.sources.isPrimary, true)
-                ))
-                .limit(1);
-
-            const primarySource = articleSources[0];
+            const primarySource = primarySourceByArticleId.get(article.id);
             if (primarySource && sourceNames.includes(primarySource.sourceName)) {
-                const sourceInfo = sources.find(s => s.sourceName === primarySource.sourceName);
+                const sourceInfo = sourceInfoByName.get(primarySource.sourceName);
                 result.push({
                     ...article,
                     source: primarySource.sourceName,

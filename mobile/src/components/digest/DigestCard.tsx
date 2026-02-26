@@ -12,7 +12,7 @@ interface DigestCardProps {
     isNew?: boolean;
 }
 
-export const DigestCard = ({ title, summary, date, onPress, disabled, isFeatured = false, isNew = false }: DigestCardProps) => {
+export const DigestCard = React.memo(({ title, summary, date, onPress, disabled, isFeatured = false, isNew = false }: DigestCardProps) => {
     // Parse date to get day name (e.g., "Perşembe")
     const dateObj = new Date(date);
     const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'long' });
@@ -68,4 +68,4 @@ export const DigestCard = ({ title, summary, date, onPress, disabled, isFeatured
             </View>
         </TouchableOpacity>
     );
-};
+});

@@ -1,16 +1,25 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, Dimensions, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, { useAnimatedStyle, withTiming, useSharedValue } from 'react-native-reanimated';
 import { X, User, Settings, HelpCircle, Mic, LogOut, ChevronRight, Globe, Heart } from 'lucide-react-native';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAppStore } from '../../store/useAppStore';
+import { safePush } from '../../utils/navigation';
 
 
 const { width, height } = Dimensions.get('window');
 const MENU_WIDTH = width * 0.75;
 
-export const SideMenu = () => {
+const menuItems = [
+    { icon: Heart, label: 'Destek Ol', path: '/premium', color: '#ef4444' },
+    { icon: Globe, label: 'Kaynaklar', path: '/sources' },
+    { icon: Mic, label: 'Podcastler', path: '/podcast' },
+    { icon: Settings, label: 'Ayarlar', path: '/settings' },
+    { icon: HelpCircle, label: 'Yardım & Destek', path: '/help' },
+];
+
+export const SideMenu = React.memo(() => {
     const router = useRouter();
     const { user, logout } = useAuthStore();
     const { isSideMenuOpen, toggleSideMenu } = useAppStore();
@@ -23,13 +32,13 @@ export const SideMenu = () => {
     // Watch for state changes
     React.useEffect(() => {
         if (isSideMenuOpen) {
-            translateX.value = withTiming(0, { duration: 300 });
-            opacity.value = withTiming(1, { duration: 300 });
+            translateX.value = withTiming(0, { duration: 200 });
+            opacity.value = withTiming(1, { duration: 200 });
         } else {
-            translateX.value = withTiming(-MENU_WIDTH, { duration: 300 });
-            opacity.value = withTiming(0, { duration: 300 });
+            translateX.value = withTiming(-MENU_WIDTH, { duration: 200 });
+            opacity.value = withTiming(0, { duration: 200 });
         }
-    }, [isSideMenuOpen, translateX, opacity]);
+    }, [isSideMenuOpen]);
 
     const animatedStyle = useAnimatedStyle(() => ({
         transform: [{ translateX: translateX.value }],
@@ -39,24 +48,21 @@ export const SideMenu = () => {
         opacity: opacity.value,
     }));
 
-    const handleNavigation = (path: string) => {
+    const handleNavigation = useCallback((path: string) => {
         toggleSideMenu();
         setTimeout(() => {
             if (path === 'logout') {
                 // Logout logic usually handled separately
             } else {
-                router.push(path as any);
+                safePush(router, path as any);
             }
-        }, 300);
-    };
+        }, 200);
+    }, [toggleSideMenu, router]);
 
-    const menuItems = [
-        { icon: Heart, label: 'Destek Ol', path: '/premium', color: '#ef4444' },
-        { icon: Globe, label: 'Kaynaklar', path: '/sources' },
-        { icon: Mic, label: 'Podcastler', path: '/podcast' },
-        { icon: Settings, label: 'Ayarlar', path: '/settings' },
-        { icon: HelpCircle, label: 'Yardım & Destek', path: '/help' },
-    ];
+    const handleLogout = useCallback(() => {
+        toggleSideMenu();
+        logout();
+    }, [toggleSideMenu, logout]);
 
     const containerPointerEvents = isSideMenuOpen ? 'box-none' : 'none';
 
@@ -112,7 +118,7 @@ export const SideMenu = () => {
                                 </View>
                             </View>
                         ) : (
-                            <TouchableOpacity onPress={() => router.push('/auth')} className="flex-row items-center gap-4">
+                            <TouchableOpacity onPress={() => safePush(router, '/auth' as any)} className="flex-row items-center gap-4">
                                 <View className="w-12 h-12 rounded-full bg-zinc-200 dark:bg-zinc-800 justify-center items-center">
                                     <User size={24} color="#a1a1aa" />
                                 </View>
@@ -134,10 +140,6 @@ export const SideMenu = () => {
                             <X size={20} color="#a1a1aa" />
                         </TouchableOpacity>
                     </View>
-
-
-
-
 
 
 
@@ -169,10 +171,7 @@ export const SideMenu = () => {
                     {user && (
                         <View className="p-6 border-t border-zinc-100 dark:border-zinc-800">
                             <TouchableOpacity
-                                onPress={() => {
-                                    toggleSideMenu();
-                                    logout();
-                                }}
+                                onPress={handleLogout}
                                 className="flex-row items-center p-4 bg-red-50 dark:bg-red-900/20 rounded-xl"
                             >
                                 <LogOut size={20} color="#ef4444" className="mr-3" />
@@ -184,7 +183,7 @@ export const SideMenu = () => {
             </Animated.View>
         </View>
     );
-};
+});
 
 // Helper to handle safe area inside absolute view
 const SafeAreaViewWrapper = ({ children }: { children: React.ReactNode }) => {

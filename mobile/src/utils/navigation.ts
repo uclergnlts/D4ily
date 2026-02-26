@@ -10,3 +10,16 @@ export function safeBack(router: Router, fallback: Href = '/(tabs)') {
     // Pop to a known screen if possible, otherwise replace with fallback.
     router.dismissTo(fallback);
 }
+
+let lastNavTime = 0;
+const NAV_THROTTLE_MS = 500;
+
+/**
+ * Throttled router.push — prevents duplicate screen pushes from rapid taps.
+ */
+export function safePush(router: Router, href: Href) {
+    const now = Date.now();
+    if (now - lastNavTime < NAV_THROTTLE_MS) return;
+    lastNavTime = now;
+    router.push(href);
+}

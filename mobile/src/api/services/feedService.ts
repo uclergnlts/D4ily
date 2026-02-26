@@ -75,6 +75,16 @@ export const feedService = {
         }
     },
 
+    recordArticleView: async (country: string, articleId: string): Promise<void> => {
+        try {
+            await client.post<ApiResponse<{ articleId: string; viewed: boolean }>>(
+                `/feed/${country}/${articleId}/view`
+            );
+        } catch {
+            // Best-effort call; do not block rendering.
+        }
+    },
+
     getAnalysis: async (country: string, articleId: string): Promise<EmotionalAnalysisResponse> => {
         try {
             // Backend: GET /feed/:country/:articleId/analysis
@@ -106,8 +116,20 @@ export const feedService = {
 
             return response.data.data;
         } catch {
-            // Perspectives are optional, return mock in all cases
-            return getMockPerspectives(articleId);
+            if (isDevelopment) {
+                return getMockPerspectives(articleId);
+            }
+            return {
+                mainArticle: {
+                    id: articleId,
+                    title: '',
+                    summary: '',
+                    sourceName: '',
+                    govAlignmentScore: 0,
+                    govAlignmentLabel: 'Belirsiz',
+                },
+                relatedPerspectives: [],
+            };
         }
     },
 
@@ -133,3 +155,4 @@ export const feedService = {
         }
     }
 };
+

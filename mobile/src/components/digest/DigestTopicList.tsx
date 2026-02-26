@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { ArrowRight } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { feedService } from '../../api/services/feedService';
+import { useAppStore } from '../../store/useAppStore';
 
 interface Topic {
     title: string;
@@ -41,6 +44,23 @@ function getImportanceMeta(tier?: Topic['importanceTier']) {
 }
 
 export const DigestTopicList = React.memo(function DigestTopicList({ topics, onTopicPress, className }: DigestTopicListProps) {
+    const queryClient = useQueryClient();
+    const selectedCountry = useAppStore(s => s.selectedCountry);
+
+    // Prefetch articles linked from topics — so they open instantly
+    useEffect(() => {
+        if (!topics) return;
+        topics.forEach(topic => {
+            if (topic.articleId) {
+                queryClient.prefetchQuery({
+                    queryKey: ['article', selectedCountry, topic.articleId],
+                    queryFn: () => feedService.getArticle(selectedCountry, topic.articleId!),
+                    staleTime: 1000 * 60 * 30,
+                });
+            }
+        });
+    }, [topics, selectedCountry]);
+
     if (!topics || topics.length === 0) return null;
 
     return (

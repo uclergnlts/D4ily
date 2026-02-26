@@ -7,10 +7,10 @@ export function useStaggeredEntry() {
     const getEntryAnimation = (index: number) => {
         if (reducedMotion) return undefined;
         return FadeInDown
-            .delay(index * 80)
-            .duration(400)
+            .delay(index * 40)
+            .duration(250)
             .springify()
-            .damping(15);
+            .damping(18);
     };
 
     return { getEntryAnimation, reducedMotion };

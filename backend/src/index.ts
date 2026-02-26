@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { serve } from '@hono/node-server';
 import { Hono, Context, Next } from 'hono';
 import { cors } from 'hono/cors';
+import { compress } from 'hono/compress';
 import crypto from 'node:crypto';
 import { logger } from './config/logger';
 import { env } from './config/env';
@@ -82,6 +83,9 @@ app.use('*', cors({
     credentials: true,
 }));
 
+// Compression for API responses
+app.use('*', compress());
+
 // Rate Limiting
 app.use('*', apiRateLimiter);
 
@@ -90,6 +94,8 @@ app.use('*', async (c, next) => {
     const start = Date.now();
     await next();
     const duration = Date.now() - start;
+    const budgetMs = c.req.path.startsWith('/feed') ? 800 : c.req.path.startsWith('/digest') ? 3000 : 1200;
+    c.res.headers.set('Server-Timing', `app;dur=${duration}`);
 
     logger.info({
         method: c.req.method,
@@ -97,6 +103,16 @@ app.use('*', async (c, next) => {
         status: c.res.status,
         duration,
     });
+
+    if (duration > budgetMs) {
+        logger.warn({
+            method: c.req.method,
+            path: c.req.path,
+            status: c.res.status,
+            duration,
+            budgetMs,
+        }, 'Route exceeded latency budget');
+    }
 });
 
 // Routes

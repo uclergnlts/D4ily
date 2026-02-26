@@ -82,11 +82,12 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerShown: false,
+              animation: 'slide_from_right',
               contentStyle: { backgroundColor: activeScheme === 'dark' ? '#000' : '#fff' }
             }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="auth" options={{ presentation: 'modal', headerShown: false }} />
-            <Stack.Screen name="vote-source" options={{ presentation: 'modal', headerTitle: 'Duruş Oyla' }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
+            <Stack.Screen name="auth" options={{ presentation: 'modal', headerShown: false, animation: 'slide_from_bottom' }} />
+            <Stack.Screen name="vote-source" options={{ presentation: 'modal', headerTitle: 'Duruş Oyla', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="user-profile" options={{ headerShown: false }} />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
             <Stack.Screen name="podcast" options={{ headerShown: false }} />

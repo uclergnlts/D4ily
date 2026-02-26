@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueries } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, FileText, BarChart3, Menu, Map } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { digestService } from '../../src/api/services/digestService';
 import { DailyDigest, WeeklyComparison } from '../../src/types';
 import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
 import { useLatestWeekly } from '../../src/hooks/useWeekly';
 import { useThemeStore } from '../../src/store/useThemeStore';
+import { useAppStore } from '../../src/store/useAppStore';
+import { safePush } from '../../src/utils/navigation';
 
 const COUNTRIES: { code: string; name: string; flag: string }[] = [
     { code: 'tr', name: 'Türkiye', flag: '🇹🇷' },
@@ -231,6 +234,8 @@ function CountryDigestCard({
 }
 
 export default function CompareScreen() {
+    const router = useRouter();
+    const toggleSideMenu = useAppStore(state => state.toggleSideMenu);
     const activeScheme = useThemeStore(state => state.activeScheme);
     const isDark = activeScheme === 'dark';
     const [viewMode, setViewMode] = useState<ViewMode>('daily');
@@ -282,7 +287,7 @@ export default function CompareScreen() {
                 {/* Header: Menu - Title - Map */}
                 <View className="flex-row items-center justify-between mb-6 mt-2">
                     <TouchableOpacity
-                        onPress={() => import('../../src/store/useAppStore').then(m => m.useAppStore.getState().toggleSideMenu())}
+                        onPress={toggleSideMenu}
                         className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
                     >
                         <Menu size={22} color={isDark ? "#ffffff" : "#18181b"} />
@@ -293,7 +298,7 @@ export default function CompareScreen() {
                     </Text>
 
                     <TouchableOpacity
-                        onPress={() => import('expo-router').then(r => r.router.push('/(tabs)/map'))}
+                        onPress={() => safePush(router, '/(tabs)/map' as any)}
                         className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
                     >
                         <Map size={20} color={isDark ? "#ffffff" : "#18181b"} />

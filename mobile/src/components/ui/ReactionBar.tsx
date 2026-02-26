@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Heart, ThumbsDown, Bookmark, Share2 } from 'lucide-react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, SharedValue } from 'react-native-reanimated';
@@ -19,7 +19,7 @@ interface ReactionBarProps {
 
 const AnimatedButton = Animated.createAnimatedComponent(TouchableOpacity);
 
-export function ReactionBar({
+export const ReactionBar = React.memo(function ReactionBar({
     likeCount,
     dislikeCount,
     commentCount,
@@ -36,17 +36,23 @@ export function ReactionBar({
     const dislikeScale = useSharedValue(1);
     const bookmarkScale = useSharedValue(1);
 
-    const handlePress = (action: (() => void) | undefined, scaleValue: SharedValue<number>) => {
+    const handlePress = useCallback((action: (() => void) | undefined, scaleValue: SharedValue<number>) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         scaleValue.value = withSequence(
             withSpring(1.4),
             withSpring(1)
         );
         if (action) action();
-    };
+    }, []);
 
-    const useButtonAnimation = (scale: SharedValue<number>) => useAnimatedStyle(() => ({
-        transform: [{ scale: scale.value }]
+    const likeAnimStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: likeScale.value }]
+    }));
+    const dislikeAnimStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: dislikeScale.value }]
+    }));
+    const bookmarkAnimStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: bookmarkScale.value }]
     }));
 
     return (
@@ -57,7 +63,7 @@ export function ReactionBar({
                 <AnimatedButton
                     onPress={() => handlePress(onLike, likeScale)}
                     className="flex-row items-center gap-1.5 active:opacity-70"
-                    style={useButtonAnimation(likeScale)}
+                    style={likeAnimStyle}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     <Heart
@@ -75,7 +81,7 @@ export function ReactionBar({
                 <AnimatedButton
                     onPress={() => handlePress(onDislike, dislikeScale)}
                     className="flex-row items-center gap-1.5 active:opacity-70"
-                    style={useButtonAnimation(dislikeScale)}
+                    style={dislikeAnimStyle}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     <ThumbsDown
@@ -96,7 +102,7 @@ export function ReactionBar({
                 <AnimatedButton
                     onPress={() => handlePress(onBookmark, bookmarkScale)}
                     className="p-1 active:opacity-70"
-                    style={useButtonAnimation(bookmarkScale)}
+                    style={bookmarkAnimStyle}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
                     <Bookmark
@@ -124,4 +130,4 @@ export function ReactionBar({
             </View>
         </View>
     );
-}
+});

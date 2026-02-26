@@ -4,6 +4,8 @@ import { logger } from '../config/logger.js';
 import { aiChatCompletion } from '../utils/aiRequestWrapper.js';
 import { getDigestFallback } from '../utils/aiFallbacks.js';
 import type { DigestSection } from '../utils/aiFallbacks.js';
+import { processArticleWithAI } from './ai/aiService.js';
+import { findPerspectives } from './perspectivesService.js';
 import {
     tr_articles, tr_daily_digests, tr_tweets,
     de_articles, de_daily_digests, de_tweets,
@@ -14,7 +16,7 @@ import {
     it_articles, it_daily_digests, it_tweets,
     ru_articles, ru_daily_digests, ru_tweets,
 } from '../db/schema/index.js';
-import { gte, lte, eq, desc, and } from 'drizzle-orm';
+import { gte, lte, eq, desc, and, inArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 
 const COUNTRY_TABLES = {
@@ -122,6 +124,11 @@ const SUPPORTING_ARTICLE_LIMIT_WITH_TWEETS = {
     tr: 24,
     default: 18,
 } as const;
+
+const DETAIL_PREFETCH_TOPIC_LIMIT = 5;
+const DETAIL_PREFETCH_CONCURRENCY = 2;
+const PERSPECTIVE_PREFETCH_TOPIC_LIMIT = 4;
+const PERSPECTIVE_PREFETCH_CONCURRENCY = 1;
 
 const GENERIC_SUMMARY_PATTERNS: RegExp[] = [
     /bugun .*? onemli gelismeler yasandi/i,
@@ -573,6 +580,150 @@ function normalizeTopicItems(rawTopics: any[], articles: ArticleInput[]): TopicI
 
 function buildConfidenceNote(telemetry: DigestTelemetry): string {
     return `Guven notu: ${telemetry.selectedArticleCount} haber, ${telemetry.selectedTweetCount} X paylasimi ve ${telemetry.minorityIncludedCount} azinlik-perspektifli baslik analiz edildi.`;
+}
+
+function needsDetailPrefetch(article: {
+    summary: string | null;
+    detailContent: string | null;
+    originalContent: string | null;
+}): boolean {
+    const summary = normalizeText(String(article.summary || ''));
+    const detail = normalizeText(String(article.detailContent || ''));
+    const original = normalizeText(String(article.originalContent || ''));
+
+    if (!detail) return true;
+    if (!summary) return detail.length < 180;
+    if (detail === summary) return true;
+
+    const detailSentenceCount = splitSentences(detail).length;
+    if (detailSentenceCount < 2 && original.length > detail.length) return true;
+    if (detail.length < 180 && original.length > detail.length) return true;
+
+    return false;
+}
+
+async function precomputeDigestTopicDetails(
+    countryCode: CountryCode,
+    tables: (typeof COUNTRY_TABLES)[CountryCode],
+    topTopics: TopicItem[],
+): Promise<void> {
+    const topicArticleIds = Array.from(new Set(
+        topTopics
+            .map(topic => String(topic.articleId || '').trim())
+            .filter(Boolean)
+    )).slice(0, DETAIL_PREFETCH_TOPIC_LIMIT);
+
+    if (topicArticleIds.length === 0) return;
+
+    const topicArticles = await db
+        .select({
+            id: tables.articles.id,
+            translatedTitle: tables.articles.translatedTitle,
+            originalContent: tables.articles.originalContent,
+            originalLanguage: tables.articles.originalLanguage,
+            summary: tables.articles.summary,
+            detailContent: tables.articles.detailContent,
+        })
+        .from(tables.articles)
+        .where(inArray(tables.articles.id, topicArticleIds));
+
+    const toPrefetch = topicArticles.filter(needsDetailPrefetch);
+    if (toPrefetch.length === 0) return;
+
+    const queue = [...toPrefetch];
+    let updated = 0;
+    let failed = 0;
+
+    const workers = Array.from({ length: Math.min(DETAIL_PREFETCH_CONCURRENCY, queue.length) }, async () => {
+        while (queue.length > 0) {
+            const article = queue.shift();
+            if (!article) continue;
+
+            try {
+                const sourceContent = normalizeText(String(
+                    article.originalContent || article.detailContent || article.summary || article.translatedTitle
+                ));
+                const language = String(
+                    article.originalLanguage || (countryCode === 'tr' ? 'tr' : countryCode === 'de' ? 'de' : 'en')
+                );
+                const aiResult = await processArticleWithAI(article.translatedTitle, sourceContent, language);
+                const nextDetail = normalizeText(String(aiResult.detailContent || ''));
+                if (!nextDetail) continue;
+
+                const currentDetail = normalizeText(String(article.detailContent || ''));
+                if (nextDetail === currentDetail) continue;
+
+                await db
+                    .update(tables.articles)
+                    .set({ detailContent: nextDetail })
+                    .where(eq(tables.articles.id, article.id));
+                updated++;
+            } catch (error) {
+                failed++;
+                logger.warn({
+                    countryCode,
+                    articleId: article.id,
+                    error: error instanceof Error ? error.message : String(error),
+                }, 'Failed to precompute digest topic detail');
+            }
+        }
+    });
+
+    await Promise.all(workers);
+    logger.info({
+        countryCode,
+        requestedTopics: topicArticleIds.length,
+        prefetchedTopics: toPrefetch.length,
+        updated,
+        failed,
+    }, 'Digest topic detail precompute completed');
+}
+
+async function precomputeDigestTopicPerspectives(
+    countryCode: CountryCode,
+    topTopics: TopicItem[],
+): Promise<void> {
+    const topicArticleIds = Array.from(new Set(
+        topTopics
+            .map(topic => String(topic.articleId || '').trim())
+            .filter(Boolean)
+    )).slice(0, PERSPECTIVE_PREFETCH_TOPIC_LIMIT);
+
+    if (topicArticleIds.length === 0) return;
+
+    const queue = [...topicArticleIds];
+    let succeeded = 0;
+    let failed = 0;
+
+    const workers = Array.from({ length: Math.min(PERSPECTIVE_PREFETCH_CONCURRENCY, queue.length) }, async () => {
+        while (queue.length > 0) {
+            const articleId = queue.shift();
+            if (!articleId) continue;
+
+            try {
+                await findPerspectives(articleId, countryCode, {
+                    maxResults: 5,
+                    timeWindowHours: 24,
+                });
+                succeeded++;
+            } catch (error) {
+                failed++;
+                logger.warn({
+                    countryCode,
+                    articleId,
+                    error: error instanceof Error ? error.message : String(error),
+                }, 'Failed to precompute digest topic perspectives');
+            }
+        }
+    });
+
+    await Promise.all(workers);
+    logger.info({
+        countryCode,
+        requestedTopics: topicArticleIds.length,
+        succeeded,
+        failed,
+    }, 'Digest topic perspectives precompute completed');
 }
 
 function getDominantAlignmentLabel(score: number): 'muhalif' | 'iktidar' | 'merkez' | 'belirsiz' {
@@ -1203,6 +1354,26 @@ export async function generateDailyDigest(
 
         // Generate digest with AI
         const digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode, promptVariant);
+
+        // Precompute missing topic details so article screens open faster from digest headlines.
+        try {
+            await precomputeDigestTopicDetails(countryCode, tables, digestResult.topTopics);
+        } catch (error) {
+            logger.warn({
+                countryCode,
+                error: error instanceof Error ? error.message : String(error),
+            }, 'Digest topic detail precompute skipped');
+        }
+
+        // Precompute perspectives at write-time to avoid expensive read-time generation.
+        try {
+            await precomputeDigestTopicPerspectives(countryCode, digestResult.topTopics);
+        } catch (error) {
+            logger.warn({
+                countryCode,
+                error: error instanceof Error ? error.message : String(error),
+            }, 'Digest topic perspectives precompute skipped');
+        }
 
         // Format date string
         const digestDate = targetDate.toISOString().split('T')[0];
