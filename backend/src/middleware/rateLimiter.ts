@@ -1,5 +1,6 @@
 import { Context, Next } from 'hono';
 import { logger } from '../config/logger.js';
+import { getConnInfo } from '@hono/node-server/conninfo';
 
 interface RateLimitEntry {
     count: number;
@@ -43,6 +44,29 @@ interface RateLimitOptions {
     message?: string;      // Custom error message
 }
 
+function getRequestIp(c: Context): string {
+    // Prefer actual socket address from Node adapter (harder to spoof).
+    try {
+        const connInfo = getConnInfo(c as any);
+        const remoteAddress = connInfo?.remote?.address;
+        if (remoteAddress && typeof remoteAddress === 'string') {
+            return remoteAddress.trim();
+        }
+    } catch {
+        // Fallback to header-based detection below.
+    }
+
+    // Fallback for non-node adapters/tests.
+    const forwardedFor = c.req.header('x-forwarded-for') || '';
+    if (forwardedFor) {
+        // Use first address only, ignore potentially injected chain.
+        const first = forwardedFor.split(',')[0]?.trim();
+        if (first) return first;
+    }
+
+    return c.req.header('x-real-ip') || 'unknown';
+}
+
 /**
  * Rate limiting middleware for Hono
  */
@@ -53,7 +77,7 @@ export function rateLimiter(options: RateLimitOptions) {
         keyGenerator = (c) => {
             // Use IP address or user ID as key
             const user = c.get('user') as { uid?: string } | undefined;
-            const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || 'unknown';
+            const ip = getRequestIp(c);
             return user?.uid || ip;
         },
         message = 'Too many requests, please try again later',

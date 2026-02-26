@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import axios from 'axios';
 import {
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -61,14 +62,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   checkAdminStatus: async () => {
     try {
-      const response = await apiClient.get('/admin/stats');
+      const response = await apiClient.get('/admin/access');
       if (response.data.success) {
-        set({ isAdmin: true });
+        set({ isAdmin: true, error: null });
         return true;
       }
-      return false;
-    } catch {
       set({ isAdmin: false });
+      return false;
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+
+      // Backward compatibility for environments where /admin/access is not deployed yet.
+      if (status === 404) {
+        try {
+          const fallbackResponse = await apiClient.get('/admin/stats');
+          if (fallbackResponse.data.success) {
+            set({ isAdmin: true, error: null });
+            return true;
+          }
+        } catch (fallbackError) {
+          const fallbackStatus = axios.isAxiosError(fallbackError)
+            ? fallbackError.response?.status
+            : undefined;
+
+          if (fallbackStatus === 403 || fallbackStatus === 404) {
+            set({ isAdmin: false });
+            return false;
+          }
+        }
+      }
+
+      if (status === 403) {
+        set({ isAdmin: false });
+        return false;
+      }
+
+      set({ isAdmin: false, error: 'Admin durumu dogrulanamadi. Lutfen tekrar deneyin.' });
       return false;
     }
   },

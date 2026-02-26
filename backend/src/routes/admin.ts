@@ -496,6 +496,19 @@ admin.get('/cron/status', async (c) => {
 // ===========================
 
 /**
+ * GET /admin/access
+ * Lightweight endpoint to verify admin session/access
+ */
+admin.get('/access', (c) => {
+    return c.json({
+        success: true,
+        data: {
+            isAdmin: true,
+        },
+    });
+});
+
+/**
  * GET /admin/stats
  * Get dashboard statistics
  */

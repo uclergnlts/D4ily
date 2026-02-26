@@ -5,8 +5,12 @@ import { eq } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { createId } from '@paralleldrive/cuid2';
 import crypto from 'crypto';
+import { cacheGet, cacheSet } from '../config/redis.js';
 
 const webhookRoute = new Hono();
+const processedWebhookEvents = new Map<string, number>();
+const WEBHOOK_EVENT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const WEBHOOK_EVENT_PREFIX = 'webhook:revenuecat:event:';
 
 // RevenueCat webhook events
 interface RevenueCatEvent {
@@ -48,6 +52,12 @@ webhookRoute.post('/revenuecat', async (c) => {
             return c.json({ success: false, error: 'Invalid signature' }, 401);
         }
 
+        // Enforce idempotency (blocks replayed webhook events).
+        if (await isWebhookEventAlreadyProcessed(event.id)) {
+            logger.warn({ eventId: event.id }, 'Duplicate RevenueCat webhook event ignored');
+            return c.json({ success: true, duplicate: true });
+        }
+
         // Handle different event types
         switch (event.type) {
             case 'INITIAL_PURCHASE':
@@ -71,6 +81,8 @@ webhookRoute.post('/revenuecat', async (c) => {
             default:
                 logger.info({ eventType: event.type }, 'Unhandled RevenueCat event type');
         }
+
+        await markWebhookEventProcessed(event.id);
 
         return c.json({ success: true });
     } catch (error) {
@@ -107,6 +119,38 @@ function verifyWebhookSignature(rawBody: string, signature: string | undefined):
     } catch (error) {
         logger.error({ error }, 'Webhook signature verification failed');
         return false;
+    }
+}
+
+async function isWebhookEventAlreadyProcessed(eventId: string): Promise<boolean> {
+    const key = `${WEBHOOK_EVENT_PREFIX}${eventId}`;
+
+    const cached = await cacheGet<string>(key);
+    if (cached) return true;
+
+    const now = Date.now();
+    const memoryExpiry = processedWebhookEvents.get(eventId);
+    if (memoryExpiry && memoryExpiry > now) return true;
+    if (memoryExpiry && memoryExpiry <= now) {
+        processedWebhookEvents.delete(eventId);
+    }
+
+    return false;
+}
+
+async function markWebhookEventProcessed(eventId: string): Promise<void> {
+    const key = `${WEBHOOK_EVENT_PREFIX}${eventId}`;
+    await cacheSet(key, '1', WEBHOOK_EVENT_TTL_SECONDS);
+    processedWebhookEvents.set(eventId, Date.now() + (WEBHOOK_EVENT_TTL_SECONDS * 1000));
+
+    // Prevent unbounded memory use when Redis is unavailable.
+    if (processedWebhookEvents.size > 10000) {
+        const entries = Array.from(processedWebhookEvents.entries())
+            .sort((a, b) => a[1] - b[1]);
+        const removeCount = Math.floor(processedWebhookEvents.size * 0.2);
+        for (let i = 0; i < removeCount; i++) {
+            processedWebhookEvents.delete(entries[i][0]);
+        }
     }
 }
 

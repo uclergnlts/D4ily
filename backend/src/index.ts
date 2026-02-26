@@ -41,6 +41,22 @@ const opsRateLimiter = rateLimiter({
     message: 'Too many ops requests, please wait',
 });
 
+const defaultProductionOrigins = [
+    'https://d4ily.com',
+    'https://www.d4ily.com',
+    'https://admin.d4ily.com',
+];
+
+const extraConfiguredOrigins = (env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const allowedProductionOrigins = new Set([
+    ...defaultProductionOrigins,
+    ...extraConfiguredOrigins,
+]);
+
 function timingSafeEqualString(a: string, b: string): boolean {
     const aBuf = Buffer.from(a);
     const bBuf = Buffer.from(b);
@@ -76,7 +92,7 @@ async function opsAuthMiddleware(c: Context, next: Next) {
 app.use('*', cors({
     origin: (origin) => {
         if (env.NODE_ENV === 'production') {
-            return origin === 'https://admin.d4ily.com' ? origin : null;
+            return origin && allowedProductionOrigins.has(origin) ? origin : null;
         }
         return origin || '*';
     },
@@ -168,8 +184,8 @@ app.route('/webhooks', webhookRoute);
 app.route('/cii', ciiRoute);
 app.route('/feedback', feedbackRoute);
 
-// DEV-ONLY: Manual trigger endpoints (no auth required)
-if (env.NODE_ENV !== 'production') {
+// DEV-ONLY: Manual trigger endpoints (development only, never staging/production)
+if (env.NODE_ENV === 'development') {
     const { triggerDigestManually } = await import('./cron/digestCron');
     const { runScraper } = await import('./cron/scraperCron');
 

@@ -152,12 +152,12 @@ authRoute.post('/login', authRateLimiter, async (c) => {
             
             // Map Firebase error messages to user-friendly messages
             let userMessage = 'Giriş başarısız';
-            if (errorMessage.includes('EMAIL_NOT_FOUND')) {
-                userMessage = 'Bu e-posta adresi kayıtlı değil';
-            } else if (errorMessage.includes('INVALID_PASSWORD') || errorMessage.includes('INVALID_LOGIN_CREDENTIALS')) {
+            if (
+                errorMessage.includes('EMAIL_NOT_FOUND')
+                || errorMessage.includes('INVALID_PASSWORD')
+                || errorMessage.includes('INVALID_LOGIN_CREDENTIALS')
+            ) {
                 userMessage = 'E-posta veya şifre hatalı';
-            } else if (errorMessage.includes('USER_DISABLED')) {
-                userMessage = 'Bu hesap devre dışı bırakılmış';
             } else if (errorMessage.includes('TOO_MANY_ATTEMPTS')) {
                 userMessage = 'Çok fazla başarısız deneme. Lütfen daha sonra tekrar deneyin';
             }
@@ -357,7 +357,7 @@ authRoute.post('/verify-email', authMiddleware, async (c) => {
         const link = await auth.generateEmailVerificationLink(authUser.email!);
 
         // In production, send this via email service (Resend, SendGrid, etc.)
-        logger.info({ userId: authUser.uid, link }, 'Email verification link generated');
+        logger.info({ userId: authUser.uid }, 'Email verification link generated');
 
         return c.json({
             success: true,
@@ -413,20 +413,16 @@ authRoute.post('/reset-password', authRateLimiter, async (c) => {
         };
 
         if (!firebaseResponse.ok || firebaseData.error) {
-            const errorMessage = firebaseData.error?.message || 'Password reset failed';
-            
-            // Map Firebase error messages to user-friendly messages
-            let userMessage = 'Şifre sıfırlama başarısız';
-            if (errorMessage.includes('EMAIL_NOT_FOUND')) {
-                userMessage = 'Bu e-posta adresi kayıtlı değil';
-            } else if (errorMessage.includes('INVALID_EMAIL')) {
-                userMessage = 'Geçersiz e-posta adresi';
-            }
+            // Return a generic success response to prevent email enumeration.
+            logger.warn({
+                email,
+                firebaseError: firebaseData.error?.message || 'unknown',
+            }, 'Password reset requested for unknown/invalid account');
 
             return c.json({
-                success: false,
-                error: userMessage,
-            }, 400);
+                success: true,
+                message: 'Eğer hesap varsa şifre sıfırlama bağlantısı gönderildi',
+            });
         }
 
         logger.info({ email }, 'Password reset email sent');
@@ -569,3 +565,7 @@ authRoute.delete('/delete', authMiddleware, async (c) => {
 });
 
 export default authRoute;
+
+
+
+

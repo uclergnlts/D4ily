@@ -33,6 +33,7 @@ const envSchema = z.object({
     SENTRY_DSN: z.string().optional(),
     POSTHOG_API_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
+    ALLOWED_ORIGINS: z.string().optional(),
 });
 
 let env: z.infer<typeof envSchema>;

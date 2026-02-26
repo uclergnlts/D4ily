@@ -4,23 +4,31 @@ import { userFeedback } from '../db/schema/index.js';
 import { desc } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
-import { optionalAuthMiddleware, authMiddleware, AuthUser } from '../middleware/auth.js';
+import { optionalAuthMiddleware, adminMiddleware, AuthUser } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
+import { sanitizeInput } from '../utils/sanitize.js';
+import { rateLimiter } from '../middleware/rateLimiter.js';
 
 type Variables = { user: AuthUser };
 const feedbackRoute = new Hono<{ Variables: Variables }>();
 
 const feedbackSchema = z.object({
     type: z.enum(['istek', 'oneri', 'sikayet', 'genel']),
-    content: z.string().min(5, 'En az 5 karakter yazmalısın').max(2000, 'Çok uzun'),
+    content: z.string().min(5, 'En az 5 karakter yazmalisin').max(2000, 'Cok uzun'),
     email: z.string().email().optional().nullable(),
+});
+
+const feedbackRateLimiter = rateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    message: 'Cok fazla geri bildirim gonderildi. Lutfen daha sonra tekrar deneyin.',
 });
 
 /**
  * POST /feedback
- * Submit user feedback (auth optional — allows anonymous)
+ * Submit user feedback (auth optional - allows anonymous)
  */
-feedbackRoute.post('/', optionalAuthMiddleware, async (c) => {
+feedbackRoute.post('/', optionalAuthMiddleware, feedbackRateLimiter, async (c) => {
     try {
         const user = c.get('user') as AuthUser | undefined;
         const userId = user?.uid || null;
@@ -34,7 +42,7 @@ feedbackRoute.post('/', optionalAuthMiddleware, async (c) => {
                 id: uuidv4(),
                 userId,
                 type: validated.type,
-                content: validated.content,
+                content: sanitizeInput(validated.content),
                 email: validated.email || null,
                 status: 'new',
                 createdAt: new Date(),
@@ -52,7 +60,7 @@ feedbackRoute.post('/', optionalAuthMiddleware, async (c) => {
         logger.error({ error }, 'Submit feedback failed');
         return c.json({
             success: false,
-            error: error instanceof Error ? error.message : 'Geri bildirim gönderilemedi',
+            error: error instanceof Error ? error.message : 'Geri bildirim gonderilemedi',
         }, 400);
     }
 });
@@ -61,13 +69,8 @@ feedbackRoute.post('/', optionalAuthMiddleware, async (c) => {
  * GET /feedback
  * List all feedback (admin only)
  */
-feedbackRoute.get('/', authMiddleware, async (c) => {
+feedbackRoute.get('/', adminMiddleware, async (c) => {
     try {
-        const user = c.get('user') as AuthUser;
-        if (user.userRole !== 'admin') {
-            return c.json({ success: false, error: 'Forbidden' }, 403);
-        }
-
         const page = parseInt(c.req.query('page') ?? '1', 10);
         const limit = Math.min(parseInt(c.req.query('limit') ?? '50', 10), 100);
         const offset = (page - 1) * limit;

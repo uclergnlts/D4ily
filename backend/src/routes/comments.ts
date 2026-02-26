@@ -6,6 +6,7 @@ import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
+import { sanitizeInput } from '../utils/sanitize.js';
 
 type Variables = {
     user: AuthUser;
@@ -135,6 +136,14 @@ commentsRoute.post('/:country', authMiddleware, async (c) => {
 
         const body = await c.req.json();
         const validatedData = createCommentSchema.parse(body);
+        const sanitizedContent = sanitizeInput(validatedData.content);
+
+        if (!sanitizedContent) {
+            return c.json({
+                success: false,
+                error: 'Comment content is required',
+            }, 400);
+        }
 
         const newComment = await db
             .insert(comments)
@@ -144,7 +153,7 @@ commentsRoute.post('/:country', authMiddleware, async (c) => {
                 targetId: validatedData.articleId,
                 countryCode: validatedCountry,
                 userId: user.uid, // Get from authenticated user
-                content: validatedData.content,
+                content: sanitizedContent,
                 parentCommentId: validatedData.parentCommentId ?? null,
                 likeCount: 0,
                 createdAt: new Date(),
@@ -182,6 +191,14 @@ commentsRoute.patch('/:country/:commentId', authMiddleware, async (c) => {
         const { content } = z.object({
             content: z.string().min(1, 'Comment content is required').max(1000, 'Comment too long'),
         }).parse(body);
+        const sanitizedContent = sanitizeInput(content);
+
+        if (!sanitizedContent) {
+            return c.json({
+                success: false,
+                error: 'Comment content is required',
+            }, 400);
+        }
 
         // Check if comment exists and belongs to user
         const existingComment = await db
@@ -219,7 +236,7 @@ commentsRoute.patch('/:country/:commentId', authMiddleware, async (c) => {
         const updatedComment = await db
             .update(comments)
             .set({
-                content,
+                content: sanitizedContent,
                 updatedAt: new Date(),
             })
             .where(eq(comments.id, commentId))
