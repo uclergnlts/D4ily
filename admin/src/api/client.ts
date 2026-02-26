@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { auth } from '../config/firebase';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3333';
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim();
+const API_BASE_URL = rawApiUrl
+  ? (/^https?:\/\//i.test(rawApiUrl) ? rawApiUrl : `https://${rawApiUrl}`)
+  : 'http://localhost:3333';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

@@ -42,7 +42,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const isAdmin = await get().checkAdminStatus();
       if (!isAdmin) {
         await firebaseSignOut(auth);
-        set({ user: null, isAdmin: false, error: 'Access denied. Admin privileges required.' });
+        const currentError = get().error;
+        set({
+          user: null,
+          isAdmin: false,
+          error: currentError || 'Access denied. Admin privileges required.',
+        });
       }
     } catch (error) {
       set({ error: (error as Error).message });
@@ -97,7 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return false;
       }
 
-      set({ isAdmin: false, error: 'Admin durumu dogrulanamadi. Lutfen tekrar deneyin.' });
+      set({ isAdmin: false, error: 'Admin API baglantisi basarisiz. VITE_API_URL degerini kontrol edin.' });
       return false;
     }
   },
