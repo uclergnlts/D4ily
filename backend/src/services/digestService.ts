@@ -40,6 +40,26 @@ const CATEGORY_NAMES: Record<number, string> = {
 type CountryCode = keyof typeof COUNTRY_TABLES;
 type LegacyPeriod = 'morning' | 'evening';
 type Period = 'daily';
+const DIGEST_TIMEZONE = 'Europe/Istanbul';
+
+function toDateParts(date: Date, timeZone: string): { year: string; month: string; day: string } {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date);
+
+    const year = parts.find((part) => part.type === 'year')?.value || '';
+    const month = parts.find((part) => part.type === 'month')?.value || '';
+    const day = parts.find((part) => part.type === 'day')?.value || '';
+    return { year, month, day };
+}
+
+export function getDigestDateString(date: Date = new Date()): string {
+    const { year, month, day } = toDateParts(date, DIGEST_TIMEZONE);
+    return `${year}-${month}-${day}`;
+}
 
 interface TopicItem {
     title: string;
@@ -1376,7 +1396,7 @@ export async function generateDailyDigest(
         }
 
         // Format date string
-        const digestDate = targetDate.toISOString().split('T')[0];
+        const digestDate = getDigestDateString(targetDate);
 
         // Check if digest already exists
         const existing = await db
@@ -1422,10 +1442,23 @@ export async function generateDailyDigest(
 export async function getLatestDigest(countryCode: CountryCode) {
     const tables = COUNTRY_TABLES[countryCode];
 
+    const todayDigestDate = getDigestDateString(new Date());
+    const todayDigest = await db
+        .select()
+        .from(tables.digests)
+        .where(eq(tables.digests.digestDate, todayDigestDate))
+        .orderBy(desc(tables.digests.createdAt))
+        .limit(1)
+        .get();
+
+    if (todayDigest) {
+        return todayDigest;
+    }
+
     const digest = await db
         .select()
         .from(tables.digests)
-        .orderBy(desc(tables.digests.createdAt))
+        .orderBy(desc(tables.digests.digestDate), desc(tables.digests.createdAt))
         .limit(1)
         .get();
 

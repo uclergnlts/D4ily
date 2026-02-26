@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
+import { formatDigestDate } from '../../utils/digestDate';
 
 interface DigestHeaderProps {
     title: string;
@@ -9,10 +10,7 @@ interface DigestHeaderProps {
 }
 
 export const DigestHeader = React.memo(function DigestHeader({ title, date, summary, className }: DigestHeaderProps) {
-    const dateObj = new Date(date);
-    const formattedDate = !isNaN(dateObj.getTime())
-        ? dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' })
-        : date;
+    const formattedDate = formatDigestDate(date, { day: 'numeric', month: 'long', weekday: 'long' });
 
     const periodLabel = 'GÜNLÜK ÖZET';
 

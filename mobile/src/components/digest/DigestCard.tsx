@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { ArrowRight } from 'lucide-react-native';
+import { formatDigestDate } from '../../utils/digestDate';
 
 interface DigestCardProps {
     title: string;
@@ -14,9 +15,8 @@ interface DigestCardProps {
 
 export const DigestCard = React.memo(({ title, summary, date, onPress, disabled, isFeatured = false, isNew = false }: DigestCardProps) => {
     // Parse date to get day name (e.g., "Perşembe")
-    const dateObj = new Date(date);
-    const dayName = dateObj.toLocaleDateString('tr-TR', { weekday: 'long' });
-    const formattedDate = dateObj.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
+    const dayName = formatDigestDate(date, { weekday: 'long' });
+    const formattedDate = formatDigestDate(date, { day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
         <TouchableOpacity

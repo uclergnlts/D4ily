@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native/pure';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ArticleCard } from '../src/components/article/ArticleCard';
 import { Article } from '../src/types';
+import { feedService } from '../src/api/services/feedService';
 
 const mockArticle: Article = {
     id: '1',
@@ -28,11 +29,18 @@ const mockArticle: Article = {
 };
 
 describe('ArticleCard', () => {
+    afterEach(() => {
+        jest.restoreAllMocks();
+    });
+
     it('renders correctly', () => {
+        jest.spyOn(feedService, 'getArticle').mockResolvedValue(mockArticle);
+
         const queryClient = new QueryClient({
             defaultOptions: {
                 queries: {
                     retry: false,
+                    gcTime: Infinity,
                 },
             },
         });

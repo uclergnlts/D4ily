@@ -15,7 +15,7 @@ import {
 import { eq, and, desc, isNull, gte, sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
-import { getLatestDigest, getDigestByDateAndPeriod } from '../services/digestService.js';
+import { generateDailyDigest, getLatestDigest, getDigestByDateAndPeriod, getDigestDateString } from '../services/digestService.js';
 import { safeJsonParse } from '../utils/json.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -39,9 +39,12 @@ const COUNTRY_TABLES = {
 
 // Generate title from date
 function generateTitle(digest: { period: string; digestDate: string }): string {
-    const date = new Date(digest.digestDate);
+    const [year, month, day] = String(digest.digestDate).split('-').map(Number);
+    const date = Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)
+        ? new Date(Date.UTC(year, month - 1, day, 12, 0, 0))
+        : new Date(digest.digestDate);
     const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
-    const formattedDate = date.toLocaleDateString('tr-TR', options);
+    const formattedDate = date.toLocaleDateString('tr-TR', { ...options, timeZone: 'Europe/Istanbul' });
     return `${formattedDate} Günlük Özet`;
 }
 
@@ -133,7 +136,7 @@ digestRoute.get('/locations', async (c) => {
                 })
                 .from(table)
                 .where(gte(table.digestDate, cutoffStr))
-                .orderBy(desc(table.createdAt));
+                .orderBy(desc(table.digestDate), desc(table.createdAt));
 
             const allTopics: { title: string; description: string; date: string; period: string }[] = [];
             for (const digest of digests) {
@@ -179,7 +182,26 @@ digestRoute.get('/:country/latest', async (c) => {
         const { country } = c.req.param();
         const validatedCountry = countrySchema.parse(country) as 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 
-        const digest = await getLatestDigest(validatedCountry);
+        const todayDigestDate = getDigestDateString(new Date());
+        let digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
+
+        if (!digest) {
+            logger.info({ country: validatedCountry, digestDate: todayDigestDate }, 'No digest for today, generating on demand');
+            const generated = await generateDailyDigest(validatedCountry, 'daily', new Date());
+            if (generated.success) {
+                digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
+            } else {
+                logger.warn({
+                    country: validatedCountry,
+                    digestDate: todayDigestDate,
+                    error: generated.error,
+                }, 'On-demand digest generation failed, falling back to latest available');
+            }
+        }
+
+        if (!digest) {
+            digest = await getLatestDigest(validatedCountry);
+        }
 
         if (!digest) {
             return c.json({
@@ -220,7 +242,7 @@ digestRoute.get('/:country', async (c) => {
             const digests = await db
                 .select()
                 .from(table)
-                .orderBy(desc(table.createdAt))
+                .orderBy(desc(table.digestDate), desc(table.createdAt))
                 .limit(10);
 
             return c.json({

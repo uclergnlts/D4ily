@@ -38,6 +38,11 @@ vi.mock('@/services/digestService.js', () => ({
         articleCount: 10,
         createdAt: new Date(),
     }),
+    generateDailyDigest: vi.fn().mockResolvedValue({
+        id: 'digest-1',
+        success: true,
+    }),
+    getDigestDateString: vi.fn().mockReturnValue('2026-01-22'),
     getDigestByDateAndPeriod: vi.fn().mockResolvedValue({
         id: 'digest-1',
         countryCode: 'tr',
