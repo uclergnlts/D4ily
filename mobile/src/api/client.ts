@@ -35,10 +35,27 @@ function sanitizeValue(value: unknown): unknown {
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Retry logic for timeout and network errors
+const MAX_RETRIES = 1;
+const RETRY_DELAY = 1000;
+
+apiClient.interceptors.response.use(undefined, async (error) => {
+  const config = error.config;
+  if (!config || config.__retryCount >= MAX_RETRIES) return Promise.reject(error);
+
+  const shouldRetry = error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK';
+  if (!shouldRetry) return Promise.reject(error);
+
+  config.__retryCount = (config.__retryCount || 0) + 1;
+  console.warn(`[API] Retrying request (${config.__retryCount}/${MAX_RETRIES}): ${config.url}`);
+  await new Promise((r) => setTimeout(r, RETRY_DELAY));
+  return apiClient(config);
 });
 
 // Request interceptor - Add auth token
