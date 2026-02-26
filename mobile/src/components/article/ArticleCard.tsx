@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { View, Text } from 'react-native';
 import { Image } from 'expo-image';
 import { Article } from '../../types';
@@ -6,9 +6,6 @@ import { useRouter } from 'expo-router';
 import { MotiPressable } from 'moti/interactions';
 import * as Haptics from 'expo-haptics';
 import { safePush } from '../../utils/navigation';
-import { useQueryClient } from '@tanstack/react-query';
-import { feedService } from '../../api/services/feedService';
-import { useAppStore } from '../../store/useAppStore';
 
 import { TimeAgo } from '../ui/TimeAgo';
 import { Eye, MessageCircle, Bookmark, Share2 } from 'lucide-react-native';
@@ -21,17 +18,6 @@ export const ArticleCard = React.memo(function ArticleCard({ article }: ArticleC
     const primarySource = article.sources?.find(s => s.isPrimary) || article.sources?.[0];
     const sourceName = primarySource?.sourceName || article.source || 'Kaynak';
     const router = useRouter();
-    const queryClient = useQueryClient();
-    const selectedCountry = useAppStore(s => s.selectedCountry);
-
-    // Prefetch article detail when the card renders — instant open on tap
-    useEffect(() => {
-        queryClient.prefetchQuery({
-            queryKey: ['article', selectedCountry, article.id],
-            queryFn: () => feedService.getArticle(selectedCountry, article.id),
-            staleTime: 1000 * 60 * 30, // 30 min
-        });
-    }, [article.id, selectedCountry]);
 
     // Fallback Logo Map
     const SOURCE_LOGOS: Record<string, string> = {
