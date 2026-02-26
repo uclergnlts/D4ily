@@ -139,10 +139,10 @@ export async function adminMiddleware(c: Context, next: Next) {
         }
 
         if (user.userRole !== 'admin') {
-            logger.warn({ userId: decodedToken.uid }, 'Non-admin user attempted admin action');
+            logger.warn({ userId: decodedToken.uid, email: user.email }, 'Non-admin user attempted admin action');
             return c.json({
                 success: false,
-                error: 'Forbidden: Admin access required',
+                error: `User ${user.email} does not have admin privileges. Run 'npm run db:make-admin ${user.email}' in the backend to grant admin access.`,
             }, 403);
         }
 

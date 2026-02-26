@@ -98,11 +98,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (status === 403) {
-        set({ isAdmin: false });
+        const errorMessage = axios.isAxiosError(error) && error.response?.data?.error
+          ? error.response.data.error
+          : 'Access denied. Admin privileges required.';
+        set({ isAdmin: false, error: errorMessage });
         return false;
       }
 
-      set({ isAdmin: false, error: 'Admin API baglantisi basarisiz. VITE_API_URL degerini kontrol edin.' });
+      set({ isAdmin: false, error: 'Admin API connection failed. Check VITE_API_URL value.' });
       return false;
     }
   },
