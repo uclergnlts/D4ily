@@ -47,7 +47,9 @@
     "zod": "^3.22.0",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^20.10.0",
-    "@types/xml2js": "^0.4.14"
+    "@types/node-cron": "^3.0.11",
+    "@types/xml2js": "^0.4.14",
+    "@paralleldrive/cuid2": "^2.2.2"
   },
   "overrides": {
     "axios": "^1.13.5",
