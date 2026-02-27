@@ -31,6 +31,6 @@ export const cronService = {
     if (!response.data.success) {
       throw new Error(response.data.error || 'Failed to run scraper');
     }
-    return { message: (response.data as any).message || 'Scraper started' };
+    return { message: response.data.data?.message || 'Scraper started' };
   },
 };

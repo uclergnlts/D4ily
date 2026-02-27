@@ -274,7 +274,7 @@ export interface NotificationEntry {
   type: string;
   title: string;
   body: string;
-  data: any;
+  data: Record<string, unknown>;
   isRead: boolean;
   sentAt: string;
 }

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { digestService } from '../api/services/digestService';
-import type { CountryCode } from '../types';
+import type { CountryCode, DigestTopic, DigestSection } from '../types';
 import toast from 'react-hot-toast';
 
 export function useDigestQuality(country: CountryCode, days: number) {
@@ -28,7 +28,7 @@ export function useDigestById(country: CountryCode, digestId?: string) {
 export function useUpdateDigest() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ country, digestId, data }: { country: CountryCode; digestId: string; data: { summaryText?: string; topTopics?: any[]; sections?: any[] } }) =>
+    mutationFn: ({ country, digestId, data }: { country: CountryCode; digestId: string; data: { summaryText?: string; topTopics?: DigestTopic[]; sections?: DigestSection[] } }) =>
       digestService.updateDigest(country, digestId, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['digests'] });
