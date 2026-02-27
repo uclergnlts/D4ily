@@ -88,6 +88,12 @@ async function opsAuthMiddleware(c: Context, next: Next) {
     await next();
 }
 
+// UTF-8 Encoding Middleware
+app.use('*', async (c, next) => {
+    c.header('Content-Type', 'application/json; charset=utf-8');
+    await next();
+});
+
 // CORS Middleware
 app.use('*', cors({
     origin: (origin) => {

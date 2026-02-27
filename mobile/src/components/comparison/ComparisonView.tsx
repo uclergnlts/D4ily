@@ -1,32 +1,83 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Modal, Image } from 'react-native';
 import { Scale, ArrowLeftRight, TrendingUp, ChevronRight, Zap, Search, Lock, Crown } from 'lucide-react-native';
 import { usePremium } from '../../hooks/usePremium';
 
-const ComparisonCard = ({ topic, source1, source2, diffScore }: any) => (
-    <TouchableOpacity className="bg-white dark:bg-zinc-900 w-72 rounded-2xl p-4 mr-4 border border-zinc-100 dark:border-zinc-800 shadow-sm">
-        <View className="flex-row items-center justify-between mb-3">
-            <View className="bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded-md">
-                <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-500">GÜNDEM</Text>
+// Source logo mapping
+const SOURCE_LOGOS: Record<string, string> = {
+    'CNN Türk': 'https://logo.clearbit.com/cnnturk.com',
+    'Fox Haber': 'https://logo.clearbit.com/fox.com.tr',
+    'Sabah': 'https://logo.clearbit.com/sabah.com.tr',
+    'Cumhuriyet': 'https://logo.clearbit.com/cumhuriyet.com.tr',
+    'HaberGlobal': 'https://logo.clearbit.com/haberglobal.com.tr',
+    'Sözcü': 'https://logo.clearbit.com/sozcu.com.tr',
+    'Hürriyet': 'https://logo.clearbit.com/hurriyet.com.tr',
+    'Milliyet': 'https://logo.clearbit.com/milliyet.com.tr',
+    'TRT Haber': 'https://logo.clearbit.com/trthaber.com',
+    'Anadolu Ajansı': 'https://logo.clearbit.com/aa.com.tr',
+    'DHA': 'https://logo.clearbit.com/dha.com.tr',
+    'İHA': 'https://logo.clearbit.com/iha.com.tr',
+    'A Haber': 'https://logo.clearbit.com/ahaber.com.tr',
+    'NTV': 'https://logo.clearbit.com(ntv.com.tr',
+    'Bloomberg HT': 'https://logo.clearbit.com(bloomberght.com',
+    'HaberTürk': 'https://logo.clearbit.com(haberturk.com',
+};
+
+const getSourceLogo = (sourceName: string): string => {
+    // Direct match
+    if (SOURCE_LOGOS[sourceName]) {
+        return SOURCE_LOGOS[sourceName];
+    }
+
+    // Partial match
+    for (const [key, url] of Object.entries(SOURCE_LOGOS)) {
+        if (sourceName.toLowerCase().includes(key.toLowerCase()) ||
+            key.toLowerCase().includes(sourceName.toLowerCase())) {
+            return url;
+        }
+    }
+
+    // Fallback to initials
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(sourceName.substring(0, 2))}&background=random&color=fff&size=64`;
+};
+
+const ComparisonCard = ({ topic, source1, source2, diffScore }: any) => {
+    const logo1 = getSourceLogo(source1);
+    const logo2 = getSourceLogo(source2);
+
+    return (
+        <TouchableOpacity className="bg-white dark:bg-zinc-900 w-72 rounded-2xl p-4 mr-4 border border-zinc-100 dark:border-zinc-800 shadow-sm">
+            <View className="flex-row items-center justify-between mb-3">
+                <View className="bg-amber-100 dark:bg-amber-900/30 px-2 py-1 rounded-md">
+                    <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-500">GÜNDEM</Text>
+                </View>
+                <Text className="text-xs font-bold text-zinc-400">{diffScore}% Fark</Text>
             </View>
-            <Text className="text-xs font-bold text-zinc-400">{diffScore}% Fark</Text>
-        </View>
-        <Text className="text-lg font-bold text-zinc-900 dark:text-white mb-4 leading-6" numberOfLines={2}>
-            {topic}
-        </Text>
-        <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center">
-                <View className="w-6 h-6 bg-red-100 rounded-full mr-2 items-center justify-center"><Text className="text-[10px] font-bold">CN</Text></View>
-                <Text className="text-xs text-zinc-500 font-medium">{source1}</Text>
+            <Text className="text-lg font-bold text-zinc-900 dark:text-white mb-4 leading-6" numberOfLines={2}>
+                {topic}
+            </Text>
+            <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center">
+                    <Image
+                        source={{ uri: logo1 }}
+                        className="w-6 h-6 rounded-full mr-2"
+                        resizeMode="cover"
+                    />
+                    <Text className="text-xs text-zinc-500 font-medium">{source1}</Text>
+                </View>
+                <ArrowLeftRight size={14} color="#a1a1aa" />
+                <View className="flex-row items-center">
+                    <Text className="text-xs text-zinc-500 font-medium mr-2">{source2}</Text>
+                    <Image
+                        source={{ uri: logo2 }}
+                        className="w-6 h-6 rounded-full"
+                        resizeMode="cover"
+                    />
+                </View>
             </View>
-            <ArrowLeftRight size={14} color="#a1a1aa" />
-            <View className="flex-row items-center">
-                <Text className="text-xs text-zinc-500 font-medium mr-2">{source2}</Text>
-                <View className="w-6 h-6 bg-blue-100 rounded-full items-center justify-center"><Text className="text-[10px] font-bold">FX</Text></View>
-            </View>
-        </View>
-    </TouchableOpacity>
-);
+        </TouchableOpacity>
+    );
+};
 
 const ToolCard = ({ icon: Icon, title, desc, color }: any) => (
     <TouchableOpacity className="bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-100 dark:border-zinc-800 mb-3 flex-row items-center active:bg-zinc-50 dark:active:bg-zinc-800">
