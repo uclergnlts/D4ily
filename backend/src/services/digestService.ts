@@ -899,7 +899,44 @@ async function generateDefaultDigestWithAI(
         ? articles.map((a, i) => `${i + 1}. [Kaynak:${a.sourceCount}] [Onem:${Math.round((a.importanceScore || 0) * 100)}] [Belirsizlik:${a.uncertaintyLevel || 'Muhtemel'}] [${a.alignmentSummary || 'Etiket:belirsiz'}] ${a.translatedTitle}: ${a.summary}`).join('\n')
         : '(Haber verisi yok)';
 
-    const prompt = `${sourceStats} ile ${periodLabel} bulteni olustur.\n${narrativeStyle}\n\n=== X (Twitter) - Birincil Kaynak ===\n${tweetBlock}\n\n=== Haber Siteleri - Destekleyici ===\n${articleBlock}\n\nJSON:\n{\n  \"summary\": \"4-6 cumle, 120-170 kelime\",\n  \"top_topics\": [{\n    \"title\": \"...\",\n    \"description\": \"...\",\n    \"why_important\": \"...\",\n    \"uncertainty_level\": \"Kesin|Muhtemel|Gelisiyor\",\n    \"counter_narrative\": \"...\",\n    \"timeline\": { \"before\": \"...\", \"now\": \"...\", \"next\": \"...\" },\n    \"importance_score\": 0.74\n  }]\n}\n\nKurallar:\n- Yorum yapma, sadece olgu yaz.\n- summary icinde en az 2 tweet alintisi ver.\n- Dusuk kaynakli 1-2 haberi de dahil et.\n\nSadece JSON.`;
+    const prompt = `${sourceStats} ile ${periodLabel} bulteni olustur.
+
+${narrativeStyle}
+
+=== X (Twitter) - Birincil Kaynak ===
+${tweetBlock}
+
+=== Haber Siteleri - Destekleyici ===
+${articleBlock}
+
+JSON uret:
+1. summary (4-6 madde, her madde tam cumle, 200-300 kelime toplam):
+   YASAK KALIPLAR — bunlari kesinlikle kullanma:
+   ✗ "Bugun onemli gelismeler yasandi"
+   ✗ "Gundem yogun gecti"
+   ✗ "Dikkat cekici gelismeler"
+   ✗ "...one cikiyor/one cikti"
+   ✗ "...dikkat cekti/dikkat cekiyor"
+   ✗ "...gundemde yer aldi/gundemde"
+   ✗ "...yanki buldu/yanki uyandirdi"
+   ✗ Cumleleri yarida kesme
+
+   DOGRU YAZIM:
+   ✓ Her madde tam ve eksiksiz bir cumle olsun
+   ✓ Her madde dogrudan bir olayla baslasin: "• [Isim] [ne yapti/ne acikladi]."
+   ✓ Ornek: "Dışişleri Bakanı Fidan, Gazze Yönetim Baskan'ini Ankara'da kabul etti."
+   ✓ Her cumle yeni bir bilgi versin. Yorum veya degerlendirme ekleme, sadece olgu.
+   ✓ Cumleleri nokta ile bitir, virgul veya tire ile kesme
+   ✓ Her madde ayri bir paragraf olsun
+
+2. top_topics (3-5 konu):
+   - title: Tam cumle, nokta ile bitir
+   - description: 15-25 kelime, tam cumle, nokta ile bitir
+   - Turkce karakterleri dogru kullan (ş, İ, ğ, ö, ü, ç)
+
+{ "summary": "• Madde 1.\\n• Madde 2.\\n• Madde 3.", "top_topics": [{ "title": "...", "description": "..." }] }
+
+Sadece JSON.`;
 
     const result = await aiChatCompletion<any>(
         {
@@ -993,7 +1030,46 @@ async function generateTRDigestWithAI(
         })
         .join('\n\n') || '(Haber verisi yok)';
 
-    const prompt = `${tweets.length} tweet ve ${articles.length} haber ile Turkiye gunluk bulteni olustur.\n${narrativeStyle}\n\n=== X (Twitter) - Birincil Kaynak ===\n${tweetBlock}\n\n=== Haber Siteleri - Destekleyici ===\n${categoryBlocks}\n\nJSON:\n{\n  \"summary\": \"4-6 cumle, 120-170 kelime\",\n  \"sections\": [{\n    \"category\": \"Kategori\",\n    \"icon\": \"emoji\",\n    \"summary\": \"En az 80 kelime\",\n    \"highlights\": [\"...\"],\n    \"counterNarrative\": \"...\",\n    \"uncertaintyLevel\": \"Muhtemel\",\n    \"timeline\": { \"before\": \"...\", \"now\": \"...\", \"next\": \"...\" },\n    \"importanceScore\": 0.8,\n    \"tweetContext\": \"...\",\n    \"tweets\": [{ \"author\": \"...\", \"handle\": \"@...\", \"text\": \"...\" }]\n  }],\n  \"top_topics\": [{\n    \"title\": \"...\",\n    \"description\": \"...\",\n    \"why_important\": \"...\",\n    \"uncertainty_level\": \"Kesin|Muhtemel|Gelisiyor\",\n    \"counter_narrative\": \"...\",\n    \"timeline\": { \"before\": \"...\", \"now\": \"...\", \"next\": \"...\" },\n    \"importance_score\": 0.8\n  }]\n}\n\nKurallar:\n- summary icinde en az 3 tweet alintisi ver.\n- yuksek kaynakli haberleri omurga yap.\n- dusuk kaynakli 1-2 haberi mutlaka ekle.\n\nSadece JSON.`;
+    const prompt = `${tweets.length} tweet ve ${articles.length} haber ile Turkiye gunluk bulteni olustur.
+
+${narrativeStyle}
+
+=== X (Twitter) - Birincil Kaynak ===
+${tweetBlock}
+
+=== Haber Siteleri - Destekleyici ===
+${categoryBlocks}
+
+JSON uret:
+1. summary (4-6 madde, her madde tam cumle, 200-300 kelime toplam):
+   YASAK KALIPLAR — bunlari kesinlikle kullanma:
+   ✗ "Bugun onemli gelismeler yasandi"
+   ✗ "Gundem yogun gecti"
+   ✗ "Dikkat cekici gelismeler"
+   ✗ "...one cikiyor/one cikti"
+   ✗ "...dikkat cekti/dikkat cekiyor"
+   ✗ "...gundemde yer aldi/gundemde"
+   ✗ "...yanki buldu/yanki uyandirdi"
+   ✗ Cumleleri yarida kesme
+
+   DOGRU YAZIM:
+   ✓ Her madde tam ve eksiksiz bir cumle olsun
+   ✓ Her madde dogrudan bir olayla baslasin: "• [Isim] [ne yapti/ne acikladi]."
+   ✓ Ornek: "Dışişleri Bakanı Fidan, Gazze Yönetim Baskan'ini Ankara'da kabul etti."
+   ✓ Her cumle yeni bir bilgi versin. Yorum veya degerlendirme ekleme, sadece olgu.
+   ✓ Cumleleri nokta ile bitir, virgul veya tire ile kesme
+   ✓ Her madde ayri bir paragraf olsun
+
+2. sections (Kategorilere gore bolumler):
+   - summary: En az 80 kelime
+   - highlights: 3-5 anahtar nokta
+
+3. top_topics (3-5 konu):
+   - title: Tam cumle, nokta ile bitir
+   - description: 15-25 kelime, tam cumle, nokta ile bitir
+   - Turkce karakterleri dogru kullan (ş, İ, ğ, ö, ü, ç)
+
+Sadece JSON.`;
 
     const result = await aiChatCompletion<any>(
         {
@@ -1507,5 +1583,3 @@ export async function generateAllDigests(_period: Period | LegacyPeriod = 'daily
 
     return results;
 }
-
-

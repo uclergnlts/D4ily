@@ -8,7 +8,7 @@ const API_BASE_URL = rawApiUrl
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 120000, // Increased to 120s for long-running operations like digest generation
   headers: {
     'Content-Type': 'application/json',
   },

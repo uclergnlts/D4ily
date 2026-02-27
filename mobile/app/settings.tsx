@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, ScrollView, Switch, Alert } from 'react-n
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { safeBack } from '../src/utils/navigation';
-import { ChevronLeft, Bell, Moon, Shield, FileText, Mail, ChevronRight, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Bell, Moon, Shield, FileText, Mail, ChevronRight, Sparkles, ExternalLink } from 'lucide-react-native';
+import { Linking } from 'react-native';
 
 import { useThemeStore } from '../src/store/useThemeStore';
 
@@ -78,6 +79,19 @@ export default function SettingsScreen() {
         setMode(mode === 'dark' ? 'light' : 'dark');
     };
 
+    const openURL = async (url: string) => {
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert('Hata', 'Bu bağlantı açılamıyor.');
+            }
+        } catch (error) {
+            Alert.alert('Hata', 'Bağlantı açılırken bir sorun oluştu.');
+        }
+    };
+
     return (
         <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark" edges={['top']}>
             {/* Header */}
@@ -128,20 +142,20 @@ export default function SettingsScreen() {
                     <SettingsItem
                         icon={Shield}
                         label="Gizlilik Politikası"
-                        onPress={() => { }}
+                        onPress={() => openURL('https://d4ily.com/privacy')}
                         color="#10B981"
                         isFirst={true}
                     />
                     <SettingsItem
                         icon={FileText}
                         label="Kullanım Koşulları"
-                        onPress={() => { }}
+                        onPress={() => openURL('https://d4ily.com/terms')}
                         color="#FBBF24"
                     />
                     <SettingsItem
                         icon={Mail}
                         label="İletişim"
-                        onPress={() => Alert.alert('İletişim', 'destek@d4ily.com')}
+                        onPress={() => openURL('mailto:destek@d4ily.com')}
                         color="#0A66C2"
                         isLast={true}
                     />

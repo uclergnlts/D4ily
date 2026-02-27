@@ -35,10 +35,12 @@ function sanitizeValue(value: unknown): unknown {
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 120000,
   headers: {
-    'Content-Type': 'application/json',
+    'Content-Type': 'application/json; charset=utf-8',
+    'Accept': 'application/json; charset=utf-8',
   },
+  responseType: 'json',
 });
 
 // Retry logic for timeout and network errors

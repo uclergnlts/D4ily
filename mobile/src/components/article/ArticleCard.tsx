@@ -52,7 +52,7 @@ export const ArticleCard = React.memo(function ArticleCard({ article }: ArticleC
                 stiffness: 400,
                 damping: 25,
             }}
-            {...({ className: "bg-surface-light-elevated dark:bg-surface-dark-elevated mx-4 mb-4 p-4 rounded-3xl shadow-sm shadow-zinc-200/50 dark:shadow-none border border-border-light dark:border-border-dark" } as any)}
+            {...({ className: "bg-white dark:bg-zinc-900 mx-4 mb-4 p-4 rounded-3xl shadow-sm shadow-zinc-200/50 dark:shadow-none border border-zinc-200 dark:border-zinc-800" } as any)}
         >
             <View className="flex-row gap-4">
                 <View className="flex-1">

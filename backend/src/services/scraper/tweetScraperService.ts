@@ -75,7 +75,7 @@ async function fetchWithRetry(url: string, retries = MAX_RETRIES): Promise<Respo
 async function fetchUserTweets(userName: string): Promise<TwitterApiTweet[]> {
     const url = `${TWITTER_API_BASE}/twitter/user/last_tweets?userName=${encodeURIComponent(userName)}`;
     const response = await fetchWithRetry(url);
-    const raw: TwitterApiResponse = await response.json();
+    const raw = await response.json() as TwitterApiResponse;
 
     if (raw.status !== 'success') {
         logger.warn({ userName, status: raw.status }, 'Twitter API returned non-success');

@@ -17,9 +17,50 @@ export default function AuthScreen() {
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
+    const [emailError, setEmailError] = useState('');
+    const [passwordError, setPasswordError] = useState('');
 
     const login = useAuthStore(state => state.login);
     const router = useRouter();
+
+    // Email validation
+    const validateEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        return emailRegex.test(email);
+    };
+
+    // Password strength calculation
+    const getPasswordStrength = (password: string): { strength: number; label: string; color: string } => {
+        let strength = 0;
+        if (password.length >= 8) strength += 1;
+        if (password.length >= 12) strength += 1;
+        if (/[A-Z]/.test(password)) strength += 1;
+        if (/[a-z]/.test(password)) strength += 1;
+        if (/[0-9]/.test(password)) strength += 1;
+        if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+
+        if (strength <= 2) return { strength, label: 'Zayıf', color: '#ef4444' };
+        if (strength <= 4) return { strength, label: 'Orta', color: '#f59e0b' };
+        return { strength, label: 'Güçlü', color: '#22c55e' };
+    };
+
+    const handleEmailChange = (text: string) => {
+        setEmail(text);
+        if (text && !validateEmail(text)) {
+            setEmailError('Geçerli bir e-posta adresi girin');
+        } else {
+            setEmailError('');
+        }
+    };
+
+    const handlePasswordChange = (text: string) => {
+        setPassword(text);
+        if (!isLogin && text.length < 8) {
+            setPasswordError('Şifre en az 8 karakter olmalı');
+        } else {
+            setPasswordError('');
+        }
+    };
 
     const handleSubmit = async () => {
         if (!email || !password || (!isLogin && !name)) {
@@ -27,7 +68,16 @@ export default function AuthScreen() {
             return;
         }
 
+        if (!validateEmail(email)) {
+            Alert.alert('Hata', 'Geçerli bir e-posta adresi girin.');
+            return;
+        }
+
         if (!isLogin) {
+            if (password.length < 8) {
+                Alert.alert('Hata', 'Şifre en az 8 karakter olmalıdır.');
+                return;
+            }
             if (password !== confirmPassword) {
                 Alert.alert('Hata', 'Şifreler eşleşmiyor.');
                 return;
@@ -178,30 +228,33 @@ export default function AuthScreen() {
 
                         <View>
                             <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">E-posta</Text>
-                            <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4 focus:border-blue-500 focus:bg-white dark:focus:bg-black transition-all">
-                                <Mail size={20} color="#a1a1aa" className="mr-3" />
+                            <View className={`flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border rounded-2xl px-4 py-4 transition-all ${emailError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-zinc-200 dark:border-zinc-800 focus:border-blue-500 focus:bg-white dark:focus:bg-black'}`}>
+                                <Mail size={20} color={emailError ? '#ef4444' : '#a1a1aa'} className="mr-3" />
                                 <TextInput
                                     className="flex-1 text-zinc-900 dark:text-white font-medium text-[15px]"
                                     placeholder="ornek@email.com"
                                     placeholderTextColor="#a1a1aa"
                                     value={email}
-                                    onChangeText={setEmail}
+                                    onChangeText={handleEmailChange}
                                     autoCapitalize="none"
                                     keyboardType="email-address"
                                 />
                             </View>
+                            {emailError ? (
+                                <Text className="text-red-500 text-xs mt-1 ml-1">{emailError}</Text>
+                            ) : null}
                         </View>
 
                         <View>
                             <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">Şifre</Text>
-                            <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4 focus:border-blue-500 focus:bg-white dark:focus:bg-black transition-all">
-                                <Lock size={20} color="#a1a1aa" className="mr-3" />
+                            <View className={`flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border rounded-2xl px-4 py-4 transition-all ${passwordError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-zinc-200 dark:border-zinc-800 focus:border-blue-500 focus:bg-white dark:focus:bg-black'}`}>
+                                <Lock size={20} color={passwordError ? '#ef4444' : '#a1a1aa'} className="mr-3" />
                                 <TextInput
                                     className="flex-1 text-zinc-900 dark:text-white font-medium text-[15px]"
                                     placeholder="••••••••"
                                     placeholderTextColor="#a1a1aa"
                                     value={password}
-                                    onChangeText={setPassword}
+                                    onChangeText={handlePasswordChange}
                                     secureTextEntry={!showPassword}
                                 />
                                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -212,6 +265,29 @@ export default function AuthScreen() {
                                     )}
                                 </TouchableOpacity>
                             </View>
+                            {/* Password Strength Indicator */}
+                            {!isLogin && password.length > 0 && (
+                                <View className="mt-2">
+                                    <View className="flex-row items-center justify-between mb-1">
+                                        <Text className="text-xs text-zinc-500">Şifre Gücü:</Text>
+                                        <Text className="text-xs font-bold" style={{ color: getPasswordStrength(password).color }}>
+                                            {getPasswordStrength(password).label}
+                                        </Text>
+                                    </View>
+                                    <View className="h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
+                                        <View
+                                            className="h-full rounded-full transition-all duration-300"
+                                            style={{
+                                                width: `${(getPasswordStrength(password).strength / 6) * 100}%`,
+                                                backgroundColor: getPasswordStrength(password).color
+                                            }}
+                                        />
+                                    </View>
+                                </View>
+                            )}
+                            {passwordError ? (
+                                <Text className="text-red-500 text-xs mt-1 ml-1">{passwordError}</Text>
+                            ) : null}
                         </View>
 
                         {!isLogin && (

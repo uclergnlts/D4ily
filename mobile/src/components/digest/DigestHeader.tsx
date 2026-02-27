@@ -37,11 +37,25 @@ export const DigestHeader = React.memo(function DigestHeader({ title, date, summ
 
             <View className="h-[1px] bg-border-light dark:bg-border-dark w-12 mb-6" />
 
-            <Text
-                className="text-body-xl text-zinc-600 dark:text-zinc-300 leading-[28px] font-sans"
-            >
-                {summary}
-            </Text>
+            <View className="gap-3">
+                {summary.split('\n').map((line, index) => {
+                    const isBullet = line.trim().startsWith('•') || line.trim().startsWith('-') || line.trim().startsWith('*');
+                    const cleanLine = line.trim().replace(/^[•\-\*]\s*/, '');
+
+                    if (!cleanLine) return null;
+
+                    return (
+                        <View key={index} className="flex-row items-start gap-2">
+                            {isBullet && (
+                                <View className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-2.5 shrink-0" />
+                            )}
+                            <Text className={`text-[17px] text-zinc-600 dark:text-zinc-300 leading-[26px] ${isBullet ? 'flex-1' : ''}`}>
+                                {cleanLine}
+                            </Text>
+                        </View>
+                    );
+                })}
+            </View>
         </View>
     );
 });
