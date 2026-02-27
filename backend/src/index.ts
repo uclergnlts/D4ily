@@ -34,6 +34,12 @@ import webhookRoute from './routes/webhooks';
 import ciiRoute from './routes/cii';
 import feedbackRoute from './routes/feedback';
 
+// New admin routes
+import adminUsersRoute from './routes/admin-users';
+import adminCampaignsRoute from './routes/admin-campaigns';
+import adminModerationRoute from './routes/admin-moderation';
+import adminAnalyticsRoute from './routes/admin-analytics';
+
 const app = new Hono();
 const opsRateLimiter = rateLimiter({
     windowMs: 60 * 1000,
@@ -174,6 +180,13 @@ app.use('/search/*', defaultTimeout);
 app.route('/categories', categoriesRoute);
 app.route('/sources', sourcesRoute);
 app.route('/admin', adminRoute);
+
+// New admin routes
+app.route('/admin/users', adminUsersRoute);
+app.route('/admin/campaigns', adminCampaignsRoute);
+app.route('/admin/moderation', adminModerationRoute);
+app.route('/admin/analytics', adminAnalyticsRoute);
+
 app.route('/comments', commentsRoute);
 app.route('/auth', authRoute);
 app.route('/reactions', reactionRoute);
