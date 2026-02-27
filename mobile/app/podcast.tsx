@@ -1,8 +1,9 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ExternalLink, Headphones, Radio, PlayCircle } from 'lucide-react-native';
-// import { useRouter } from 'expo-router'; // Kept for future navigation
+import { ExternalLink, Headphones, Radio, PlayCircle, ChevronLeft } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { safeBack } from '../src/utils/navigation';
 
 // Spotify Links
 const FEATURED_PODCAST = {
@@ -50,7 +51,7 @@ const RECOMMENDED_PODCASTS = [
 ];
 
 export default function PodcastScreen() {
-    // const router = useRouter(); // Kept for future navigation
+    const router = useRouter();
 
     const openSpotify = async (url: string) => {
         try {
@@ -67,12 +68,22 @@ export default function PodcastScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-zinc-50 dark:bg-black" edges={['top']}>
-            {/* Header */}
+            {/* Header with Back Button */}
             <View className="px-6 py-4">
-                <Text className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">
-                    Podcastler
-                </Text>
-                <Text className="text-zinc-500 mt-1">Gündemi Spotify&apos;da dinle.</Text>
+                <View className="flex-row items-center mb-4">
+                    <TouchableOpacity
+                        onPress={() => safeBack(router)}
+                        className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 items-center justify-center mr-4"
+                    >
+                        <ChevronLeft size={24} color="#71717a" />
+                    </TouchableOpacity>
+                    <View>
+                        <Text className="text-3xl font-black text-zinc-900 dark:text-white tracking-tight">
+                            Podcastler
+                        </Text>
+                        <Text className="text-zinc-500 mt-1">Gündemi Spotify&apos;da dinle.</Text>
+                    </View>
+                </View>
             </View>
 
             <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingBottom: 40 }}>
