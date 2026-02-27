@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { logger } from '../config/logger.js';
 import { generateAllDigests } from '../services/digestService.js';
 import { sendDigestNotifications } from '../services/digestNotificationService.js';
+import { addCronLog } from '../routes/admin.js';
 
 /**
  * Digest Cron Job
@@ -19,6 +20,12 @@ export function startDigestCron() {
 
             logger.info({ period, successful, failed, results }, 'Daily digest generation completed');
 
+            addCronLog({
+                jobName: 'digest',
+                status: failed === 0 ? 'success' : 'error',
+                message: `${successful} successful, ${failed} failed`,
+            });
+
             if (successful > 0) {
                 try {
                     await sendDigestNotifications();
@@ -28,6 +35,11 @@ export function startDigestCron() {
             }
         } catch (error) {
             logger.error({ error, period }, 'Daily digest generation failed');
+            addCronLog({
+                jobName: 'digest',
+                status: 'error',
+                message: error instanceof Error ? error.message : 'Unknown error',
+            });
         }
     };
 

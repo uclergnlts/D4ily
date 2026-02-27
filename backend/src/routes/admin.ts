@@ -5,9 +5,13 @@ import {
     tr_articles, de_articles, us_articles, uk_articles, fr_articles, es_articles, it_articles, ru_articles,
     tr_article_sources, de_article_sources, us_article_sources,
     tr_daily_digests, de_daily_digests, us_daily_digests, uk_daily_digests, fr_daily_digests, es_daily_digests, it_daily_digests, ru_daily_digests,
+    twitter_accounts, notifications, userDevices,
+    tr_tweets, de_tweets, us_tweets, uk_tweets, fr_tweets, es_tweets, it_tweets, ru_tweets,
 } from '../db/schema/index.js';
+import { aiUsageMetrics } from '../db/schema/metrics.js';
 import { eq, desc, sql, and, gte, lte, inArray } from 'drizzle-orm';
 import { scrapeSource } from '../services/scraper/scraperService.js';
+import { sendBulkPushNotifications } from '../services/notificationService.js';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { adminMiddleware } from '../middleware/auth.js';
@@ -43,6 +47,38 @@ const digestTables = {
     it: it_daily_digests,
     ru: ru_daily_digests,
 } as const;
+
+const tweetTables = {
+    tr: tr_tweets,
+    de: de_tweets,
+    us: us_tweets,
+    uk: uk_tweets,
+    fr: fr_tweets,
+    es: es_tweets,
+    it: it_tweets,
+    ru: ru_tweets,
+} as const;
+
+// In-memory cron log store
+interface CronLogEntry {
+    id: string;
+    jobName: string;
+    status: 'success' | 'error';
+    message: string;
+    duration?: number;
+    timestamp: string;
+}
+const cronLogs: CronLogEntry[] = [];
+const MAX_CRON_LOGS = 200;
+
+export function addCronLog(entry: Omit<CronLogEntry, 'id' | 'timestamp'>) {
+    cronLogs.unshift({
+        ...entry,
+        id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+    });
+    if (cronLogs.length > MAX_CRON_LOGS) cronLogs.length = MAX_CRON_LOGS;
+}
 
 const admin = new Hono();
 
@@ -934,6 +970,448 @@ admin.delete('/articles/:country/:articleId', async (c) => {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to delete article',
         }, 500);
+    }
+});
+
+// ===========================
+// DIGEST MANAGEMENT
+// ===========================
+
+/**
+ * PATCH /admin/digests/:country/:digestId
+ * Update a digest (summary, topics)
+ */
+admin.patch('/digests/:country/:digestId', async (c) => {
+    try {
+        const { country, digestId } = c.req.param();
+        if (!(country in digestTables)) {
+            return c.json({ success: false, error: 'Invalid country code' }, 400);
+        }
+        const table = digestTables[country as keyof typeof digestTables];
+        const body = await c.req.json();
+
+        const updateFields: Record<string, any> = {};
+        if (body.summaryText !== undefined) updateFields.summaryText = body.summaryText;
+        if (body.topTopics !== undefined) updateFields.topTopics = JSON.stringify(body.topTopics);
+        if (body.sections !== undefined) updateFields.sections = JSON.stringify(body.sections);
+
+        if (Object.keys(updateFields).length === 0) {
+            return c.json({ success: false, error: 'No valid fields to update' }, 400);
+        }
+
+        const updated = await db
+            .update(table)
+            .set(updateFields)
+            .where(eq(table.id, digestId))
+            .returning()
+            .get();
+
+        if (!updated) {
+            return c.json({ success: false, error: 'Digest not found' }, 404);
+        }
+
+        logger.info({ country, digestId }, 'Digest updated by admin');
+        return c.json({ success: true, data: updated });
+    } catch (error) {
+        logger.error({ error }, 'Update digest failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to update digest' }, 500);
+    }
+});
+
+/**
+ * DELETE /admin/digests/:country/:digestId
+ * Delete a digest
+ */
+admin.delete('/digests/:country/:digestId', async (c) => {
+    try {
+        const { country, digestId } = c.req.param();
+        if (!(country in digestTables)) {
+            return c.json({ success: false, error: 'Invalid country code' }, 400);
+        }
+        const table = digestTables[country as keyof typeof digestTables];
+
+        const deleted = await db
+            .delete(table)
+            .where(eq(table.id, digestId))
+            .returning()
+            .get();
+
+        if (!deleted) {
+            return c.json({ success: false, error: 'Digest not found' }, 404);
+        }
+
+        logger.info({ country, digestId }, 'Digest deleted by admin');
+        return c.json({ success: true, message: 'Digest deleted successfully' });
+    } catch (error) {
+        logger.error({ error }, 'Delete digest failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to delete digest' }, 500);
+    }
+});
+
+// ===========================
+// TWITTER ACCOUNT MANAGEMENT
+// ===========================
+
+/**
+ * GET /admin/twitter-accounts
+ * Get all twitter accounts, optionally filtered by country
+ */
+admin.get('/twitter-accounts', async (c) => {
+    try {
+        const country = c.req.query('country');
+        const conditions = country ? eq(twitter_accounts.countryCode, country) : undefined;
+
+        const accounts = await db
+            .select()
+            .from(twitter_accounts)
+            .where(conditions)
+            .orderBy(desc(twitter_accounts.id));
+
+        return c.json({ success: true, data: accounts });
+    } catch (error) {
+        logger.error({ error }, 'Get twitter accounts failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to fetch twitter accounts' }, 500);
+    }
+});
+
+const createTwitterAccountSchema = z.object({
+    countryCode: z.enum(['tr', 'de', 'us', 'uk', 'fr', 'es', 'it', 'ru']),
+    userName: z.string().min(1),
+    displayName: z.string().min(1),
+    profileImageUrl: z.string().url().optional().nullable(),
+    accountType: z.enum(['government', 'news_agency', 'journalist', 'institution', 'political_party']),
+    isActive: z.boolean().default(true),
+    description: z.string().optional().nullable(),
+    govAlignmentScore: z.number().int().min(-3).max(3).default(0),
+});
+
+/**
+ * POST /admin/twitter-accounts
+ * Create a new twitter account
+ */
+admin.post('/twitter-accounts', async (c) => {
+    try {
+        const body = await c.req.json();
+        const data = createTwitterAccountSchema.parse(body);
+
+        const [created] = await db
+            .insert(twitter_accounts)
+            .values(data)
+            .returning();
+
+        logger.info({ accountId: created.id }, 'Twitter account created by admin');
+        return c.json({ success: true, data: created }, 201);
+    } catch (error) {
+        logger.error({ error }, 'Create twitter account failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to create twitter account' }, 400);
+    }
+});
+
+/**
+ * PATCH /admin/twitter-accounts/:accountId
+ * Update a twitter account
+ */
+admin.patch('/twitter-accounts/:accountId', async (c) => {
+    try {
+        const accountId = parseInt(c.req.param('accountId'), 10);
+        if (isNaN(accountId)) return c.json({ success: false, error: 'Invalid account ID' }, 400);
+
+        const body = await c.req.json();
+        const updateData: Record<string, any> = {};
+        if (body.userName !== undefined) updateData.userName = body.userName;
+        if (body.displayName !== undefined) updateData.displayName = body.displayName;
+        if (body.profileImageUrl !== undefined) updateData.profileImageUrl = body.profileImageUrl;
+        if (body.accountType !== undefined) updateData.accountType = body.accountType;
+        if (body.isActive !== undefined) updateData.isActive = body.isActive;
+        if (body.description !== undefined) updateData.description = body.description;
+        if (body.govAlignmentScore !== undefined) updateData.govAlignmentScore = body.govAlignmentScore;
+        if (body.countryCode !== undefined) updateData.countryCode = body.countryCode;
+
+        if (Object.keys(updateData).length === 0) {
+            return c.json({ success: false, error: 'No valid fields to update' }, 400);
+        }
+
+        const updated = await db
+            .update(twitter_accounts)
+            .set(updateData)
+            .where(eq(twitter_accounts.id, accountId))
+            .returning()
+            .get();
+
+        if (!updated) return c.json({ success: false, error: 'Account not found' }, 404);
+
+        logger.info({ accountId }, 'Twitter account updated by admin');
+        return c.json({ success: true, data: updated });
+    } catch (error) {
+        logger.error({ error }, 'Update twitter account failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to update twitter account' }, 400);
+    }
+});
+
+/**
+ * DELETE /admin/twitter-accounts/:accountId
+ * Delete a twitter account
+ */
+admin.delete('/twitter-accounts/:accountId', async (c) => {
+    try {
+        const accountId = parseInt(c.req.param('accountId'), 10);
+        if (isNaN(accountId)) return c.json({ success: false, error: 'Invalid account ID' }, 400);
+
+        const deleted = await db
+            .delete(twitter_accounts)
+            .where(eq(twitter_accounts.id, accountId))
+            .returning()
+            .get();
+
+        if (!deleted) return c.json({ success: false, error: 'Account not found' }, 404);
+
+        logger.info({ accountId }, 'Twitter account deleted by admin');
+        return c.json({ success: true, message: 'Twitter account deleted successfully' });
+    } catch (error) {
+        logger.error({ error }, 'Delete twitter account failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to delete twitter account' }, 500);
+    }
+});
+
+// ===========================
+// CRON LOGS
+// ===========================
+
+/**
+ * GET /admin/cron/logs
+ * Get cron execution history
+ */
+admin.get('/cron/logs', async (c) => {
+    const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+    const jobName = c.req.query('job');
+
+    let filtered = cronLogs;
+    if (jobName) {
+        filtered = cronLogs.filter(l => l.jobName === jobName);
+    }
+
+    return c.json({
+        success: true,
+        data: filtered.slice(0, limit),
+    });
+});
+
+// ===========================
+// PUSH NOTIFICATIONS
+// ===========================
+
+/**
+ * POST /admin/notifications/send
+ * Send push notification to all users or specific users
+ */
+admin.post('/notifications/send', async (c) => {
+    try {
+        const body = await c.req.json();
+        const { title, body: notifBody, type, userIds } = body;
+
+        if (!title || !notifBody) {
+            return c.json({ success: false, error: 'Title and body are required' }, 400);
+        }
+
+        let targetUserIds: string[] = userIds || [];
+
+        if (targetUserIds.length === 0) {
+            const allUsers = await db.select({ id: users.id }).from(users);
+            targetUserIds = allUsers.map(u => u.id);
+        }
+
+        if (targetUserIds.length === 0) {
+            return c.json({ success: false, error: 'No users found' }, 404);
+        }
+
+        const result = await sendBulkPushNotifications(targetUserIds, {
+            type: type || 'system',
+            title,
+            body: notifBody,
+        });
+
+        logger.info({ targetCount: targetUserIds.length, ...result }, 'Admin notification sent');
+        return c.json({
+            success: true,
+            data: {
+                targetUsers: targetUserIds.length,
+                ...result,
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Send notification failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to send notification' }, 500);
+    }
+});
+
+/**
+ * GET /admin/notifications/history
+ * Get recent notifications
+ */
+admin.get('/notifications/history', async (c) => {
+    try {
+        const limit = Math.min(parseInt(c.req.query('limit') || '50', 10), 200);
+
+        const recent = await db
+            .select()
+            .from(notifications)
+            .orderBy(desc(notifications.sentAt))
+            .limit(limit);
+
+        return c.json({ success: true, data: recent });
+    } catch (error) {
+        logger.error({ error }, 'Get notification history failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to get notifications' }, 500);
+    }
+});
+
+/**
+ * GET /admin/notifications/devices
+ * Get registered device count
+ */
+admin.get('/notifications/devices', async (c) => {
+    try {
+        const totalResult = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(userDevices)
+            .get();
+
+        const iosResult = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(userDevices)
+            .where(eq(userDevices.deviceType, 'ios'))
+            .get();
+
+        const androidResult = await db
+            .select({ count: sql<number>`count(*)` })
+            .from(userDevices)
+            .where(eq(userDevices.deviceType, 'android'))
+            .get();
+
+        return c.json({
+            success: true,
+            data: {
+                total: totalResult?.count || 0,
+                ios: iosResult?.count || 0,
+                android: androidResult?.count || 0,
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Get device stats failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to get device stats' }, 500);
+    }
+});
+
+// ===========================
+// SYSTEM HEALTH
+// ===========================
+
+/**
+ * GET /admin/system/health
+ * System health metrics
+ */
+admin.get('/system/health', async (c) => {
+    try {
+        const uptime = process.uptime();
+        const memUsage = process.memoryUsage();
+
+        // DB sizes per country
+        const dbStats: Record<string, any> = {};
+        for (const [cc, table] of Object.entries(articleTables)) {
+            const articleCount = await db.select({ count: sql<number>`count(*)` }).from(table).get();
+            const digestTable = digestTables[cc as keyof typeof digestTables];
+            const digestCount = await db.select({ count: sql<number>`count(*)` }).from(digestTable).get();
+            const tweetTable = tweetTables[cc as keyof typeof tweetTables];
+            const tweetCount = await db.select({ count: sql<number>`count(*)` }).from(tweetTable).get();
+            dbStats[cc] = {
+                articles: articleCount?.count || 0,
+                digests: digestCount?.count || 0,
+                tweets: tweetCount?.count || 0,
+            };
+        }
+
+        const userCount = await db.select({ count: sql<number>`count(*)` }).from(users).get();
+        const sourceCount = await db.select({ count: sql<number>`count(*)` }).from(rss_sources).where(eq(rss_sources.isActive, true)).get();
+        const deviceCount = await db.select({ count: sql<number>`count(*)` }).from(userDevices).get();
+
+        // AI usage from last 7 days
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const weekAgoStr = weekAgo.toISOString().split('T')[0];
+        const aiMetrics = await db
+            .select()
+            .from(aiUsageMetrics)
+            .where(gte(aiUsageMetrics.date, weekAgoStr))
+            .orderBy(desc(aiUsageMetrics.date))
+            .limit(7);
+
+        return c.json({
+            success: true,
+            data: {
+                uptime,
+                memory: {
+                    rss: Math.round(memUsage.rss / 1024 / 1024),
+                    heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+                    heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+                },
+                database: dbStats,
+                users: userCount?.count || 0,
+                activeSources: sourceCount?.count || 0,
+                registeredDevices: deviceCount?.count || 0,
+                aiUsage: aiMetrics,
+            },
+        });
+    } catch (error) {
+        logger.error({ error }, 'Get system health failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to get system health' }, 500);
+    }
+});
+
+// ===========================
+// ARTICLE EDITING
+// ===========================
+
+/**
+ * PATCH /admin/articles/:country/:articleId
+ * Update article details
+ */
+admin.patch('/articles/:country/:articleId', async (c) => {
+    try {
+        const { country, articleId } = c.req.param();
+        if (!(country in articleTables)) {
+            return c.json({ success: false, error: 'Invalid country code' }, 400);
+        }
+
+        const articlesTable = articleTables[country as keyof typeof articleTables];
+        const body = await c.req.json();
+
+        const updateData: Record<string, any> = {};
+        if (body.translatedTitle !== undefined) updateData.translatedTitle = body.translatedTitle;
+        if (body.summary !== undefined) updateData.summary = body.summary;
+        if (body.categoryId !== undefined) updateData.categoryId = body.categoryId;
+        if (body.isFiltered !== undefined) updateData.isFiltered = body.isFiltered;
+        if (body.sentiment !== undefined) updateData.sentiment = body.sentiment;
+
+        if (Object.keys(updateData).length === 0) {
+            return c.json({ success: false, error: 'No valid fields to update' }, 400);
+        }
+
+        const updated = await db
+            .update(articlesTable)
+            .set(updateData)
+            .where(eq(articlesTable.id, articleId))
+            .returning()
+            .get();
+
+        if (!updated) {
+            return c.json({ success: false, error: 'Article not found' }, 404);
+        }
+
+        logger.info({ country, articleId }, 'Article updated by admin');
+        return c.json({ success: true, data: updated });
+    } catch (error) {
+        logger.error({ error }, 'Update article failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to update article' }, 500);
     }
 });
 

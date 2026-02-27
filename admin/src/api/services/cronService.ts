@@ -25,4 +25,12 @@ export const cronService = {
     }
     return response.data.data;
   },
+
+  runScraper: async (): Promise<{ message: string }> => {
+    const response = await apiClient.post<ApiResponse<{ message: string }>>('/admin/scrape-trigger');
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to run scraper');
+    }
+    return { message: (response.data as any).message || 'Scraper started' };
+  },
 };

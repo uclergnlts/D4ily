@@ -232,6 +232,94 @@ export interface UpdateUserForm {
   subscriptionStatus?: 'free' | 'premium';
 }
 
+// Twitter Account types
+export interface TwitterAccount {
+  id: number;
+  countryCode: CountryCode;
+  userName: string;
+  displayName: string;
+  profileImageUrl: string | null;
+  accountType: 'government' | 'news_agency' | 'journalist' | 'institution' | 'political_party';
+  isActive: boolean;
+  description: string | null;
+  govAlignmentScore: number;
+  lastFetchedAt: string | null;
+}
+
+export interface CreateTwitterAccountForm {
+  countryCode: CountryCode;
+  userName: string;
+  displayName: string;
+  profileImageUrl?: string | null;
+  accountType: TwitterAccount['accountType'];
+  isActive: boolean;
+  description?: string | null;
+  govAlignmentScore: number;
+}
+
+// Cron Log types
+export interface CronLogEntry {
+  id: string;
+  jobName: string;
+  status: 'success' | 'error';
+  message: string;
+  duration?: number;
+  timestamp: string;
+}
+
+// Notification types
+export interface NotificationEntry {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  body: string;
+  data: any;
+  isRead: boolean;
+  sentAt: string;
+}
+
+export interface DeviceStats {
+  total: number;
+  ios: number;
+  android: number;
+}
+
+// System Health types
+export interface SystemHealth {
+  uptime: number;
+  memory: {
+    rss: number;
+    heapUsed: number;
+    heapTotal: number;
+  };
+  database: Record<string, { articles: number; digests: number; tweets: number }>;
+  users: number;
+  activeSources: number;
+  registeredDevices: number;
+  aiUsage: AIUsageMetric[];
+}
+
+export interface AIUsageMetric {
+  id: number;
+  date: string;
+  totalCalls: number;
+  successfulCalls: number;
+  failedCalls: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  estimatedCostUsd: number;
+}
+
+// Update Article Form
+export interface UpdateArticleForm {
+  translatedTitle?: string;
+  summary?: string;
+  categoryId?: number | null;
+  isFiltered?: boolean;
+  sentiment?: 'positive' | 'neutral' | 'negative';
+}
+
 // Country type
 export type CountryCode = 'tr' | 'de' | 'us' | 'uk' | 'fr' | 'es' | 'it' | 'ru';
 

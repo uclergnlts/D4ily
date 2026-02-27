@@ -5,10 +5,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card'
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
-import { useDigestQuality, useDigests } from '../hooks/useDigest';
+import { useDigestQuality, useDigests, useUpdateDigest, useDeleteDigest } from '../hooks/useDigest';
 import { useRunDigest } from '../hooks/useCron';
 import { COUNTRIES, type CountryCode, type DailyDigestAdmin, type DigestTopic } from '../types';
-import { BarChart3, CalendarDays, MessageCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { BarChart3, CalendarDays, MessageCircle, Pencil, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 
 const DAYS_OPTIONS = [3, 7, 14, 30];
 
@@ -33,8 +33,13 @@ export function DigestsByCountryPage() {
   const shouldRedirect = !getCountry(countryCode);
   const [days, setDays] = useState(7);
   const [selectedDigest, setSelectedDigest] = useState<DailyDigestAdmin | null>(null);
+  const [editingDigest, setEditingDigest] = useState<DailyDigestAdmin | null>(null);
+  const [editSummary, setEditSummary] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<DailyDigestAdmin | null>(null);
 
   const runDigestMutation = useRunDigest();
+  const updateDigestMutation = useUpdateDigest();
+  const deleteDigestMutation = useDeleteDigest();
 
   const countryInfo = COUNTRIES.find((c) => c.code === resolvedCountry)!;
 
@@ -199,9 +204,17 @@ export function DigestsByCountryPage() {
                       ))}
                     </div>
 
-                    <Button variant="secondary" size="sm" onClick={() => setSelectedDigest(digest)}>
-                      View Details
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => setSelectedDigest(digest)}>
+                        View Details
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setEditingDigest(digest); setEditSummary(digest.summary); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm(digest)}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -312,6 +325,60 @@ export function DigestsByCountryPage() {
             )}
           </div>
         )}
+      </Modal>
+
+      <Modal isOpen={!!editingDigest} onClose={() => setEditingDigest(null)} title="Edit Digest Summary" size="lg">
+        {editingDigest && (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Summary</label>
+              <textarea
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[120px]"
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                placeholder="Digest summary text"
+                title="Digest summary"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setEditingDigest(null)}>Cancel</Button>
+              <Button
+                isLoading={updateDigestMutation.isPending}
+                onClick={() => {
+                  updateDigestMutation.mutate(
+                    { country: resolvedCountry, digestId: editingDigest.id, data: { summaryText: editSummary } },
+                    { onSuccess: () => setEditingDigest(null) }
+                  );
+                }}
+              >
+                Save
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Delete Digest" size="sm">
+        <p className="text-gray-600 mb-4">
+          Are you sure you want to delete the digest from <strong>{deleteConfirm?.date}</strong>?
+        </p>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
+          <Button
+            variant="danger"
+            isLoading={deleteDigestMutation.isPending}
+            onClick={() => {
+              if (deleteConfirm) {
+                deleteDigestMutation.mutate(
+                  { country: resolvedCountry, digestId: deleteConfirm.id },
+                  { onSuccess: () => setDeleteConfirm(null) }
+                );
+              }
+            }}
+          >
+            Delete
+          </Button>
+        </div>
       </Modal>
     </div>
   );

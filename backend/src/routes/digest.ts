@@ -15,7 +15,7 @@ import {
 import { eq, and, desc, isNull, gte, sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
-import { generateDailyDigest, getLatestDigest, getDigestByDateAndPeriod, getDigestDateString } from '../services/digestService.js';
+import { getLatestDigest, getDigestByDateAndPeriod, getDigestDateString } from '../services/digestService.js';
 import { safeJsonParse } from '../utils/json.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -185,21 +185,11 @@ digestRoute.get('/:country/latest', async (c) => {
         const todayDigestDate = getDigestDateString(new Date());
         let digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
 
+        // If no digest for today, return the latest available one.
+        // Digest generation is handled by cron jobs (07:00/19:00),
+        // not on-demand in the request path — avoids 30s+ GPT-4 latency.
         if (!digest) {
-            logger.info({ country: validatedCountry, digestDate: todayDigestDate }, 'No digest for today, generating on demand');
-            const generated = await generateDailyDigest(validatedCountry, 'daily', new Date());
-            if (generated.success) {
-                digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
-            } else {
-                logger.warn({
-                    country: validatedCountry,
-                    digestDate: todayDigestDate,
-                    error: generated.error,
-                }, 'On-demand digest generation failed, falling back to latest available');
-            }
-        }
-
-        if (!digest) {
+            logger.info({ country: validatedCountry, digestDate: todayDigestDate }, 'No digest for today, falling back to latest available');
             digest = await getLatestDigest(validatedCountry);
         }
 

@@ -11,6 +11,10 @@ import { ManageCountriesPage } from './pages/ManageCountriesPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { DigestsByCountryPage } from './pages/DigestsByCountryPage';
+import { TwitterAccountsPage } from './pages/TwitterAccountsPage';
+import { CronLogsPage } from './pages/CronLogsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { SystemHealthPage } from './pages/SystemHealthPage';
 
 function App() {
   return (
@@ -27,10 +31,17 @@ function App() {
             {/* Articles routes */}
             <Route path="/articles" element={<Navigate to="/articles/tr" replace />} />
             <Route path="/articles/:countryCode" element={<ArticlesByCountryPage />} />
-            {/* Other routes */}
+            {/* Digests routes */}
             <Route path="/digests" element={<Navigate to="/digests/tr" replace />} />
             <Route path="/digests/:countryCode" element={<DigestsByCountryPage />} />
+            {/* Twitter/X routes */}
+            <Route path="/twitter" element={<Navigate to="/twitter/tr" replace />} />
+            <Route path="/twitter/:countryCode" element={<TwitterAccountsPage />} />
+            {/* Other routes */}
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/cron-logs" element={<CronLogsPage />} />
+            <Route path="/system" element={<SystemHealthPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Routes>
