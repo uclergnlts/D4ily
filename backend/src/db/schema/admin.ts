@@ -11,7 +11,7 @@ export const userActivityLogs = sqliteTable('user_activity_logs', {
     metadata: text('metadata'), // JSON string for additional data
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`unixepoch()`),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Banned/Suspended users
@@ -20,7 +20,7 @@ export const userBans = sqliteTable('user_bans', {
     userId: text('user_id').notNull(),
     reason: text('reason').notNull(),
     bannedBy: text('banned_by').notNull(), // Admin user ID
-    bannedAt: integer('banned_at', { mode: 'timestamp' }).notNull().default(sql`unixepoch()`),
+    bannedAt: integer('banned_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
     expiresAt: integer('expires_at', { mode: 'timestamp' }), // NULL = permanent
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     unbannedAt: integer('unbanned_at', { mode: 'timestamp' }),
@@ -37,7 +37,7 @@ export const blacklistedWords = sqliteTable('blacklisted_words', {
     replacement: text('replacement'), // For 'replace' action
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdBy: text('created_by').notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`unixepoch()`),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Push notification campaigns
@@ -55,7 +55,7 @@ export const notificationCampaigns = sqliteTable('notification_campaigns', {
     deliveredCount: integer('delivered_count').notNull().default(0),
     openedCount: integer('opened_count').notNull().default(0),
     createdBy: text('created_by').notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`unixepoch()`),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Daily analytics snapshots
@@ -73,7 +73,7 @@ export const analyticsSnapshots = sqliteTable('analytics_snapshots', {
     retentionD1: real('retention_d1').default(0), // Day 1 retention
     retentionD7: real('retention_d7').default(0), // Day 7 retention
     retentionD30: real('retention_d30').default(0), // Day 30 retention
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`unixepoch()`),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
 
 // Content moderation queue
@@ -88,5 +88,5 @@ export const moderationQueue = sqliteTable('moderation_queue', {
     reviewedBy: text('reviewed_by'),
     reviewedAt: integer('reviewed_at', { mode: 'timestamp' }),
     notes: text('notes'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`unixepoch()`),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(unixepoch())`),
 });
