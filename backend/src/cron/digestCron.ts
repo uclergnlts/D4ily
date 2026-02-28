@@ -91,7 +91,7 @@ async function generateDigestsWithTracking(
         updateCountryStatus(country, 'running');
 
         try {
-            const result = await generateDailyDigest(country, 'daily');
+            const result = await generateDailyDigest(country, 'daily', undefined, { skipPrecompute: true });
             if (result.success) {
                 updateCountryStatus(country, 'success');
             } else {

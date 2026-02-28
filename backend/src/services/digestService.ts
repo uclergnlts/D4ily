@@ -146,9 +146,9 @@ const SUPPORTING_ARTICLE_LIMIT_WITH_TWEETS = {
 } as const;
 
 const DETAIL_PREFETCH_TOPIC_LIMIT = 5;
-const DETAIL_PREFETCH_CONCURRENCY = 2;
-const PERSPECTIVE_PREFETCH_TOPIC_LIMIT = 4;
-const PERSPECTIVE_PREFETCH_CONCURRENCY = 1;
+const DETAIL_PREFETCH_CONCURRENCY = 4;
+const PERSPECTIVE_PREFETCH_TOPIC_LIMIT = 2;
+const PERSPECTIVE_PREFETCH_CONCURRENCY = 3;
 
 const GENERIC_SUMMARY_PATTERNS: RegExp[] = [
     /bugun .*? onemli gelismeler yasandi/i,
@@ -1448,7 +1448,8 @@ function getSupportingArticles(
 export async function generateDailyDigest(
     countryCode: CountryCode,
     _period: Period | LegacyPeriod = 'daily',
-    date?: Date
+    date?: Date,
+    options?: { skipPrecompute?: boolean }
 ): Promise<{ id: string; success: boolean; error?: string }> {
     try {
         const period: Period = 'daily';
@@ -1629,26 +1630,6 @@ export async function generateDailyDigest(
             digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode, promptVariant);
         }
 
-        // Precompute missing topic details so article screens open faster from digest headlines.
-        try {
-            await precomputeDigestTopicDetails(countryCode, tables, digestResult.topTopics);
-        } catch (error) {
-            logger.warn({
-                countryCode,
-                error: error instanceof Error ? error.message : String(error),
-            }, 'Digest topic detail precompute skipped');
-        }
-
-        // Precompute perspectives at write-time to avoid expensive read-time generation.
-        try {
-            await precomputeDigestTopicPerspectives(countryCode, digestResult.topTopics);
-        } catch (error) {
-            logger.warn({
-                countryCode,
-                error: error instanceof Error ? error.message : String(error),
-            }, 'Digest topic perspectives precompute skipped');
-        }
-
         // Format date string
         const digestDate = getDigestDateString(targetDate);
 
@@ -1669,19 +1650,41 @@ export async function generateDailyDigest(
 
         // Use raw SQL for writes to bypass drizzle json mode serialization issues with local libsql
         const tableName = `${countryCode}_daily_digests`;
+        let savedDigestId: string;
 
         if (existing) {
             await db.run(sql`UPDATE ${sql.raw(tableName)} SET summary_text = ${safeSummary}, top_topics = ${safeTopics}, sections = ${safeSections}, article_count = ${safeCount}, tweet_count = ${safeTweetCount} WHERE id = ${existing.id}`);
-
+            savedDigestId = existing.id;
             logger.info({ countryCode, period, digestId: existing.id, tweetCount: safeTweetCount, sectionCount: digestResult.sections.length }, 'Digest updated');
-            return { id: existing.id, success: true };
+        } else {
+            savedDigestId = uuidv4();
+            await db.run(sql`INSERT INTO ${sql.raw(tableName)} (id, country_code, period, digest_date, summary_text, top_topics, sections, article_count, tweet_count, comment_count, created_at) VALUES (${savedDigestId}, ${countryCode}, ${period}, ${digestDate}, ${safeSummary}, ${safeTopics}, ${safeSections}, ${safeCount}, ${safeTweetCount}, 0, unixepoch())`);
+            logger.info({ countryCode, period, digestId: savedDigestId, articleCount: digestResult.articleCount, tweetCount: safeTweetCount, sectionCount: digestResult.sections.length }, 'Digest created');
         }
 
-        const digestId = uuidv4();
-        await db.run(sql`INSERT INTO ${sql.raw(tableName)} (id, country_code, period, digest_date, summary_text, top_topics, sections, article_count, tweet_count, comment_count, created_at) VALUES (${digestId}, ${countryCode}, ${period}, ${digestDate}, ${safeSummary}, ${safeTopics}, ${safeSections}, ${safeCount}, ${safeTweetCount}, 0, unixepoch())`);
+        // Fire precompute in background (non-blocking) — digest is already saved to DB
+        if (!options?.skipPrecompute) {
+            void (async () => {
+                try {
+                    await precomputeDigestTopicDetails(countryCode, tables, digestResult.topTopics);
+                } catch (error) {
+                    logger.warn({
+                        countryCode,
+                        error: error instanceof Error ? error.message : String(error),
+                    }, 'Digest topic detail precompute skipped');
+                }
+                try {
+                    await precomputeDigestTopicPerspectives(countryCode, digestResult.topTopics);
+                } catch (error) {
+                    logger.warn({
+                        countryCode,
+                        error: error instanceof Error ? error.message : String(error),
+                    }, 'Digest topic perspectives precompute skipped');
+                }
+            })();
+        }
 
-        logger.info({ countryCode, period, digestId, articleCount: digestResult.articleCount, tweetCount: safeTweetCount, sectionCount: digestResult.sections.length }, 'Digest created');
-        return { id: digestId, success: true };
+        return { id: savedDigestId, success: true };
     } catch (error) {
         const errMsg = error instanceof Error ? error.message : String(error);
         const errStack = error instanceof Error ? error.stack : undefined;
