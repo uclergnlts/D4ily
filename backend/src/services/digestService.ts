@@ -1754,9 +1754,16 @@ export async function generateAllDigests(_period: Period | LegacyPeriod = 'daily
     const countries = Object.keys(COUNTRY_TABLES) as CountryCode[];
     const results = [];
 
-    for (const country of countries) {
+    for (let i = 0; i < countries.length; i++) {
+        const country = countries[i];
         const result = await generateDailyDigest(country, 'daily');
         results.push({ country, ...result });
+
+        // Brief pause between countries to avoid OpenAI rate limits (429).
+        // Skip delay after the last country.
+        if (i < countries.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
     }
 
     return results;

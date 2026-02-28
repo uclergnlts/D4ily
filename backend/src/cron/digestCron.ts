@@ -88,9 +88,14 @@ export function startDigestCron() {
 
         try {
             const results = [];
-            for (const country of missingCountries) {
+            for (let i = 0; i < missingCountries.length; i++) {
+                const country = missingCountries[i];
                 const result = await generateDailyDigest(country, 'daily');
                 results.push({ country, ...result });
+                // Brief pause between countries to avoid OpenAI rate limits
+                if (i < missingCountries.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
             }
 
             const successful = results.filter(r => r.success).length;
