@@ -104,7 +104,8 @@
       "Bash(wc -l /c/Users/ucler/Desktop/D4ily/backend/src/routes/admin-*.ts)",
       "Bash(npx vite build)",
       "Bash(xargs grep -l \"notificationService\\\\|useNotification\")",
-      "Bash(xargs grep -l \"initNotifications\\\\|registerPushToken\")"
+      "Bash(xargs grep -l \"initNotifications\\\\|registerPushToken\")",
+      "Bash(npx eslint src/api/services/userService.ts)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"
