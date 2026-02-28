@@ -66,3 +66,6 @@ mobile/test_output_2.txt
 # Generated config outputs
 admin/vite.config.js
 admin/vite.config.d.ts
+
+# GSD planning docs (local-only)
+.planning/
