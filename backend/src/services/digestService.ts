@@ -602,6 +602,96 @@ function buildConfidenceNote(telemetry: DigestTelemetry): string {
     return `Guven notu: ${telemetry.selectedArticleCount} haber, ${telemetry.selectedTweetCount} X paylasimi ve ${telemetry.minorityIncludedCount} azinlik-perspektifli baslik analiz edildi.`;
 }
 
+function buildSectionFallbacksFromArticles(articles: ArticleInput[]): DigestSection[] {
+    const grouped = new Map<string, ArticleInput[]>();
+    for (const article of articles) {
+        const category = article.categoryId ? (CATEGORY_NAMES[article.categoryId] || 'Gundem') : 'Gundem';
+        const bucket = grouped.get(category) || [];
+        bucket.push(article);
+        grouped.set(category, bucket);
+    }
+
+    return Array.from(grouped.entries())
+        .sort((a, b) => b[1].length - a[1].length)
+        .slice(0, 5)
+        .map(([category, items]) => {
+            const leadSentences = items
+                .slice(0, 3)
+                .map((a) => splitSentences(a.summary)[0] || `${normalizeText(a.translatedTitle)}.`)
+                .filter(Boolean)
+                .map((s) => (/[.!?]$/.test(s) ? s : `${s}.`));
+
+            const highlights = items
+                .slice(0, 4)
+                .map((a) => normalizeText(a.translatedTitle))
+                .filter(Boolean)
+                .map((t) => (/[.!?]$/.test(t) ? t : `${t}.`));
+
+            const avgImportance = items.length > 0
+                ? items.reduce((acc, curr) => acc + safeNumber(curr.importanceScore, 0.55), 0) / items.length
+                : 0.55;
+
+            return {
+                category,
+                icon: '??',
+                summary: normalizeText(leadSentences.join(' ')),
+                highlights,
+                counterNarrative: 'Farkli kaynaklar ayni olayi farkli neden-sonuc zinciri ile aktariyor.',
+                uncertaintyLevel: items.some((a) => a.uncertaintyLevel === 'Gelisiyor') ? 'Gelisiyor' : 'Muhtemel',
+                timeline: {
+                    before: 'Gelisme once sinirli kaynakta goruldu.',
+                    now: 'Birden fazla kaynakta dogrulama ve etkileri tartisiliyor.',
+                    next: 'Resmi aciklamalar ve yeni saha verileri beklenecek.',
+                },
+                importanceScore: clamp(avgImportance, 0, 1),
+            } as DigestSection;
+        })
+        .filter((s) => s.summary && s.highlights.length > 0);
+}
+
+function buildOperationalDigestFallback(
+    articles: ArticleInput[],
+    tweets: TweetInput[],
+    countryCode: CountryCode,
+    promptVariant: 'A' | 'B',
+): DigestResult {
+    const sections = countryCode === 'tr' ? buildSectionFallbacksFromArticles(articles) : [];
+    const topTopics = normalizeTopicItems([], articles);
+
+    let summaryText = enforceSummaryQuality('', {
+        sections,
+        topics: topTopics,
+        articles,
+        tweets,
+        minWords: countryCode === 'tr' ? 100 : 90,
+        minTweetRefs: countryCode === 'tr' ? 3 : 2,
+    });
+
+    const telemetry: DigestTelemetry = {
+        promptVariant,
+        rawArticleCount: articles.length,
+        dedupedArticleCount: articles.length,
+        selectedArticleCount: articles.length,
+        rawTweetCount: tweets.length,
+        selectedTweetCount: tweets.length,
+        highImportanceCount: articles.filter(a => a.importanceTier === 'yuksek').length,
+        minorityIncludedCount: articles.filter(a => (a.alignmentSummary || '').includes('Etiket:muhalif') || (a.alignmentSummary || '').includes('Etiket:iktidar')).length,
+    };
+
+    if (!normalizeForPattern(summaryText).includes('guven notu')) {
+        summaryText = normalizeText(`${summaryText} ${buildConfidenceNote(telemetry)}`);
+    }
+
+    return {
+        summaryText: summaryText || getDigestFallback(articles.length, countryCode === 'tr').summaryText,
+        topTopics,
+        sections,
+        articleCount: articles.length,
+        tweetCount: tweets.length,
+        telemetry,
+    };
+}
+
 function needsDetailPrefetch(article: {
     summary: string | null;
     detailContent: string | null;
@@ -1204,7 +1294,7 @@ async function generateDigestWithAI(
         return await generateDefaultDigestWithAI(articles, tweets, promptVariant);
     } catch (error) {
         logger.error({ error, countryCode }, 'Digest AI generation failed');
-        return { ...getDigestFallback(articles.length, true), tweetCount: 0 };
+        return buildOperationalDigestFallback(articles, tweets, countryCode, promptVariant);
     }
 }
 
@@ -1477,10 +1567,7 @@ export async function generateDailyDigest(
                 countryCode,
                 articleCount: supportingArticles.length,
             }, 'Using stale article fallback digest (AI skipped)');
-            digestResult = {
-                ...getDigestFallback(supportingArticles.length, countryCode === 'tr'),
-                tweetCount: tweets.length,
-            };
+            digestResult = buildOperationalDigestFallback(supportingArticles, tweets, countryCode, promptVariant);
         } else {
             // Generate digest with AI for fresh/recent data windows.
             digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode, promptVariant);

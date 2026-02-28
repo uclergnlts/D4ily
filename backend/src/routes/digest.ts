@@ -15,7 +15,7 @@ import {
 import { eq, and, desc, isNull, gte, sql } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
-import { getLatestDigest, getDigestByDateAndPeriod, getDigestDateString } from '../services/digestService.js';
+import { generateDailyDigest, getLatestDigest, getDigestByDateAndPeriod, getDigestDateString } from '../services/digestService.js';
 import { safeJsonParse } from '../utils/json.js';
 import { authMiddleware, AuthUser } from '../middleware/auth.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -103,6 +103,21 @@ function transformDigestResponse(digest: any) {
 // In-memory cache for locations endpoint
 let locationsCache: { data: any; timestamp: number; days: number } | null = null;
 const LOCATIONS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
+const WEAK_DIGEST_RETRY_TTL = 15 * 60 * 1000; // 15 minutes
+const weakDigestRetryState = new Map<string, number>();
+
+function isWeakDigest(digest: any): boolean {
+    const summary = String(digest?.summaryText || '');
+    const topTopics = safeJsonParse(digest?.topTopics, []);
+    const sections = safeJsonParse(digest?.sections, []);
+
+    const hasNoDetail = (!Array.isArray(topTopics) || topTopics.length === 0)
+        && (!Array.isArray(sections) || sections.length === 0);
+
+    if (!hasNoDetail) return false;
+
+    return /haber\s+i[sş]lendi|onemli\s+gelismeler\s+icin\s+haberleri\s+inceleyiniz|önemli\s+gelişmeler\s+için\s+haberleri\s+inceleyiniz/i.test(summary);
+}
 
 /**
  * GET /digest/locations
@@ -184,6 +199,21 @@ digestRoute.get('/:country/latest', async (c) => {
 
         const todayDigestDate = getDigestDateString(new Date());
         let digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
+
+        // Self-heal: if today's digest exists but looks like a generic fallback,
+        // retry generation once per country/date window.
+        if (digest && isWeakDigest(digest)) {
+            const retryKey = `${validatedCountry}:${todayDigestDate}`;
+            const lastRetryAt = weakDigestRetryState.get(retryKey) || 0;
+            const canRetry = Date.now() - lastRetryAt > WEAK_DIGEST_RETRY_TTL;
+
+            if (canRetry) {
+                weakDigestRetryState.set(retryKey, Date.now());
+                logger.warn({ country: validatedCountry, digestDate: todayDigestDate }, 'Weak digest detected, retrying generation');
+                await generateDailyDigest(validatedCountry, 'daily', new Date());
+                digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
+            }
+        }
 
         // If no digest for today, return the latest available one.
         // Digest generation is handled by cron jobs (07:00/19:00),

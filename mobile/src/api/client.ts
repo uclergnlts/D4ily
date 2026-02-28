@@ -6,7 +6,12 @@ import { useAuthStore } from '../store/useAuthStore';
  * Provides automatic authentication, error handling, and request/response interceptors
  */
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://d4ily-production.up.railway.app';
+const ENV_API_URL = (process.env.EXPO_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
+const API_BASE_URL_FALLBACK = 'https://d4ily-production.up.railway.app';
+const API_BASE_URL_CANDIDATES = Array.from(
+  new Set([ENV_API_URL, API_BASE_URL_FALLBACK].filter(Boolean))
+);
+const API_BASE_URL = API_BASE_URL_CANDIDATES[0] || API_BASE_URL_FALLBACK;
 const DEBUG_API_LOGS = process.env.EXPO_PUBLIC_DEBUG_API === 'true';
 const REDACT_KEYS = ['authorization', 'token', 'password', 'secret', 'apiKey', 'api_key', 'refreshToken', 'accessToken'];
 
@@ -44,15 +49,28 @@ const apiClient: AxiosInstance = axios.create({
 });
 
 // Retry logic for timeout and network errors
-const MAX_RETRIES = 1;
+const MAX_RETRIES = Math.max(1, API_BASE_URL_CANDIDATES.length - 1);
 const RETRY_DELAY = 1000;
 
 apiClient.interceptors.response.use(undefined, async (error) => {
   const config = error.config;
   if (!config || config.__retryCount >= MAX_RETRIES) return Promise.reject(error);
 
-  const shouldRetry = error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK';
+  const isTimeoutError = error.code === 'ECONNABORTED';
+  const isNetworkError = error.code === 'ERR_NETWORK' || (!error.response && /network error/i.test(String(error.message || '')));
+  const shouldRetry = isTimeoutError || isNetworkError;
   if (!shouldRetry) return Promise.reject(error);
+
+  const currentBaseUrl = config.baseURL || API_BASE_URL;
+  const currentIndex = Math.max(0, API_BASE_URL_CANDIDATES.findIndex((url) => url === currentBaseUrl));
+  const canSwitchBaseUrl = isNetworkError && currentIndex < API_BASE_URL_CANDIDATES.length - 1;
+
+  if (canSwitchBaseUrl) {
+    const nextBaseUrl = API_BASE_URL_CANDIDATES[currentIndex + 1];
+    config.baseURL = nextBaseUrl;
+    apiClient.defaults.baseURL = nextBaseUrl;
+    console.warn(`[API] Switching base URL to fallback: ${nextBaseUrl}`);
+  }
 
   config.__retryCount = (config.__retryCount || 0) + 1;
   console.warn(`[API] Retrying request (${config.__retryCount}/${MAX_RETRIES}): ${config.url}`);
@@ -155,7 +173,7 @@ apiClient.interceptors.response.use(
       });
     }
 
-    if (error.code === 'ERR_NETWORK') {
+    if (error.code === 'ERR_NETWORK' || (!error.response && /network error/i.test(String(error.message || '')))) {
       console.error('[API] Network error');
       return Promise.reject({
         status: 0,

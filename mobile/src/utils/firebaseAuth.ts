@@ -1,6 +1,14 @@
-import { initializeAuth, getReactNativePersistence, GoogleAuthProvider, OAuthProvider, signInWithPopup, User, UserCredential } from 'firebase/auth';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  initializeAuth,
+  getAuth,
+  GoogleAuthProvider,
+  OAuthProvider,
+  signInWithPopup,
+  User,
+  UserCredential,
+  type Auth,
+} from 'firebase/auth';
+import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -12,13 +20,53 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '',
 };
 
-// Initialize Firebase App
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const REQUIRED_CONFIG_KEYS: (keyof typeof firebaseConfig)[] = [
+  'apiKey',
+  'authDomain',
+  'projectId',
+  'storageBucket',
+  'messagingSenderId',
+  'appId',
+];
 
-// Initialize Firebase Auth with AsyncStorage persistence
-const auth = initializeAuth(app, {
-  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
-});
+const isPlaceholderValue = (value: string): boolean => {
+  const normalized = value.trim().toLowerCase();
+  return normalized === '' || normalized.includes('your_') || normalized.includes('example');
+};
+
+const missingConfigKeys = REQUIRED_CONFIG_KEYS.filter((key) => isPlaceholderValue(firebaseConfig[key]));
+const isFirebaseConfigured = missingConfigKeys.length === 0;
+
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let missingConfigWarned = false;
+
+const getFirebaseConfigErrorMessage = () =>
+  `Firebase ayari eksik/gecersiz: ${missingConfigKeys.join(', ')}. mobile/.env dosyasina EXPO_PUBLIC_FIREBASE_* degerlerini ekleyin.`;
+
+const ensureAuth = (): Auth => {
+  if (!isFirebaseConfigured) {
+    if (!missingConfigWarned) {
+      console.warn(getFirebaseConfigErrorMessage());
+      missingConfigWarned = true;
+    }
+    throw new Error(getFirebaseConfigErrorMessage());
+  }
+
+  if (!app) {
+    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  }
+
+  if (!auth) {
+    try {
+      auth = getAuth(app);
+    } catch {
+      auth = initializeAuth(app);
+    }
+  }
+
+  return auth;
+};
 
 /**
  * Sign in with Google
@@ -26,12 +74,13 @@ const auth = initializeAuth(app, {
  */
 export const signInWithGoogle = async (): Promise<User> => {
   try {
+    const authInstance = ensureAuth();
     const provider = new GoogleAuthProvider();
-    const result: UserCredential = await signInWithPopup(auth, provider);
+    const result: UserCredential = await signInWithPopup(authInstance, provider);
     return result.user;
   } catch (error: any) {
     console.error('Google sign-in error:', error);
-    throw new Error(error.message || 'Google ile giriş başarısız');
+    throw new Error(error.message || 'Google ile giris basarisiz');
   }
 };
 
@@ -41,14 +90,15 @@ export const signInWithGoogle = async (): Promise<User> => {
  */
 export const signInWithApple = async (): Promise<User> => {
   try {
+    const authInstance = ensureAuth();
     const provider = new OAuthProvider('apple.com');
     provider.addScope('email');
     provider.addScope('name');
-    const result: UserCredential = await signInWithPopup(auth, provider);
+    const result: UserCredential = await signInWithPopup(authInstance, provider);
     return result.user;
   } catch (error: any) {
     console.error('Apple sign-in error:', error);
-    throw new Error(error.message || 'Apple ile giriş başarısız');
+    throw new Error(error.message || 'Apple ile giris basarisiz');
   }
 };
 
@@ -58,13 +108,14 @@ export const signInWithApple = async (): Promise<User> => {
  */
 export const getIdToken = async (): Promise<string | null> => {
   try {
-    const user = auth.currentUser;
+    const authInstance = ensureAuth();
+    const user = authInstance.currentUser;
     if (!user) return null;
     const token = await user.getIdToken();
     return token;
   } catch (error: any) {
     console.error('Get ID token error:', error);
-    throw new Error(error.message || 'Token alınamadı');
+    throw new Error(error.message || 'Token alinamadi');
   }
 };
 
@@ -74,7 +125,8 @@ export const getIdToken = async (): Promise<string | null> => {
  */
 export const getCurrentUser = (): User | null => {
   try {
-    return auth.currentUser;
+    const authInstance = ensureAuth();
+    return authInstance.currentUser;
   } catch (error) {
     console.error('Get current user error:', error);
     return null;
@@ -86,10 +138,11 @@ export const getCurrentUser = (): User | null => {
  */
 export const signOut = async (): Promise<void> => {
   try {
-    await auth.signOut();
+    const authInstance = ensureAuth();
+    await authInstance.signOut();
   } catch (error: any) {
     console.error('Sign out error:', error);
-    throw new Error(error.message || 'Çıkış başarısız');
+    throw new Error(error.message || 'Cikis basarisiz');
   }
 };
 
@@ -102,7 +155,7 @@ export const firebaseUserToAppUser = (firebaseUser: User) => {
   return {
     uid: firebaseUser.uid,
     email: firebaseUser.email || '',
-    name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Kullanıcı',
+    name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Kullanici',
     role: 'user' as const,
   };
 };
