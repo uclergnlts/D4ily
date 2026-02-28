@@ -16,7 +16,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { adminMiddleware } from '../middleware/auth.js';
-import { isDigestJobRunning, triggerDigestManually } from '../cron/digestCron.js';
+import { isDigestJobRunning, triggerDigestManually, getDigestJobStatus } from '../cron/digestCron.js';
 import { triggerWeeklyManually } from '../cron/weeklyCron.js';
 import { scrapeRateLimiter } from '../middleware/rateLimiter.js';
 
@@ -506,6 +506,19 @@ admin.post('/cron/digest/run', async (c) => {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to trigger digest',
         }, 500);
+    }
+});
+
+/**
+ * GET /admin/cron/digest/status
+ * Get real-time digest generation status
+ */
+admin.get('/cron/digest/status', async (c) => {
+    try {
+        const status = getDigestJobStatus();
+        return c.json({ success: true, data: status });
+    } catch (error) {
+        return c.json({ success: false, error: 'Failed to get digest status' }, 500);
     }
 });
 

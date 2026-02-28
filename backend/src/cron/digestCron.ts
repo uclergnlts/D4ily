@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { logger } from '../config/logger.js';
-import { generateAllDigests, generateDailyDigest, getDigestByDate, getDigestDateString } from '../services/digestService.js';
+import { generateDailyDigest, getDigestByDate, getDigestDateString } from '../services/digestService.js';
 import { sendDigestNotifications } from '../services/digestNotificationService.js';
 import { addCronLog } from '../routes/admin.js';
 
@@ -9,8 +9,108 @@ type DigestCountry = typeof DIGEST_COUNTRIES[number];
 const DIGEST_TIMEZONE = 'Europe/Istanbul';
 let digestJobInProgress = false;
 
+// Real-time status tracking
+interface CountryStatus {
+    country: string;
+    status: 'pending' | 'running' | 'success' | 'error';
+    error?: string;
+    startedAt?: number;
+    finishedAt?: number;
+}
+
+interface DigestJobStatus {
+    running: boolean;
+    trigger: 'manual' | 'cron' | 'recovery' | null;
+    startedAt: number | null;
+    currentCountry: string | null;
+    countries: CountryStatus[];
+    finishedAt: number | null;
+    error: string | null;
+}
+
+let lastJobStatus: DigestJobStatus = {
+    running: false,
+    trigger: null,
+    startedAt: null,
+    currentCountry: null,
+    countries: [],
+    finishedAt: null,
+    error: null,
+};
+
 export function isDigestJobRunning() {
     return digestJobInProgress;
+}
+
+export function getDigestJobStatus(): DigestJobStatus {
+    return { ...lastJobStatus, countries: [...lastJobStatus.countries] };
+}
+
+function initJobStatus(trigger: 'manual' | 'cron' | 'recovery', countries: readonly string[]) {
+    lastJobStatus = {
+        running: true,
+        trigger,
+        startedAt: Date.now(),
+        currentCountry: null,
+        countries: countries.map(c => ({ country: c, status: 'pending' })),
+        finishedAt: null,
+        error: null,
+    };
+}
+
+function updateCountryStatus(country: string, status: CountryStatus['status'], error?: string) {
+    const entry = lastJobStatus.countries.find(c => c.country === country);
+    if (entry) {
+        entry.status = status;
+        if (status === 'running') entry.startedAt = Date.now();
+        if (status === 'success' || status === 'error') entry.finishedAt = Date.now();
+        if (error) entry.error = error;
+    }
+    lastJobStatus.currentCountry = status === 'running' ? country : null;
+}
+
+function finishJobStatus(error?: string) {
+    lastJobStatus.running = false;
+    lastJobStatus.finishedAt = Date.now();
+    lastJobStatus.currentCountry = null;
+    if (error) lastJobStatus.error = error;
+}
+
+/**
+ * Generate digests for a list of countries with status tracking
+ */
+async function generateDigestsWithTracking(
+    countries: readonly string[],
+    trigger: 'manual' | 'cron' | 'recovery'
+): Promise<{ country: string; id: string; success: boolean; error?: string }[]> {
+    initJobStatus(trigger, countries);
+    const results: { country: string; id: string; success: boolean; error?: string }[] = [];
+
+    for (let i = 0; i < countries.length; i++) {
+        const country = countries[i] as DigestCountry;
+        updateCountryStatus(country, 'running');
+
+        try {
+            const result = await generateDailyDigest(country, 'daily');
+            if (result.success) {
+                updateCountryStatus(country, 'success');
+            } else {
+                updateCountryStatus(country, 'error', result.error || 'Unknown error');
+            }
+            results.push({ country, ...result });
+        } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            updateCountryStatus(country, 'error', errMsg);
+            results.push({ country, id: '', success: false, error: errMsg });
+        }
+
+        // Brief pause between countries to avoid OpenAI rate limits
+        if (i < countries.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+    }
+
+    return results;
 }
 
 /**
@@ -29,10 +129,11 @@ export function startDigestCron() {
         digestJobInProgress = true;
 
         try {
-            const results = await generateAllDigests(period);
+            const results = await generateDigestsWithTracking(DIGEST_COUNTRIES, 'cron');
             const successful = results.filter(r => r.success).length;
             const failed = results.filter(r => !r.success).length;
 
+            finishJobStatus();
             logger.info({ period, successful, failed, results }, 'Daily digest generation completed');
 
             addCronLog({
@@ -49,11 +150,13 @@ export function startDigestCron() {
                 }
             }
         } catch (error) {
+            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+            finishJobStatus(errMsg);
             logger.error({ error, period }, 'Daily digest generation failed');
             addCronLog({
                 jobName: 'digest',
                 status: 'error',
-                message: error instanceof Error ? error.message : 'Unknown error',
+                message: errMsg,
             });
         } finally {
             digestJobInProgress = false;
@@ -87,20 +190,11 @@ export function startDigestCron() {
         digestJobInProgress = true;
 
         try {
-            const results = [];
-            for (let i = 0; i < missingCountries.length; i++) {
-                const country = missingCountries[i];
-                const result = await generateDailyDigest(country, 'daily');
-                results.push({ country, ...result });
-                // Brief pause between countries to avoid OpenAI rate limits
-                if (i < missingCountries.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                }
-            }
-
+            const results = await generateDigestsWithTracking(missingCountries, 'recovery');
             const successful = results.filter(r => r.success).length;
             const failed = results.filter(r => !r.success).length;
 
+            finishJobStatus();
             logger.info({ trigger, digestDate, successful, failed, results }, 'Digest recovery generation completed');
             addCronLog({
                 jobName: 'digest-recovery',
@@ -108,11 +202,13 @@ export function startDigestCron() {
                 message: `${successful} successful, ${failed} failed`,
             });
         } catch (error) {
+            const errMsg = error instanceof Error ? error.message : 'Unknown error';
+            finishJobStatus(errMsg);
             logger.error({ error, trigger, digestDate }, 'Digest recovery generation failed');
             addCronLog({
                 jobName: 'digest-recovery',
                 status: 'error',
-                message: error instanceof Error ? error.message : 'Unknown error',
+                message: errMsg,
             });
         } finally {
             digestJobInProgress = false;
@@ -160,10 +256,12 @@ export async function triggerDigestManually(_period: 'morning' | 'evening' | 'da
     digestJobInProgress = true;
 
     try {
-        const results = await generateAllDigests(period);
+        const results = await generateDigestsWithTracking(DIGEST_COUNTRIES, 'manual');
         const successful = results.filter(r => r.success).length;
         const failed = results.filter(r => !r.success).length;
         const duration = Date.now() - startedAt;
+
+        finishJobStatus();
 
         addCronLog({
             jobName: 'digest-manual',
@@ -180,16 +278,18 @@ export async function triggerDigestManually(_period: 'morning' | 'evening' | 'da
             results,
         };
     } catch (error) {
+        const errMsg = error instanceof Error ? error.message : 'Unknown error';
+        finishJobStatus(errMsg);
         logger.error({ error }, 'Manual digest generation failed');
         addCronLog({
             jobName: 'digest-manual',
             status: 'error',
-            message: error instanceof Error ? error.message : 'Unknown error',
+            message: errMsg,
             duration: Date.now() - startedAt,
         });
         return {
             success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
+            error: errMsg,
         };
     } finally {
         digestJobInProgress = false;

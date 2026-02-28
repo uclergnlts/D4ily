@@ -25,6 +25,14 @@ export function useRunDigest() {
   });
 }
 
+export function useDigestStatus(polling: boolean) {
+  return useQuery({
+    queryKey: ['cron', 'digest', 'status'],
+    queryFn: () => cronService.getDigestStatus(),
+    refetchInterval: polling ? 3000 : false,
+  });
+}
+
 export function useRunWeekly() {
   return useMutation({
     mutationFn: () => cronService.runWeekly(),
