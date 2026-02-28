@@ -201,7 +201,9 @@ digestRoute.get('/:country/latest', async (c) => {
         let digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
 
         // Self-heal: if today's digest exists but looks like a generic fallback,
-        // retry generation once per country/date window.
+        // retry generation in background once per country/date window.
+        // Fire-and-forget so the user gets the current digest immediately
+        // instead of hitting the 30s aiTimeout middleware.
         if (digest && isWeakDigest(digest)) {
             const retryKey = `${validatedCountry}:${todayDigestDate}`;
             const lastRetryAt = weakDigestRetryState.get(retryKey) || 0;
@@ -209,9 +211,10 @@ digestRoute.get('/:country/latest', async (c) => {
 
             if (canRetry) {
                 weakDigestRetryState.set(retryKey, Date.now());
-                logger.warn({ country: validatedCountry, digestDate: todayDigestDate }, 'Weak digest detected, retrying generation');
-                await generateDailyDigest(validatedCountry, 'daily', new Date());
-                digest = await getDigestByDateAndPeriod(validatedCountry, todayDigestDate, 'daily');
+                logger.warn({ country: validatedCountry, digestDate: todayDigestDate }, 'Weak digest detected, retrying generation in background');
+                generateDailyDigest(validatedCountry, 'daily', new Date()).catch((err) => {
+                    logger.error({ country: validatedCountry, error: err instanceof Error ? err.message : String(err) }, 'Background weak digest regeneration failed');
+                });
             }
         }
 

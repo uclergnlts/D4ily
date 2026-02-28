@@ -95,7 +95,16 @@ export async function aiChatCompletion<T = any>(
             return await executeRequest();
         } catch (error) {
             if (fallback) {
-                logger.warn({ circuit: circuitName }, 'AI request failed, using fallback');
+                const errDetail = error instanceof Error ? error.message : String(error);
+                const errStatus = (error as any)?.status;
+                const errCode = (error as any)?.code;
+                logger.warn({
+                    circuit: circuitName,
+                    error: errDetail,
+                    status: errStatus,
+                    code: errCode,
+                    model: params.model || 'gpt-4o-mini',
+                }, 'AI request failed, using fallback');
                 return fallback();
             }
             throw error;

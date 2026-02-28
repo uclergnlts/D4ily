@@ -291,8 +291,8 @@ function dedupeArticlesSemantically(articles: ArticleInput[]): ArticleInput[] {
     return kept;
 }
 
-function normalizeText(text: string): string {
-    return text.replace(/\s+/g, ' ').trim();
+function normalizeText(text: string | null | undefined): string {
+    return String(text || '').replace(/\s+/g, ' ').trim();
 }
 
 function getWordCount(text: string): number {
@@ -655,17 +655,49 @@ function buildOperationalDigestFallback(
     countryCode: CountryCode,
     promptVariant: 'A' | 'B',
 ): DigestResult {
-    const sections = countryCode === 'tr' ? buildSectionFallbacksFromArticles(articles) : [];
-    const topTopics = normalizeTopicItems([], articles);
+    let sections: DigestSection[] = [];
+    let topTopics: TopicItem[] = [];
 
-    let summaryText = enforceSummaryQuality('', {
-        sections,
-        topics: topTopics,
-        articles,
-        tweets,
-        minWords: countryCode === 'tr' ? 100 : 90,
-        minTweetRefs: countryCode === 'tr' ? 3 : 2,
-    });
+    try {
+        sections = countryCode === 'tr' ? buildSectionFallbacksFromArticles(articles) : [];
+    } catch (error) {
+        logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'buildSectionFallbacksFromArticles failed');
+    }
+
+    try {
+        topTopics = normalizeTopicItems([], articles);
+    } catch (error) {
+        logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'normalizeTopicItems failed in fallback');
+        // Build minimal topics directly from articles
+        topTopics = articles.slice(0, 5).map(a => ({
+            title: normalizeText(a.translatedTitle),
+            description: normalizeText(a.summary).slice(0, 180),
+            articleId: a.id,
+            importanceScore: safeNumber(a.importanceScore, 0.5),
+            importanceTier: a.importanceTier || 'orta' as const,
+        })).filter(t => t.title);
+    }
+
+    let summaryText = '';
+    try {
+        summaryText = enforceSummaryQuality('', {
+            sections,
+            topics: topTopics,
+            articles,
+            tweets,
+            minWords: countryCode === 'tr' ? 100 : 90,
+            minTweetRefs: countryCode === 'tr' ? 3 : 2,
+        });
+    } catch (error) {
+        logger.warn({ countryCode, error: error instanceof Error ? error.message : String(error) }, 'enforceSummaryQuality failed in fallback');
+        // Build summary directly from articles
+        const parts = articles.slice(0, 6).map(a => {
+            const title = normalizeText(a.translatedTitle);
+            const summary = normalizeText(a.summary);
+            return title && summary ? `${title}: ${summary.split(/[.!?]/)[0]}.` : title ? `${title}.` : '';
+        }).filter(Boolean);
+        summaryText = normalizeText(parts.join(' '));
+    }
 
     const telemetry: DigestTelemetry = {
         promptVariant,
@@ -1161,6 +1193,8 @@ JSON uret:
 
 Sadece JSON.`;
 
+    logger.info({ promptLength: prompt.length, articleCount: articles.length, tweetCount: tweets.length }, 'TR digest AI call starting');
+
     const result = await aiChatCompletion<any>(
         {
             model: 'gpt-4o-mini',
@@ -1179,6 +1213,15 @@ Sadece JSON.`;
             maxContentLength: 70000,
         }
     );
+
+    const isFallbackResult = !result.sections && !result.summary && !result.top_topics;
+    logger.info({
+        isFallbackResult,
+        hasResultSections: !!result.sections,
+        hasResultSummary: !!result.summary,
+        hasResultTopics: !!(result.top_topics || result.topTopics),
+        resultKeys: Object.keys(result),
+    }, 'TR digest AI call completed');
 
     const tweetAvatarByHandle = new Map<string, string>();
     const tweetAvatarByAuthor = new Map<string, string>();
@@ -1293,8 +1336,21 @@ async function generateDigestWithAI(
         }
         return await generateDefaultDigestWithAI(articles, tweets, promptVariant);
     } catch (error) {
-        logger.error({ error, countryCode }, 'Digest AI generation failed');
-        return buildOperationalDigestFallback(articles, tweets, countryCode, promptVariant);
+        const errMsg = error instanceof Error ? error.message : String(error);
+        const errStack = error instanceof Error ? error.stack : undefined;
+        logger.error({ error: errMsg, stack: errStack, countryCode, articleCount: articles.length, tweetCount: tweets.length }, 'Digest AI generation failed, using operational fallback');
+        try {
+            return buildOperationalDigestFallback(articles, tweets, countryCode, promptVariant);
+        } catch (fallbackError) {
+            logger.error({ error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError), countryCode }, 'Operational fallback also failed');
+            return {
+                summaryText: getDigestFallback(articles.length, countryCode === 'tr').summaryText,
+                topTopics: [],
+                sections: [],
+                articleCount: articles.length,
+                tweetCount: tweets.length,
+            };
+        }
     }
 }
 

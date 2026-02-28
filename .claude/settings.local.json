@@ -95,7 +95,11 @@
       "Bash(npx get-shit-done-cc@latest)",
       "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs init new-project)",
       "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs init map-codebase)",
-      "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs commit \"docs: map existing codebase\" --files .planning/codebase/STACK.md .planning/codebase/INTEGRATIONS.md .planning/codebase/ARCHITECTURE.md .planning/codebase/STRUCTURE.md .planning/codebase/CONVENTIONS.md .planning/codebase/TESTING.md .planning/codebase/CONCERNS.md)"
+      "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs commit \"docs: map existing codebase\" --files .planning/codebase/STACK.md .planning/codebase/INTEGRATIONS.md .planning/codebase/ARCHITECTURE.md .planning/codebase/STRUCTURE.md .planning/codebase/CONVENTIONS.md .planning/codebase/TESTING.md .planning/codebase/CONCERNS.md)",
+      "Bash(for country in tr de us uk fr es it ru)",
+      "Bash(do echo \"=== $country ===\")",
+      "Bash(do echo -n \"$country: \" curl -s \"https://d4ily-production.up.railway.app/digest/$country?date=2026-02-28\")",
+      "Bash(node check_digests.js)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"
