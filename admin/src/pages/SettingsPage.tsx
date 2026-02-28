@@ -35,14 +35,15 @@ export function SettingsPage() {
 
   // Auto-detect running job on initial load and manage polling lifecycle
   useEffect(() => {
-    if (digestStatus?.running) {
+    if (!digestStatus) return;
+    if (digestStatus.running) {
       setPollDigest(true);
-    } else if (pollDigest && digestStatus && !digestStatus.running && digestStatus.finishedAt) {
+    } else if (pollDigest && digestStatus.finishedAt) {
       // Stop polling 5s after completion
       const timer = setTimeout(() => setPollDigest(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [digestStatus?.running, digestStatus?.finishedAt, pollDigest]);
+  }, [digestStatus, pollDigest]);
 
   const isDigestRunning = digestStatus?.running || false;
   const successCount = digestStatus?.countries.filter(c => c.status === 'success').length ?? 0;
