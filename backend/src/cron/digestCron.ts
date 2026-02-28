@@ -9,6 +9,10 @@ type DigestCountry = typeof DIGEST_COUNTRIES[number];
 const DIGEST_TIMEZONE = 'Europe/Istanbul';
 let digestJobInProgress = false;
 
+export function isDigestJobRunning() {
+    return digestJobInProgress;
+}
+
 /**
  * Digest Cron Job
  * Runs at 19:00 every day to generate the daily digest
@@ -139,17 +143,50 @@ export async function triggerDigestManually(_period: 'morning' | 'evening' | 'da
     const period = 'daily';
     logger.info({ period }, 'Manual digest generation triggered');
 
+    if (digestJobInProgress) {
+        logger.warn({ period }, 'Manual digest generation skipped: another run is in progress');
+        return {
+            success: false,
+            error: 'Digest generation already in progress',
+        };
+    }
+
+    const startedAt = Date.now();
+    digestJobInProgress = true;
+
     try {
         const results = await generateAllDigests(period);
+        const successful = results.filter(r => r.success).length;
+        const failed = results.filter(r => !r.success).length;
+        const duration = Date.now() - startedAt;
+
+        addCronLog({
+            jobName: 'digest-manual',
+            status: failed === 0 ? 'success' : 'error',
+            message: `${successful} successful, ${failed} failed`,
+            duration,
+        });
+
         return {
             success: true,
+            successful,
+            failed,
+            duration,
             results,
         };
     } catch (error) {
         logger.error({ error }, 'Manual digest generation failed');
+        addCronLog({
+            jobName: 'digest-manual',
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            duration: Date.now() - startedAt,
+        });
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Unknown error',
         };
+    } finally {
+        digestJobInProgress = false;
     }
 }

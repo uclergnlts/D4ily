@@ -15,7 +15,7 @@ import { sendBulkPushNotifications } from '../services/notificationService.js';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { adminMiddleware } from '../middleware/auth.js';
-import { triggerDigestManually } from '../cron/digestCron.js';
+import { isDigestJobRunning, triggerDigestManually } from '../cron/digestCron.js';
 import { triggerWeeklyManually } from '../cron/weeklyCron.js';
 import { scrapeRateLimiter } from '../middleware/rateLimiter.js';
 
@@ -464,13 +464,38 @@ admin.get('/categories', async (c) => {
  */
 admin.post('/cron/digest/run', async (c) => {
     try {
-        logger.info({ period: 'daily' }, 'Manual digest generation triggered by admin');
-        const result = await triggerDigestManually('daily');
+        if (isDigestJobRunning()) {
+            return c.json({
+                success: false,
+                error: 'Digest generation already in progress',
+            }, 409);
+        }
+
+        logger.info({ period: 'daily' }, 'Manual digest generation accepted by admin');
+        void triggerDigestManually('daily').then((result) => {
+            if (!result.success) {
+                logger.error({ result }, 'Background manual digest generation failed');
+            } else {
+                const successful = 'successful' in result ? result.successful : undefined;
+                const failed = 'failed' in result ? result.failed : undefined;
+                const duration = 'duration' in result ? result.duration : undefined;
+                logger.info({
+                    successful,
+                    failed,
+                    duration,
+                }, 'Background manual digest generation completed');
+            }
+        }).catch((error) => {
+            logger.error({ error }, 'Background manual digest generation crashed');
+        });
 
         return c.json({
             success: true,
-            data: result,
-        });
+            data: {
+                accepted: true,
+                message: 'Digest generation started in background',
+            },
+        }, 202);
     } catch (error) {
         logger.error({ error }, 'Manual digest trigger failed');
         return c.json({

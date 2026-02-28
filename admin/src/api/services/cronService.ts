@@ -10,8 +10,8 @@ export const cronService = {
     return response.data.data;
   },
 
-  runDigest: async (): Promise<{ digestsCreated: number }> => {
-    const response = await apiClient.post<ApiResponse<{ digestsCreated: number }>>('/admin/cron/digest/run');
+  runDigest: async (): Promise<{ accepted: boolean; message: string }> => {
+    const response = await apiClient.post<ApiResponse<{ accepted: boolean; message: string }>>('/admin/cron/digest/run');
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.error || 'Failed to run digest');
     }
