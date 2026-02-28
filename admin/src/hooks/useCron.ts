@@ -13,7 +13,11 @@ export function useRunDigest() {
   return useMutation({
     mutationFn: () => cronService.runDigest(),
     onSuccess: (data) => {
-      toast.success(data.message || 'Digest generation started in background');
+      if (data.accepted) {
+        toast.success(data.message || 'Digest generation started in background');
+      } else {
+        toast(data.message || 'Digest generation is already in progress');
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);

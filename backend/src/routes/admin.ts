@@ -466,9 +466,12 @@ admin.post('/cron/digest/run', async (c) => {
     try {
         if (isDigestJobRunning()) {
             return c.json({
-                success: false,
-                error: 'Digest generation already in progress',
-            }, 409);
+                success: true,
+                data: {
+                    accepted: false,
+                    message: 'Digest generation is already in progress',
+                },
+            }, 202);
         }
 
         logger.info({ period: 'daily' }, 'Manual digest generation accepted by admin');
