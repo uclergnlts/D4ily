@@ -15,6 +15,8 @@ import { TwitterAccountsPage } from './pages/TwitterAccountsPage';
 import { CronLogsPage } from './pages/CronLogsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SystemHealthPage } from './pages/SystemHealthPage';
+import { ModerationPage } from './pages/ModerationPage';
+import { CampaignsPage } from './pages/CampaignsPage';
 
 function App() {
   return (
@@ -39,6 +41,8 @@ function App() {
             <Route path="/twitter/:countryCode" element={<TwitterAccountsPage />} />
             {/* Other routes */}
             <Route path="/users" element={<UsersPage />} />
+            <Route path="/moderation" element={<ModerationPage />} />
+            <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/cron-logs" element={<CronLogsPage />} />
             <Route path="/system" element={<SystemHealthPage />} />

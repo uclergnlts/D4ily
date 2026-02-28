@@ -11,7 +11,8 @@ import {
 import { aiUsageMetrics } from '../db/schema/metrics.js';
 import { eq, desc, sql, and, gte, lte, inArray } from 'drizzle-orm';
 import { scrapeSource } from '../services/scraper/scraperService.js';
-import { sendBulkPushNotifications } from '../services/notificationService.js';
+import { sendBulkNotifications } from '../services/expoNotificationService.js';
+import { v4 as uuidv4 } from 'uuid';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { adminMiddleware } from '../middleware/auth.js';
@@ -1241,6 +1242,7 @@ admin.post('/notifications/send', async (c) => {
             return c.json({ success: false, error: 'Title and body are required' }, 400);
         }
 
+        // Get target users
         let targetUserIds: string[] = userIds || [];
 
         if (targetUserIds.length === 0) {
@@ -1252,18 +1254,57 @@ admin.post('/notifications/send', async (c) => {
             return c.json({ success: false, error: 'No users found' }, 404);
         }
 
-        const result = await sendBulkPushNotifications(targetUserIds, {
-            type: type || 'system',
-            title,
-            body: notifBody,
-        });
+        // Get active device tokens for target users
+        const devices = await db
+            .select({ fcmToken: userDevices.fcmToken, userId: userDevices.userId })
+            .from(userDevices)
+            .where(and(
+                eq(userDevices.isActive, true),
+                inArray(userDevices.userId, targetUserIds)
+            ));
+        const tokens = devices.map(d => d.fcmToken).filter(Boolean);
 
-        logger.info({ targetCount: targetUserIds.length, ...result }, 'Admin notification sent');
+        // Send push notifications via Expo SDK
+        let sentCount = 0;
+        let failedCount = 0;
+
+        if (tokens.length > 0) {
+            const result = await sendBulkNotifications(
+                tokens,
+                title,
+                notifBody,
+                { type: type || 'system' }
+            );
+            sentCount = result.success;
+            failedCount = result.failed;
+        }
+
+        // Save notification records for each target user
+        const notifType = type || 'system';
+        const now = new Date();
+        for (const userId of targetUserIds) {
+            try {
+                await db.insert(notifications).values({
+                    id: uuidv4(),
+                    userId,
+                    type: notifType,
+                    title,
+                    body: notifBody,
+                    sentAt: now,
+                });
+            } catch (err) {
+                // Non-critical - don't fail the whole operation
+                logger.warn({ userId, error: err instanceof Error ? err.message : String(err) }, 'Failed to save notification record');
+            }
+        }
+
+        logger.info({ targetCount: targetUserIds.length, tokenCount: tokens.length, sentCount, failedCount }, 'Admin notification sent');
         return c.json({
             success: true,
             data: {
                 targetUsers: targetUserIds.length,
-                ...result,
+                success: sentCount,
+                failed: failedCount,
             },
         });
     } catch (error) {

@@ -15,6 +15,8 @@ import {
   Clock,
   Bell,
   Activity,
+  Shield,
+  Megaphone,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 import { cn } from '../../lib/utils';
@@ -153,6 +155,16 @@ export function Sidebar() {
         <NavLink to="/users" className={navLinkClass}>
           <Users className="h-5 w-5" />
           <span>Users</span>
+        </NavLink>
+
+        <NavLink to="/moderation" className={navLinkClass}>
+          <Shield className="h-5 w-5" />
+          <span>Moderation</span>
+        </NavLink>
+
+        <NavLink to="/campaigns" className={navLinkClass}>
+          <Megaphone className="h-5 w-5" />
+          <span>Campaigns</span>
         </NavLink>
 
         <NavLink to="/notifications" className={navLinkClass}>

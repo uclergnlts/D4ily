@@ -33,3 +33,42 @@ export function useUpdateUser() {
     },
   });
 }
+
+export function useUserDetails(id: string) {
+  return useQuery({
+    queryKey: ['users', id, 'details'],
+    queryFn: () => userService.getDetails(id),
+    enabled: !!id,
+  });
+}
+
+export function useBanUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reason, durationDays }: { id: string; reason: string; durationDays?: number }) =>
+      userService.ban(id, reason, durationDays),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User banned successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useUnbanUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => userService.unban(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User unbanned successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}

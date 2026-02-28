@@ -100,7 +100,11 @@
       "Bash(do echo \"=== $country ===\")",
       "Bash(do echo -n \"$country: \" curl -s \"https://d4ily-production.up.railway.app/digest/$country?date=2026-02-28\")",
       "Bash(node check_digests.js)",
-      "Bash(git status -u)"
+      "Bash(git status -u)",
+      "Bash(wc -l /c/Users/ucler/Desktop/D4ily/backend/src/routes/admin-*.ts)",
+      "Bash(npx vite build)",
+      "Bash(xargs grep -l \"notificationService\\\\|useNotification\")",
+      "Bash(xargs grep -l \"initNotifications\\\\|registerPushToken\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"

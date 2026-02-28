@@ -5,12 +5,13 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
-import { useUsers, useUpdateUser } from '../hooks/useUsers';
+import { useUsers, useUpdateUser, useUserDetails, useBanUser, useUnbanUser } from '../hooks/useUsers';
 import type { User } from '../types';
 import { createColumnHelper } from '@tanstack/react-table';
 import { formatDate } from '../lib/utils';
-import { ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Ban, ShieldCheck } from 'lucide-react';
 
 const columnHelper = createColumnHelper<User>();
 
@@ -19,9 +20,16 @@ export function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editRole, setEditRole] = useState<'user' | 'admin'>('user');
   const [editSubscription, setEditSubscription] = useState<'free' | 'premium'>('free');
+  const [banningUser, setBanningUser] = useState<User | null>(null);
+  const [banReason, setBanReason] = useState('');
+  const [banDuration, setBanDuration] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
 
   const { data, isLoading } = useUsers(page, 20);
   const updateMutation = useUpdateUser();
+  const banMutation = useBanUser();
+  const unbanMutation = useUnbanUser();
+  const { data: userDetails } = useUserDetails(selectedUserId);
 
   const columns = [
     columnHelper.accessor('name', {
@@ -66,17 +74,33 @@ export function UsersPage() {
       id: 'actions',
       header: 'Actions',
       cell: (info) => (
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            setEditingUser(info.row.original);
-            setEditRole(info.row.original.userRole);
-            setEditSubscription(info.row.original.subscriptionStatus);
-          }}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setEditingUser(info.row.original);
+              setEditRole(info.row.original.userRole);
+              setEditSubscription(info.row.original.subscriptionStatus);
+              setSelectedUserId(info.row.original.id);
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setSelectedUserId(info.row.original.id);
+              setBanningUser(info.row.original);
+              setBanReason('');
+              setBanDuration('');
+            }}
+            className="text-red-600 hover:text-red-700"
+          >
+            <Ban className="h-4 w-4" />
+          </Button>
+        </div>
       ),
     }),
   ];
@@ -98,6 +122,27 @@ export function UsersPage() {
         },
       }
     );
+  };
+
+  const handleBan = () => {
+    if (!banningUser || !banReason) return;
+
+    banMutation.mutate(
+      {
+        id: banningUser.id,
+        reason: banReason,
+        durationDays: banDuration ? parseInt(banDuration, 10) : undefined,
+      },
+      {
+        onSuccess: () => {
+          setBanningUser(null);
+        },
+      }
+    );
+  };
+
+  const handleUnban = (userId: string) => {
+    unbanMutation.mutate(userId);
   };
 
   return (
@@ -157,6 +202,29 @@ export function UsersPage() {
             </div>
           </div>
 
+          {userDetails?.banStatus && (
+            <div className="flex items-center justify-between rounded-lg bg-red-50 border border-red-200 p-3">
+              <div>
+                <p className="text-sm font-medium text-red-800">User is banned</p>
+                <p className="text-xs text-red-600">{userDetails.banStatus.reason}</p>
+                {userDetails.banStatus.expiresAt && (
+                  <p className="text-xs text-red-500 mt-1">
+                    Expires: {formatDate(userDetails.banStatus.expiresAt)}
+                  </p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => handleUnban(editingUser!.id)}
+                isLoading={unbanMutation.isPending}
+                className="flex items-center gap-1"
+              >
+                <ShieldCheck className="h-3 w-3" /> Unban
+              </Button>
+            </div>
+          )}
+
           <Select
             label="Role"
             options={[
@@ -183,6 +251,58 @@ export function UsersPage() {
             </Button>
             <Button onClick={handleUpdate} isLoading={updateMutation.isPending}>
               Save Changes
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Ban User Modal */}
+      <Modal
+        isOpen={!!banningUser}
+        onClose={() => setBanningUser(null)}
+        title="Ban User"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 mb-4">
+            {banningUser?.avatarUrl && (
+              <img
+                src={banningUser.avatarUrl}
+                alt=""
+                className="h-12 w-12 rounded-full"
+              />
+            )}
+            <div>
+              <p className="font-medium">{banningUser?.name}</p>
+              <p className="text-sm text-gray-500">{banningUser?.email}</p>
+            </div>
+          </div>
+
+          <Input
+            label="Reason"
+            value={banReason}
+            onChange={(e) => setBanReason(e.target.value)}
+            placeholder="Why is this user being banned?"
+          />
+
+          <Input
+            label="Duration (days, leave empty for permanent)"
+            type="number"
+            value={banDuration}
+            onChange={(e) => setBanDuration(e.target.value)}
+            placeholder="e.g. 7"
+          />
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button variant="secondary" onClick={() => setBanningUser(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleBan}
+              isLoading={banMutation.isPending}
+              disabled={!banReason}
+            >
+              Ban User
             </Button>
           </div>
         </div>

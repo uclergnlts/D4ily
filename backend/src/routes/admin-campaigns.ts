@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { db } from '../config/db.js';
-import { users } from '../db/schema/index.js';
+import { users, userDevices, notifications } from '../db/schema/index.js';
 import { notificationCampaigns } from '../db/schema/admin.js';
 import { authMiddleware, adminMiddleware, AuthUser } from '../middleware/auth.js';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and, inArray } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
-import { sendPushNotification } from '../services/expoNotificationService.js';
+import { sendBulkNotifications } from '../services/expoNotificationService.js';
 
 type Variables = {
     user: AuthUser;
@@ -126,38 +126,127 @@ adminCampaigns.post('/:campaignId/send', async (c) => {
             return c.json({ success: false, error: 'Campaign already sent' }, 400);
         }
 
-        // Get all users (simplified - in production you'd get push tokens from user_devices table)
-        let userQuery = db.select({ id: users.id }).from(users);
-        
+        // Get target user IDs based on audience
+        let whereClause = undefined;
         if (campaign.targetAudience === 'premium') {
-            userQuery = userQuery.where(eq(users.subscriptionStatus, 'premium')) as typeof userQuery;
+            whereClause = eq(users.subscriptionStatus, 'premium');
         } else if (campaign.targetAudience === 'free') {
-            userQuery = userQuery.where(eq(users.subscriptionStatus, 'free')) as typeof userQuery;
+            whereClause = eq(users.subscriptionStatus, 'free');
+        } else if (campaign.targetAudience === 'inactive') {
+            // Users with no device activity in last 30 days
+            const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const activeUserIds = await db
+                .select({ userId: userDevices.userId })
+                .from(userDevices)
+                .where(and(
+                    eq(userDevices.isActive, true),
+                    sql`${userDevices.lastActive} > ${Math.floor(thirtyDaysAgo.getTime() / 1000)}`
+                ));
+            const activeSet = new Set(activeUserIds.map(u => u.userId));
+            const allUsers = await db.select({ id: users.id }).from(users);
+            const inactiveIds = allUsers.filter(u => !activeSet.has(u.id)).map(u => u.id);
+
+            if (inactiveIds.length === 0) {
+                await db.update(notificationCampaigns).set({ status: 'sent', sentAt: new Date(), sentCount: 0, deliveredCount: 0 }).where(eq(notificationCampaigns.id, campaignId));
+                return c.json({ success: true, message: 'No inactive users found', data: { sentCount: 0, failedCount: 0, totalTargets: 0 } });
+            }
+
+            // Use inactive user IDs directly
+            const devices = await db
+                .select({ fcmToken: userDevices.fcmToken })
+                .from(userDevices)
+                .where(and(eq(userDevices.isActive, true), inArray(userDevices.userId, inactiveIds)));
+            const tokens = devices.map(d => d.fcmToken).filter(Boolean);
+
+            let sentCount = 0;
+            let failedCount = 0;
+            if (tokens.length > 0) {
+                const result = await sendBulkNotifications(tokens, campaign.title, campaign.body, { type: 'campaign', campaignId });
+                sentCount = result.success;
+                failedCount = result.failed;
+            }
+
+            // Save notification records
+            const now = new Date();
+            for (const userId of inactiveIds) {
+                try {
+                    await db.insert(notifications).values({ id: uuidv4(), userId, type: 'campaign', title: campaign.title, body: campaign.body, data: JSON.stringify({ campaignId }), sentAt: now });
+                } catch (_) { /* non-critical */ }
+            }
+
+            await db.update(notificationCampaigns).set({ status: 'sent', sentAt: now, sentCount: tokens.length, deliveredCount: sentCount }).where(eq(notificationCampaigns.id, campaignId));
+            logger.info({ campaignId, sentCount, failedCount, totalTokens: tokens.length, audience: 'inactive' }, 'Campaign sent');
+            return c.json({ success: true, message: 'Campaign sent', data: { sentCount, failedCount, totalTargets: tokens.length } });
+        }
+        // 'all', 'premium', 'free' paths
+        const targetUsers = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(whereClause);
+
+        const userIds = targetUsers.map(u => u.id);
+
+        // Get active device tokens for target users
+        let tokens: string[] = [];
+        if (userIds.length > 0) {
+            const devices = await db
+                .select({ fcmToken: userDevices.fcmToken })
+                .from(userDevices)
+                .where(and(
+                    eq(userDevices.isActive, true),
+                    inArray(userDevices.userId, userIds)
+                ));
+            tokens = devices.map(d => d.fcmToken).filter(Boolean);
         }
 
-        const targetUsers = await userQuery;
-
-        // Send notifications (mock - would use actual push tokens)
+        // Send actual push notifications
         let sentCount = 0;
         let failedCount = 0;
+
+        if (tokens.length > 0) {
+            const result = await sendBulkNotifications(
+                tokens,
+                campaign.title,
+                campaign.body,
+                { type: 'campaign', campaignId }
+            );
+            sentCount = result.success;
+            failedCount = result.failed;
+        }
+
+        // Save notification records for each target user
+        const now = new Date();
+        for (const userId of userIds) {
+            try {
+                await db.insert(notifications).values({
+                    id: uuidv4(),
+                    userId,
+                    type: 'campaign',
+                    title: campaign.title,
+                    body: campaign.body,
+                    data: JSON.stringify({ campaignId }),
+                    sentAt: now,
+                });
+            } catch (_) { /* non-critical */ }
+        }
 
         // Update campaign status
         await db
             .update(notificationCampaigns)
             .set({
                 status: 'sent',
-                sentAt: new Date(),
-                sentCount: targetUsers.length,
+                sentAt: now,
+                sentCount: tokens.length,
                 deliveredCount: sentCount,
             })
             .where(eq(notificationCampaigns.id, campaignId));
 
-        logger.info({ campaignId, sentCount, failedCount }, 'Campaign sent');
+        logger.info({ campaignId, sentCount, failedCount, totalTokens: tokens.length }, 'Campaign sent');
 
         return c.json({
             success: true,
             message: 'Campaign sent',
-            data: { sentCount, failedCount, totalTargets: targetUsers.length },
+            data: { sentCount, failedCount, totalTargets: tokens.length },
         });
     } catch (error) {
         logger.error({ error }, 'Failed to send campaign');

@@ -100,7 +100,7 @@ export const userCategoryPreferences = sqliteTable('user_category_preferences', 
 export const notifications = sqliteTable('notifications', {
     id: text('id').primaryKey(),
     userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-    type: text('type', { enum: ['news', 'digest', 'weekly', 'breaking', 'comment', 'alignment'] }).notNull(),
+    type: text('type', { enum: ['news', 'digest', 'weekly', 'breaking', 'comment', 'alignment', 'system', 'campaign'] }).notNull(),
     title: text('title').notNull(),
     body: text('body').notNull(),
     data: text('data', { mode: 'json' }),

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { db } from '../config/db.js';
 import { blacklistedWords, moderationQueue } from '../db/schema/admin.js';
 import { authMiddleware, adminMiddleware, AuthUser } from '../middleware/auth.js';
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, desc, sql, and } from 'drizzle-orm';
 import { logger } from '../config/logger.js';
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
@@ -147,11 +147,11 @@ adminModeration.get('/queue', async (c) => {
         const contentType = c.req.query('contentType');
         const offset = (page - 1) * limit;
 
-        let whereClause: any = eq(moderationQueue.status, status);
-        
+        const conditions = [eq(moderationQueue.status, status)];
         if (contentType) {
-            whereClause = sql`${whereClause} AND ${moderationQueue.contentType} = ${contentType}`;
+            conditions.push(eq(moderationQueue.contentType, contentType));
         }
+        const whereClause = conditions.length === 1 ? conditions[0] : and(...conditions);
 
         const results = await db
             .select({

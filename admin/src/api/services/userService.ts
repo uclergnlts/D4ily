@@ -25,4 +25,26 @@ export const userService = {
     }
     return response.data.data;
   },
+
+  getDetails: async (id: string): Promise<{ user: User; devices: any[]; banStatus: any | null }> => {
+    const response = await apiClient.get<ApiResponse<{ user: User; devices: any[]; banStatus: any | null }>>(`/admin/users/${id}`);
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to fetch user details');
+    }
+    return response.data.data;
+  },
+
+  ban: async (id: string, reason: string, durationDays?: number): Promise<void> => {
+    const response = await apiClient.post<ApiResponse<any>>(`/admin/users/${id}/ban`, { reason, durationDays });
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to ban user');
+    }
+  },
+
+  unban: async (id: string): Promise<void> => {
+    const response = await apiClient.post<ApiResponse<any>>(`/admin/users/${id}/unban`);
+    if (!response.data.success) {
+      throw new Error(response.data.error || 'Failed to unban user');
+    }
+  },
 };
