@@ -4,6 +4,7 @@ import { rss_sources } from '../db/schema/index.js';
 import { eq } from 'drizzle-orm';
 import { scrapeSource } from '../services/scraper/scraperService.js';
 import { logger } from '../config/logger.js';
+import { addCronLog } from '../routes/admin.js';
 
 // Process sources in parallel batches to improve performance
 const BATCH_SIZE = 5;
@@ -99,8 +100,20 @@ export async function runScraper() {
             totalDuplicates,
             totalFiltered,
         }, 'Scraping cycle completed');
+
+        addCronLog({
+            jobName: 'scraper',
+            status: 'success',
+            message: `Processed ${totalProcessed}, duplicates ${totalDuplicates}, filtered ${totalFiltered}`,
+            duration: undefined,
+        });
     } catch (error) {
         logger.error({ error }, 'Scraping cycle failed');
+        addCronLog({
+            jobName: 'scraper',
+            status: 'error',
+            message: error instanceof Error ? error.message : 'Unknown error',
+        });
     }
 }
 

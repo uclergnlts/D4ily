@@ -1318,6 +1318,7 @@ export async function generateDailyDigest(
         const articleLimit = countryCode === 'tr' ? 80 : 50;
 
         // Use raw SQL for date comparisons to avoid libsql type binding issues
+        let usedStaleArticleFallback = false;
         let articles = await db
             .select({
                 id: tables.articles.id,
@@ -1358,6 +1359,28 @@ export async function generateDailyDigest(
                     gte(tables.articles.publishedAt, fallbackStart),
                     eq(tables.articles.isFiltered, false)
                 ))
+                .orderBy(desc(tables.articles.publishedAt))
+                .limit(articleLimit);
+        }
+
+        // Last-resort fallback: use latest available articles even if stale.
+        // This guarantees digest continuity when scraper is temporarily down.
+        if (articles.length === 0) {
+            logger.warn({ countryCode, period }, 'No articles in last 7 days, falling back to latest available articles');
+            usedStaleArticleFallback = true;
+
+            articles = await db
+                .select({
+                    id: tables.articles.id,
+                    translatedTitle: tables.articles.translatedTitle,
+                    summary: tables.articles.summary,
+                    categoryId: tables.articles.categoryId,
+                    sourceCount: tables.articles.sourceCount,
+                    politicalTone: tables.articles.politicalTone,
+                    publishedAt: tables.articles.publishedAt,
+                })
+                .from(tables.articles)
+                .where(eq(tables.articles.isFiltered, false))
                 .orderBy(desc(tables.articles.publishedAt))
                 .limit(articleLimit);
         }
@@ -1448,8 +1471,20 @@ export async function generateDailyDigest(
             labeledArticles: enrichedArticles.filter(a => a.alignmentSummary && !a.alignmentSummary.includes('belirsiz')).length,
         }, 'Digest source priority applied');
 
-        // Generate digest with AI
-        const digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode, promptVariant);
+        let digestResult: DigestResult;
+        if (usedStaleArticleFallback) {
+            logger.warn({
+                countryCode,
+                articleCount: supportingArticles.length,
+            }, 'Using stale article fallback digest (AI skipped)');
+            digestResult = {
+                ...getDigestFallback(supportingArticles.length, countryCode === 'tr'),
+                tweetCount: tweets.length,
+            };
+        } else {
+            // Generate digest with AI for fresh/recent data windows.
+            digestResult = await generateDigestWithAI(supportingArticles, tweets, countryCode, promptVariant);
+        }
 
         // Precompute missing topic details so article screens open faster from digest headlines.
         try {

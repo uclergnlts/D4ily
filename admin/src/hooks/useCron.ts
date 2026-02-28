@@ -32,3 +32,15 @@ export function useRunWeekly() {
     },
   });
 }
+
+export function useRunScraper() {
+  return useMutation({
+    mutationFn: () => cronService.runScraper(),
+    onSuccess: () => {
+      toast.success('Scraper started in background');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}

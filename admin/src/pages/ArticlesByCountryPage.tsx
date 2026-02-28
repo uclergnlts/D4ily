@@ -6,11 +6,13 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { DataTable } from '../components/ui/DataTable';
 import { Modal } from '../components/ui/Modal';
-import { useArticles, useDeleteArticle } from '../hooks/useArticles';
+import { Input } from '../components/ui/Input';
+import { Select } from '../components/ui/Select';
+import { useArticles, useDeleteArticle, useUpdateArticle } from '../hooks/useArticles';
 import { COUNTRIES, type Article, type CountryCode } from '../types';
 import { createColumnHelper } from '@tanstack/react-table';
 import { formatDate, truncate, getSentimentColor, getPoliticalToneLabel, getPoliticalToneColor } from '../lib/utils';
-import { ChevronLeft, ChevronRight, Trash2, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Trash2, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const columnHelper = createColumnHelper<Article>();
@@ -22,9 +24,21 @@ export function ArticlesByCountryPage() {
 
   const [page, setPage] = useState(1);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSummary, setEditSummary] = useState('');
+  const [editSentiment, setEditSentiment] = useState('');
 
   const { data, isLoading } = useArticles(country, page, 20);
   const deleteMutation = useDeleteArticle();
+  const updateMutation = useUpdateArticle();
+
+  const openEdit = (article: Article) => {
+    setEditingArticle(article);
+    setEditTitle(article.translatedTitle);
+    setEditSummary(article.summary);
+    setEditSentiment(article.sentiment || '');
+  };
 
   const columns = [
     columnHelper.accessor('translatedTitle', {
@@ -101,6 +115,13 @@ export function ArticlesByCountryPage() {
             onClick={() => setSelectedArticle(info.row.original)}
           >
             <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => openEdit(info.row.original)}
+          >
+            <Pencil className="h-4 w-4" />
           </Button>
           <Button
             size="sm"
@@ -245,6 +266,57 @@ export function ArticlesByCountryPage() {
                 <p className="text-2xl font-bold">{selectedArticle.commentCount}</p>
                 <p className="text-sm text-gray-500">Comments</p>
               </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!editingArticle} onClose={() => setEditingArticle(null)} title="Edit Article" size="lg">
+        {editingArticle && (
+          <div className="space-y-4">
+            <Input label="Title" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Summary</label>
+              <textarea
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm min-h-[100px]"
+                value={editSummary}
+                onChange={(e) => setEditSummary(e.target.value)}
+                placeholder="Article summary"
+                title="Article summary"
+              />
+            </div>
+            <Select
+              label="Sentiment"
+              value={editSentiment}
+              onChange={(e) => setEditSentiment(e.target.value)}
+              options={[
+                { value: '', label: 'None' },
+                { value: 'positive', label: 'Positive' },
+                { value: 'neutral', label: 'Neutral' },
+                { value: 'negative', label: 'Negative' },
+              ]}
+            />
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="secondary" onClick={() => setEditingArticle(null)}>Cancel</Button>
+              <Button
+                isLoading={updateMutation.isPending}
+                onClick={() => {
+                  updateMutation.mutate(
+                    {
+                      country,
+                      articleId: editingArticle.id,
+                      data: {
+                        translatedTitle: editTitle,
+                        summary: editSummary,
+                        ...(editSentiment ? { sentiment: editSentiment as 'positive' | 'neutral' | 'negative' } : {}),
+                      },
+                    },
+                    { onSuccess: () => setEditingArticle(null) }
+                  );
+                }}
+              >
+                Save
+              </Button>
             </div>
           </div>
         )}

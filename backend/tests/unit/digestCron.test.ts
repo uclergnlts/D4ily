@@ -14,11 +14,22 @@ vi.mock('node-cron', () => ({
     },
 }));
 
-const { mockGenerateAllDigests } = vi.hoisted(() => ({
+const {
+    mockGenerateAllDigests,
+    mockGenerateDailyDigest,
+    mockGetDigestByDate,
+    mockGetDigestDateString,
+} = vi.hoisted(() => ({
     mockGenerateAllDigests: vi.fn(),
+    mockGenerateDailyDigest: vi.fn(),
+    mockGetDigestByDate: vi.fn(),
+    mockGetDigestDateString: vi.fn(() => '2026-02-28'),
 }));
 vi.mock('@/services/digestService.js', () => ({
     generateAllDigests: mockGenerateAllDigests,
+    generateDailyDigest: mockGenerateDailyDigest,
+    getDigestByDate: mockGetDigestByDate,
+    getDigestDateString: mockGetDigestDateString,
 }));
 
 import { triggerDigestManually, startDigestCron } from '@/cron/digestCron.js';
@@ -26,6 +37,8 @@ import { triggerDigestManually, startDigestCron } from '@/cron/digestCron.js';
 describe('digestCron', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockGetDigestByDate.mockResolvedValue({ id: 'existing-digest' });
+        mockGenerateDailyDigest.mockResolvedValue({ id: 'generated-digest', success: true });
     });
 
     describe('triggerDigestManually', () => {
@@ -85,21 +98,28 @@ describe('digestCron', () => {
     });
 
     describe('startDigestCron', () => {
-        it('should schedule one daily cron job', async () => {
+        it('should schedule daily and recovery cron jobs', async () => {
             const cron = await import('node-cron');
             const scheduleSpy = vi.spyOn(cron.default, 'schedule');
 
             startDigestCron();
 
-            expect(scheduleSpy).toHaveBeenCalledTimes(1);
-            expect(scheduleSpy).toHaveBeenCalledWith(
+            expect(scheduleSpy).toHaveBeenCalledTimes(2);
+            expect(scheduleSpy).toHaveBeenNthCalledWith(
+                1,
                 '0 19 * * *',
+                expect.any(Function),
+                expect.objectContaining({ timezone: 'Europe/Istanbul' })
+            );
+            expect(scheduleSpy).toHaveBeenNthCalledWith(
+                2,
+                '*/30 * * * *',
                 expect.any(Function),
                 expect.objectContaining({ timezone: 'Europe/Istanbul' })
             );
         });
 
-        it('should return a cleanup function that stops the job', async () => {
+        it('should return a cleanup function that stops both jobs', async () => {
             const stopMock = vi.fn();
             const cron = await import('node-cron');
             vi.spyOn(cron.default, 'schedule').mockReturnValue({ stop: stopMock } as any);
@@ -107,7 +127,7 @@ describe('digestCron', () => {
             const cleanup = startDigestCron();
             cleanup();
 
-            expect(stopMock).toHaveBeenCalledTimes(1);
+            expect(stopMock).toHaveBeenCalledTimes(2);
         });
     });
 });

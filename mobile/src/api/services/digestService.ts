@@ -1,6 +1,25 @@
 import { client } from '../client';
 import { ApiResponse, DailyDigest } from '../../types';
 
+async function getLatestDigestFromList(country: string): Promise<DailyDigest | null> {
+    try {
+        const response = await client.get<ApiResponse<DailyDigest[]>>(`/digest/${country}`);
+        if (!response.data.success || !Array.isArray(response.data.data) || response.data.data.length === 0) {
+            return null;
+        }
+
+        const sorted = [...response.data.data].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        return sorted[0] || null;
+    } catch (error: any) {
+        if (error?.status === 404) {
+            return null;
+        }
+        throw error;
+    }
+}
+
 export const digestService = {
     getLatestDigest: async (country: string): Promise<DailyDigest | null> => {
         // Backend: GET /digest/:country/latest
@@ -8,13 +27,13 @@ export const digestService = {
             const response = await client.get<ApiResponse<DailyDigest>>(`/digest/${country}/latest`);
 
             if (!response.data.success) {
-                return null;
+                return getLatestDigestFromList(country);
             }
 
             return response.data.data;
         } catch (error: any) {
             if (error?.status === 404) {
-                return null;
+                return getLatestDigestFromList(country);
             }
             throw error;
         }

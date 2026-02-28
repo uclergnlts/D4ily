@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLatestDigest } from '../../src/hooks/useDigest';
 import { useTrackReading } from '../../src/hooks/useHistory';
@@ -29,7 +29,7 @@ export default function HomeScreen() {
     const trackedDigestId = useRef<string | null>(null);
 
     // Fetch only the latest digest instead of the list
-    const { data: latestDigest, isLoading, refetch, isRefetching } = useLatestDigest(selectedCountry);
+    const { data: latestDigest, isLoading, isError, error, refetch, isRefetching } = useLatestDigest(selectedCountry);
 
     // Track reading — only once per digest id
     useEffect(() => {
@@ -37,7 +37,7 @@ export default function HomeScreen() {
             trackedDigestId.current = latestDigest.id;
             trackReading.mutate({ articleId: latestDigest.id, countryCode: selectedCountry });
         }
-    }, [latestDigest?.id, selectedCountry]);
+    }, [latestDigest?.id, selectedCountry, trackReading]);
 
     // Prefetch digest detail so it opens instantly when tapped
     useEffect(() => {
@@ -48,7 +48,7 @@ export default function HomeScreen() {
                 staleTime: 1000 * 60 * 30,
             });
         }
-    }, [latestDigest?.id, selectedCountry]);
+    }, [latestDigest?.id, selectedCountry, queryClient]);
 
     return (
         <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark" edges={['top']}>
@@ -102,6 +102,18 @@ export default function HomeScreen() {
                             <View className="w-full h-4 bg-zinc-100 dark:bg-zinc-800 rounded mb-2" />
                             <View className="w-1/2 h-4 bg-zinc-100 dark:bg-zinc-800 rounded" />
                         </View>
+                    </View>
+                ) : isError ? (
+                    <View className="mx-5 mb-5 rounded-4xl p-8 border-2 border-dashed border-border-light dark:border-border-dark bg-surface-light-subtle dark:bg-surface-dark-subtle min-h-[300px] items-center justify-center mt-6 shadow-sm">
+                        <View className="w-16 h-16 rounded-3xl bg-surface-light-elevated dark:bg-surface-dark-elevated shadow-sm shadow-zinc-200/50 dark:shadow-none items-center justify-center mb-5">
+                            <BookOpen size={30} color={isDark ? "#71717A" : "#A1A1AA"} />
+                        </View>
+                        <Text className="text-display-lg font-display-extrabold text-zinc-900 dark:text-white text-center mb-2 tracking-tight">
+                            Ozet Alinamadi
+                        </Text>
+                        <Text className="text-body-md text-zinc-500 text-center font-sans tracking-wide">
+                            {error instanceof Error ? error.message : 'Sunucuya ulasilamadi. Lutfen tekrar dene.'}
+                        </Text>
                     </View>
                 ) : !latestDigest ? (
                     <View className="mx-5 mb-5 rounded-4xl p-8 border-2 border-dashed border-border-light dark:border-border-dark bg-surface-light-subtle dark:bg-surface-dark-subtle min-h-[300px] items-center justify-center mt-6 shadow-sm">

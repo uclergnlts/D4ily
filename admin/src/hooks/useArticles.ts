@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { articleService } from '../api/services/articleService';
-import type { CountryCode } from '../types';
+import type { CountryCode, UpdateArticleForm } from '../types';
 import toast from 'react-hot-toast';
 
 interface ArticleFilters {
@@ -14,6 +14,19 @@ export function useArticles(country: CountryCode, page = 1, limit = 20, filters?
   return useQuery({
     queryKey: ['articles', country, page, limit, filters],
     queryFn: () => articleService.getAll(country, page, limit, filters),
+  });
+}
+
+export function useUpdateArticle() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ country, articleId, data }: { country: CountryCode; articleId: string; data: UpdateArticleForm }) =>
+      articleService.update(country, articleId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['articles'] });
+      toast.success('Article updated');
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 }
 

@@ -1,10 +1,9 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Switch, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { safeBack } from '../src/utils/navigation';
-import { ChevronLeft, Bell, Moon, Shield, FileText, Mail, ChevronRight, Sparkles, ExternalLink } from 'lucide-react-native';
-import { Linking } from 'react-native';
+import { ChevronLeft, Bell, Moon, Shield, FileText, Mail, ChevronRight, Sparkles } from 'lucide-react-native';
 
 import { useThemeStore } from '../src/store/useThemeStore';
 
@@ -87,7 +86,7 @@ export default function SettingsScreen() {
             } else {
                 Alert.alert('Hata', 'Bu bağlantı açılamıyor.');
             }
-        } catch (error) {
+        } catch {
             Alert.alert('Hata', 'Bağlantı açılırken bir sorun oluştu.');
         }
     };

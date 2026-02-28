@@ -1,5 +1,5 @@
 import apiClient from '../client';
-import type { ApiResponse, Article, CountryCode } from '../../types';
+import type { ApiResponse, Article, CountryCode, UpdateArticleForm } from '../../types';
 
 interface ArticlesResponse {
   articles: Article[];
@@ -39,6 +39,16 @@ export const articleService = {
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.error || 'Failed to fetch articles');
+    }
+    return response.data.data;
+  },
+
+  update: async (country: CountryCode, articleId: string, data: UpdateArticleForm): Promise<Article> => {
+    const response = await apiClient.patch<ApiResponse<Article>>(
+      `/admin/articles/${country}/${articleId}`, data
+    );
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to update article');
     }
     return response.data.data;
   },

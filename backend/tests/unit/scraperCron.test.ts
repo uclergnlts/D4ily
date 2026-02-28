@@ -32,9 +32,12 @@ vi.mock('@/config/db.js', () => ({
     },
 }));
 
-vi.mock('@/db/schema/index.js', () => ({
-    rss_sources: {},
-}));
+vi.mock('@/db/schema/index.js', async (importOriginal) => {
+    const actual = await importOriginal();
+    return {
+        ...actual,
+    };
+});
 
 import { runScraper, startScraperCron } from '@/cron/scraperCron.js';
 

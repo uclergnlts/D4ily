@@ -89,7 +89,13 @@
       "Bash(npm uninstall:*)",
       "Bash(npx expo start:*)",
       "WebFetch(domain:www.sozcu.com.tr)",
-      "Bash(grep -n \"const.*=.*function\\\\|export default function\\\\|export const\" /c/Users/ucler/Desktop/D4ily/mobile/src/components/*.tsx)"
+      "Bash(grep -n \"const.*=.*function\\\\|export default function\\\\|export const\" /c/Users/ucler/Desktop/D4ily/mobile/src/components/*.tsx)",
+      "Bash(grep -r \"\\\\.get\\\\|\\\\.post\\\\|\\\\.put\\\\|\\\\.delete\" /c/Users/ucler/Desktop/D4ily/backend/src/routes/*.ts)",
+      "Bash(grep -A 30 \"createDailyDigestTable\\\\|function createDigest\" /c/Users/ucler/Desktop/D4ily/backend/src/db/schema/*.ts)",
+      "Bash(npx get-shit-done-cc@latest)",
+      "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs init new-project)",
+      "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs init map-codebase)",
+      "Bash(node C:/Users/ucler/.claude/get-shit-done/bin/gsd-tools.cjs commit \"docs: map existing codebase\" --files .planning/codebase/STACK.md .planning/codebase/INTEGRATIONS.md .planning/codebase/ARCHITECTURE.md .planning/codebase/STRUCTURE.md .planning/codebase/CONVENTIONS.md .planning/codebase/TESTING.md .planning/codebase/CONCERNS.md)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"

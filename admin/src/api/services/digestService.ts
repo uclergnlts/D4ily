@@ -1,5 +1,5 @@
 import apiClient from '../client';
-import type { ApiResponse, CountryCode, DailyDigestAdmin, DigestQualityMetrics } from '../../types';
+import type { ApiResponse, CountryCode, DailyDigestAdmin, DigestQualityMetrics, DigestTopic, DigestSection } from '../../types';
 
 export const digestService = {
   getQuality: async (country: CountryCode, days = 7): Promise<DigestQualityMetrics> => {
@@ -32,5 +32,18 @@ export const digestService = {
     }
 
     return response.data.data;
+  },
+
+  updateDigest: async (country: CountryCode, digestId: string, data: { summaryText?: string; topTopics?: DigestTopic[]; sections?: DigestSection[] }): Promise<DailyDigestAdmin> => {
+    const response = await apiClient.patch<ApiResponse<DailyDigestAdmin>>(`/admin/digests/${country}/${digestId}`, data);
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to update digest');
+    }
+    return response.data.data;
+  },
+
+  deleteDigest: async (country: CountryCode, digestId: string): Promise<void> => {
+    const response = await apiClient.delete<ApiResponse<void>>(`/admin/digests/${country}/${digestId}`);
+    if (!response.data.success) throw new Error(response.data.error || 'Failed to delete digest');
   },
 };

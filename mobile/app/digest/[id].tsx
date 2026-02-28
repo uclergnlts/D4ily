@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Share, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Share, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { useDigestDetail } from '../../src/hooks/useDigest';
@@ -35,7 +35,7 @@ export default function DigestDetailScreen() {
             hasTracked.current = true;
             trackReading.mutate({ articleId: id, countryCode });
         }
-    }, [id, countryCode]);
+    }, [id, countryCode, trackReading]);
 
     const handleShare = async () => {
         if (!digest) return;
