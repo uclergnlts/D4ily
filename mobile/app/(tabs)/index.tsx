@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLatestDigest } from '../../src/hooks/useDigest';
 import { useTrackReading } from '../../src/hooks/useHistory';
@@ -37,7 +37,7 @@ export default function HomeScreen() {
             trackedDigestId.current = latestDigest.id;
             trackReading.mutate({ articleId: latestDigest.id, countryCode: selectedCountry });
         }
-    }, [latestDigest?.id, selectedCountry]);
+    }, [latestDigest?.id, selectedCountry, trackReading]);
 
     // Prefetch digest detail so it opens instantly when tapped
     useEffect(() => {
@@ -48,7 +48,7 @@ export default function HomeScreen() {
                 staleTime: 1000 * 60 * 30,
             });
         }
-    }, [latestDigest?.id, selectedCountry]);
+    }, [latestDigest?.id, selectedCountry, queryClient]);
 
     return (
         <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark" edges={['top']}>
