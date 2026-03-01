@@ -1150,6 +1150,44 @@ admin.post('/twitter-accounts', async (c) => {
 });
 
 /**
+ * POST /admin/twitter-accounts/bulk
+ * Bulk import twitter accounts (skips duplicates by userName)
+ */
+admin.post('/twitter-accounts/bulk', async (c) => {
+    try {
+        const body = await c.req.json();
+        const accountsSchema = z.array(createTwitterAccountSchema);
+        const accounts = accountsSchema.parse(body.accounts);
+
+        if (accounts.length === 0) {
+            return c.json({ success: false, error: 'No accounts provided' }, 400);
+        }
+
+        if (accounts.length > 200) {
+            return c.json({ success: false, error: 'Maximum 200 accounts per request' }, 400);
+        }
+
+        let inserted = 0;
+        let skipped = 0;
+
+        for (const account of accounts) {
+            try {
+                await db.insert(twitter_accounts).values(account).onConflictDoNothing();
+                inserted++;
+            } catch {
+                skipped++;
+            }
+        }
+
+        logger.info({ inserted, skipped }, 'Bulk twitter accounts import by admin');
+        return c.json({ success: true, inserted, skipped }, 201);
+    } catch (error) {
+        logger.error({ error }, 'Bulk twitter accounts import failed');
+        return c.json({ success: false, error: error instanceof Error ? error.message : 'Failed to bulk import twitter accounts' }, 400);
+    }
+});
+
+/**
  * PATCH /admin/twitter-accounts/:accountId
  * Update a twitter account
  */

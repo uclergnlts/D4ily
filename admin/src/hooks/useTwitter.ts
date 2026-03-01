@@ -46,3 +46,15 @@ export function useDeleteTwitterAccount() {
     onError: (error: Error) => toast.error(error.message),
   });
 }
+
+export function useBulkImportTwitterAccounts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (accounts: CreateTwitterAccountForm[]) => twitterService.bulkImport(accounts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['twitter-accounts'] });
+      toast.success(`Imported ${result.inserted} accounts (${result.skipped} skipped)`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}

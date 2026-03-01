@@ -31,4 +31,12 @@ export const twitterService = {
     const response = await apiClient.delete<ApiResponse<void>>(`/admin/twitter-accounts/${id}`);
     if (!response.data.success) throw new Error(response.data.error || 'Failed to delete twitter account');
   },
+
+  bulkImport: async (accounts: CreateTwitterAccountForm[]): Promise<{ inserted: number; skipped: number }> => {
+    const response = await apiClient.post<ApiResponse<{ inserted: number; skipped: number }>>('/admin/twitter-accounts/bulk', { accounts });
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.error || 'Failed to bulk import twitter accounts');
+    }
+    return response.data.data;
+  },
 };

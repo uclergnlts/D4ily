@@ -17,9 +17,10 @@ import {
   useCreateTwitterAccount,
   useUpdateTwitterAccount,
   useDeleteTwitterAccount,
+  useBulkImportTwitterAccounts,
 } from '../hooks/useTwitter';
 import { COUNTRIES, type CountryCode, type TwitterAccount, type CreateTwitterAccountForm } from '../types';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload } from 'lucide-react';
 
 const ACCOUNT_TYPES = [
   { value: 'government', label: 'Government' },
@@ -52,6 +53,9 @@ export function TwitterAccountsPage() {
   const shouldRedirect = !getCountry(countryCode);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkJson, setBulkJson] = useState('');
+  const [bulkError, setBulkError] = useState('');
   const [editingAccount, setEditingAccount] = useState<TwitterAccount | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<TwitterAccount | null>(null);
 
@@ -59,6 +63,7 @@ export function TwitterAccountsPage() {
   const createMutation = useCreateTwitterAccount();
   const updateMutation = useUpdateTwitterAccount();
   const deleteMutation = useDeleteTwitterAccount();
+  const bulkImportMutation = useBulkImportTwitterAccounts();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -160,7 +165,10 @@ export function TwitterAccountsPage() {
         subtitle="Manage X/Twitter accounts tracked for this country"
       />
       <div className="p-8">
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-3 mb-4">
+          <Button variant="secondary" onClick={() => { setBulkJson(''); setBulkError(''); setIsBulkModalOpen(true); }} className="flex items-center gap-2">
+            <Upload className="h-4 w-4" /> Bulk Import
+          </Button>
           <Button onClick={openCreate} className="flex items-center gap-2">
             <Plus className="h-4 w-4" /> Add Account
           </Button>
@@ -227,6 +235,50 @@ export function TwitterAccountsPage() {
           >
             Delete
           </Button>
+        </div>
+      </Modal>
+
+      <Modal isOpen={isBulkModalOpen} onClose={() => setIsBulkModalOpen(false)} title="Bulk Import Accounts" size="lg">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-500">
+            Paste a JSON array of accounts. Each account needs: <code>userName</code>, <code>displayName</code>, <code>accountType</code>, and <code>countryCode</code>.
+          </p>
+          <textarea
+            className="w-full h-64 p-3 border rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            placeholder={`[\n  { "countryCode": "${resolvedCountry}", "userName": "example", "displayName": "Example", "accountType": "news_agency" }\n]`}
+            value={bulkJson}
+            onChange={(e) => { setBulkJson(e.target.value); setBulkError(''); }}
+          />
+          {bulkError && <p className="text-sm text-red-600">{bulkError}</p>}
+          <div className="flex justify-end gap-3">
+            <Button variant="secondary" onClick={() => setIsBulkModalOpen(false)}>Cancel</Button>
+            <Button
+              isLoading={bulkImportMutation.isPending}
+              onClick={() => {
+                try {
+                  const parsed = JSON.parse(bulkJson);
+                  if (!Array.isArray(parsed) || parsed.length === 0) {
+                    setBulkError('Must be a non-empty JSON array');
+                    return;
+                  }
+                  const accounts = parsed.map((a: Record<string, unknown>) => ({
+                    countryCode: (a.countryCode as string) || resolvedCountry,
+                    userName: a.userName as string,
+                    displayName: a.displayName as string,
+                    accountType: (a.accountType as string) || 'news_agency',
+                    isActive: a.isActive !== undefined ? Boolean(a.isActive) : true,
+                    description: (a.description as string) || null,
+                    govAlignmentScore: typeof a.govAlignmentScore === 'number' ? a.govAlignmentScore : 0,
+                  })) as CreateTwitterAccountForm[];
+                  bulkImportMutation.mutate(accounts, { onSuccess: () => setIsBulkModalOpen(false) });
+                } catch {
+                  setBulkError('Invalid JSON format');
+                }
+              }}
+            >
+              <Upload className="h-4 w-4 mr-2" /> Import {bulkJson ? (() => { try { const p = JSON.parse(bulkJson); return Array.isArray(p) ? `(${p.length})` : ''; } catch { return ''; } })() : ''}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
