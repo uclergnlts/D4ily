@@ -105,7 +105,9 @@
       "Bash(npx vite build)",
       "Bash(xargs grep -l \"notificationService\\\\|useNotification\")",
       "Bash(xargs grep -l \"initNotifications\\\\|registerPushToken\")",
-      "Bash(npx eslint src/api/services/userService.ts)"
+      "Bash(npx eslint src/api/services/userService.ts)",
+      "Bash(TURSO_DATABASE_URL=\"libsql://d4ilyapp-uclergnlts.aws-eu-west-1.turso.io\" TURSO_AUTH_TOKEN=\"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NjkwMjgwMjAsImlkIjoiYzgxNjgyMTktOThlNC00Zjc4LWJiNzEtZWMzZTlmN2YyNjZlIiwicmlkIjoiMmZjYWJlN2EtNzRiNi00YTI4LTg4OTYtM2UyNDI5MjZhOGRlIn0.vDPNNixNAnHnBXVnW47WLb9spgOC66fHgYg9p-i5srigUOsKeNmi7NDiy8j_02Xew88b7TUhlDP8A_8D2389DA\" npx tsx src/db/seed-twitter.ts)",
+      "Bash(TURSO_DATABASE_URL=\"libsql://d4ilyapp-uclergnlts.aws-eu-west-1.turso.io\" TURSO_AUTH_TOKEN=\"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NjkwMjgwMjAsImlkIjoiYzgxNjgyMTktOThlNC00Zjc4LWJiNzEtZWMzZTlmN2YyNjZlIiwicmlkIjoiMmZjYWJlN2EtNzRiNi00YTI4LTg4OTYtM2UyNDI5MjZhOGRlIn0.vDPNNixNAnHnBXVnW47WLb9spgOC66fHgYg9p-i5srigUOsKeNmi7NDiy8j_02Xew88b7TUhlDP8A_8D2389DA\" npx tsx src/db/check-twitter.ts)"
     ],
     "additionalDirectories": [
       "c:\\Users\\ucler\\Desktop\\D4ily\\mobile\\app\\article"
