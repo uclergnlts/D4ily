@@ -33,6 +33,7 @@ import historyRoute from './routes/history';
 import webhookRoute from './routes/webhooks';
 import ciiRoute from './routes/cii';
 import feedbackRoute from './routes/feedback';
+import feedRoute from './routes/feed';
 
 // New admin routes
 import adminUsersRoute from './routes/admin-users';
@@ -151,6 +152,7 @@ app.get('/', (c) => {
         status: 'ok',
         endpoints: {
             health: '/health',
+            feed: '/feed/:country',
             categories: '/categories',
             sources: '/sources',
             digest: '/digest/:country',
@@ -202,6 +204,7 @@ app.route('/history', historyRoute);
 app.route('/webhooks', webhookRoute);
 app.route('/cii', ciiRoute);
 app.route('/feedback', feedbackRoute);
+app.route('/feed', feedRoute);
 
 // DEV-ONLY: Manual trigger endpoints (development only, never staging/production)
 if (env.NODE_ENV === 'development') {
