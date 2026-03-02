@@ -55,12 +55,12 @@ export default function RootLayout() {
     checkAuth();
   }, [checkAuth]);
 
-  // Check if user has seen onboarding
+  // Check if user has seen onboarding — re-read when navigating away from onboarding
   useEffect(() => {
     AsyncStorage.getItem('hasSeenOnboarding').then((value) => {
       setHasSeenOnboarding(value === 'true');
     });
-  }, []);
+  }, [segments]);
 
   // Redirect to onboarding on first launch
   useEffect(() => {
@@ -70,7 +70,7 @@ export default function RootLayout() {
     if (!hasSeenOnboarding && segments[0] !== 'onboarding') {
       router.replace('/onboarding');
     }
-  }, [hasSeenOnboarding, fontsLoaded, fontError, segments]);
+  }, [hasSeenOnboarding, fontsLoaded, fontError]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
