@@ -268,6 +268,29 @@ export interface PerspectivesResult {
     relatedPerspectives: PerspectiveMatch[];
 }
 
+export interface Tweet {
+    id: string;
+    userName: string;
+    displayName: string;
+    profileImageUrl: string | null;
+    text: string;
+    lang: string | null;
+    likeCount: number;
+    retweetCount: number;
+    replyCount: number;
+    viewCount: number;
+    tweetedAt: string;
+}
+
+export interface TweetFeedResponse {
+    tweets: Tweet[];
+    pagination?: {
+        page: number;
+        limit: number;
+        hasMore: boolean;
+    };
+}
+
 export interface ArticleSummaryResponse {
     articleId: string;
     title: string;

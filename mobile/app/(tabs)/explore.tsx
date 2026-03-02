@@ -1,24 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Keyboard } from 'react-native';
-import Animated from 'react-native-reanimated';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { FlashList } from '@shopify/flash-list';
 import { useRouter } from 'expo-router';
-import { Search, X, TrendingUp, Newspaper, Users, Hash, Menu, Bell } from 'lucide-react-native';
+import { Menu, Bell, Newspaper, MessageSquare } from 'lucide-react-native';
+
 import { useAppStore } from '../../src/store/useAppStore';
-import { safePush } from '../../src/utils/navigation';
-
-import { useSearch, useSearchSuggestions, useTrending } from '../../src/hooks/useSearch';
-import { useStaggeredEntry } from '../../src/hooks/useStaggeredEntry';
-import type { SearchArticle, SearchSource, SearchTopic } from '../../src/api/services/searchService';
 import { useThemeStore } from '../../src/store/useThemeStore';
+import { useFeed } from '../../src/hooks/useFeed';
+import { useTweets } from '../../src/hooks/useTweets';
+import { ArticleCard } from '../../src/components/article/ArticleCard';
+import { TweetCard } from '../../src/components/tweet/TweetCard';
+import { safePush } from '../../src/utils/navigation';
+import type { Article, Tweet } from '../../src/types';
 
-type SearchTab = 'all' | 'articles' | 'sources' | 'topics';
+type ExploreTab = 'articles' | 'tweets';
 
-const TAB_OPTIONS: { key: SearchTab; label: string; icon: React.ElementType }[] = [
-    { key: 'all', label: 'Tümü', icon: Search },
-    { key: 'articles', label: 'Haberler', icon: Newspaper },
-    { key: 'sources', label: 'Kaynaklar', icon: Users },
-    { key: 'topics', label: 'Konular', icon: Hash },
+const TABS: { id: ExploreTab; label: string; icon: React.ElementType }[] = [
+    { id: 'articles', label: 'Haberler', icon: Newspaper },
+    { id: 'tweets', label: 'Tweetler', icon: MessageSquare },
 ];
 
 export default function ExploreScreen() {
@@ -27,47 +28,80 @@ export default function ExploreScreen() {
     const activeScheme = useThemeStore(state => state.activeScheme);
     const isDark = activeScheme === 'dark';
 
-    const [searchText, setSearchText] = useState('');
-    const [debouncedQuery, setDebouncedQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<SearchTab>('all');
-    const [showSuggestions, setShowSuggestions] = useState(false);
-    const { getEntryAnimation } = useStaggeredEntry();
+    const [activeTab, setActiveTab] = useState<ExploreTab>('articles');
+    const [containerWidth, setContainerWidth] = useState(0);
 
-    const { data: searchResults, isLoading: searchLoading } = useSearch(debouncedQuery, selectedCountry, activeTab);
-    const { data: suggestions } = useSearchSuggestions(searchText.trim(), selectedCountry);
-    const { data: trending, isLoading: trendingLoading } = useTrending(selectedCountry);
+    // Data hooks
+    const feedQuery = useFeed(selectedCountry);
+    const tweetsQuery = useTweets(selectedCountry);
+
+    // Animated tab indicator
+    const indicatorPosition = useSharedValue(0);
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedQuery(searchText.trim());
-            setShowSuggestions(false);
-        }, 500);
-        return () => clearTimeout(timer);
-    }, [searchText]);
+        const tabIndex = TABS.findIndex(t => t.id === activeTab);
+        const tabWidth = (containerWidth - 8) / 2;
 
-    const handleSuggestionPress = useCallback((suggestion: string) => {
-        setSearchText(suggestion);
-        setDebouncedQuery(suggestion);
-        setShowSuggestions(false);
-        Keyboard.dismiss();
-    }, []);
+        if (containerWidth > 0) {
+            indicatorPosition.value = withSpring(tabIndex * tabWidth, {
+                damping: 20,
+                stiffness: 150,
+            });
+        }
+    }, [activeTab, containerWidth, indicatorPosition]);
 
-    const handleTextChange = useCallback((text: string) => {
-        setSearchText(text);
-        setShowSuggestions(text.trim().length >= 2);
-    }, []);
+    const indicatorStyle = useAnimatedStyle(() => ({
+        transform: [{ translateX: indicatorPosition.value }],
+        width: (containerWidth - 8) / 2,
+    }));
 
-    // Extract results based on response shape
-    const articles: SearchArticle[] = searchResults?.results?.articles || [];
-    const sources: SearchSource[] = searchResults?.results?.sources || [];
-    const topics: SearchTopic[] = searchResults?.results?.topics || [];
-    const hasResults = articles.length > 0 || sources.length > 0 || topics.length > 0;
+    const handleLayout = (e: LayoutChangeEvent) => {
+        setContainerWidth(e.nativeEvent.layout.width);
+    };
+
+    // Flatten paginated data
+    const articles = useMemo(
+        () => feedQuery.data?.pages.flatMap(p => p.articles) ?? [],
+        [feedQuery.data],
+    );
+
+    const tweets = useMemo(
+        () => tweetsQuery.data?.pages.flatMap(p => p.tweets) ?? [],
+        [tweetsQuery.data],
+    );
+
+    const isLoading = activeTab === 'articles' ? feedQuery.isLoading : tweetsQuery.isLoading;
+    const isRefreshing = activeTab === 'articles'
+        ? (feedQuery.isRefetching && !feedQuery.isFetchingNextPage)
+        : (tweetsQuery.isRefetching && !tweetsQuery.isFetchingNextPage);
+
+    const onRefresh = useCallback(() => {
+        if (activeTab === 'articles') feedQuery.refetch();
+        else tweetsQuery.refetch();
+    }, [activeTab, feedQuery, tweetsQuery]);
+
+    const onEndReached = useCallback(() => {
+        if (activeTab === 'articles' && feedQuery.hasNextPage && !feedQuery.isFetchingNextPage) {
+            feedQuery.fetchNextPage();
+        }
+        if (activeTab === 'tweets' && tweetsQuery.hasNextPage && !tweetsQuery.isFetchingNextPage) {
+            tweetsQuery.fetchNextPage();
+        }
+    }, [activeTab, feedQuery, tweetsQuery]);
+
+    const renderArticle = useCallback(({ item }: { item: Article }) => (
+        <ArticleCard article={item} />
+    ), []);
+
+    const renderTweet = useCallback(({ item }: { item: Tweet }) => (
+        <TweetCard tweet={item} />
+    ), []);
 
     return (
         <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark" edges={['top']}>
-            <View className="px-5 pt-4 pb-4 bg-surface-light dark:bg-surface-dark z-10 border-b border-border-light dark:border-border-dark">
-                {/* Header: Menu - Title - Bell */}
-                <View className="flex-row items-center justify-between mb-6 mt-2">
+            {/* Header */}
+            <View className="px-5 pt-4 pb-4 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark">
+                <View className="flex-row items-center justify-between mb-2 mt-2">
                     <TouchableOpacity
                         onPress={toggleSideMenu}
                         className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
@@ -86,253 +120,106 @@ export default function ExploreScreen() {
                         <Bell size={20} color={isDark ? "#ffffff" : "#18181b"} />
                     </TouchableOpacity>
                 </View>
-
-                {/* Search Bar */}
-                <View
-                    className="flex-row items-center bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-full px-5 py-4 border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none"
-                    accessibilityRole="search"
-                >
-                    <Search size={22} color="#A1A1AA" />
-                    <TextInput
-                        className="flex-1 ml-3 text-zinc-900 dark:text-white text-body-lg font-sans-medium"
-                        placeholder="Haber, kaynak veya konu arayın..."
-                        placeholderTextColor="#A1A1AA"
-                        value={searchText}
-                        onChangeText={handleTextChange}
-                        returnKeyType="search"
-                        onSubmitEditing={() => {
-                            setDebouncedQuery(searchText.trim());
-                            setShowSuggestions(false);
-                        }}
-                    />
-                    {searchText.length > 0 && (
-                        <TouchableOpacity
-                            onPress={() => { setSearchText(''); setDebouncedQuery(''); }}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            className="bg-surface-light-subtle dark:bg-surface-dark-subtle rounded-full p-1.5"
-                        >
-                            <X size={14} color="#71717a" />
-                        </TouchableOpacity>
-                    )}
-                </View>
-
-                {/* Suggestions dropdown */}
-                {showSuggestions && suggestions && suggestions.length > 0 && (
-                    <View className="mt-2 bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl border border-border-light dark:border-border-dark overflow-hidden shadow-sm shadow-zinc-200/50 dark:shadow-none absolute top-40 left-5 right-5 z-50">
-                        {suggestions.map((s, i) => (
-                            <TouchableOpacity
-                                key={i}
-                                onPress={() => handleSuggestionPress(s)}
-                                className={`flex-row items-center px-5 py-4 ${i < suggestions.length - 1 ? 'border-b border-border-light dark:border-border-dark' : ''}`}
-                            >
-                                <Search size={16} color="#a1a1aa" />
-                                <Text
-                                    className="ml-3 text-body-md text-zinc-700 dark:text-zinc-300 font-sans-medium"
-                                >
-                                    {s}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                )}
             </View>
 
-            {/* Search type tabs - only show when searching */}
-            {debouncedQuery.length >= 2 && (
-                <View className="px-5 py-4 border-b border-border-light dark:border-border-dark bg-surface-light dark:bg-surface-dark">
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 px-5">
-                        <View className="flex-row gap-3">
-                            {TAB_OPTIONS.map(({ key, label, icon: Icon }) => {
-                                const isActive = activeTab === key;
-                                return (
-                                    <TouchableOpacity
-                                        key={key}
-                                        onPress={() => setActiveTab(key)}
-                                        className={`flex-row items-center gap-2 px-4 py-2.5 rounded-full ${isActive ? 'bg-primary dark:bg-primary border border-transparent' : 'bg-surface-light-elevated dark:bg-surface-dark-elevated border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none'}`}
-                                    >
-                                        <Icon size={16} color={isActive ? '#ffffff' : '#71717a'} />
-                                        <Text
-                                            className={`text-body-sm tracking-wide ${isActive ? 'text-white font-sans-bold' : 'text-zinc-600 dark:text-zinc-400 font-sans-medium'}`}
-                                        >
-                                            {label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </ScrollView>
+            {/* Tab selector */}
+            <View
+                className="mx-4 my-3 bg-zinc-100 dark:bg-zinc-900/50 rounded-xl p-1 relative border border-zinc-200/50 dark:border-zinc-800"
+                onLayout={handleLayout}
+            >
+                {/* Animated Indicator */}
+                {containerWidth > 0 && (
+                    <Animated.View
+                        className="absolute top-1 left-1 bottom-1 bg-white dark:bg-zinc-800 rounded-lg shadow-sm"
+                        style={indicatorStyle}
+                    />
+                )}
+
+                {/* Tab Buttons */}
+                <View className="flex-row">
+                    {TABS.map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        const Icon = tab.icon;
+                        return (
+                            <TouchableOpacity
+                                key={tab.id}
+                                onPress={() => setActiveTab(tab.id)}
+                                className="flex-1 flex-row py-2.5 items-center justify-center gap-2 z-10"
+                                activeOpacity={0.7}
+                            >
+                                <Icon size={16} color={isActive ? '#0A66C2' : '#a1a1aa'} />
+                                <Text className={`text-xs font-bold leading-none ${isActive ? 'text-primary' : 'text-zinc-400 dark:text-zinc-500'}`}>
+                                    {tab.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
                 </View>
-            )}
+            </View>
 
             {/* Content */}
-            {searchLoading ? (
+            {isLoading ? (
                 <View className="flex-1 items-center justify-center">
                     <ActivityIndicator size="large" color="#0A66C2" />
                 </View>
-            ) : debouncedQuery.length >= 2 ? (
-                <ScrollView className="flex-1 px-5 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-                    {!hasResults ? (
-                        <View className="flex-1 items-center justify-center py-20 mt-10 rounded-4xl border-2 border-dashed border-border-light dark:border-border-dark bg-surface-light-subtle dark:bg-surface-dark-subtle">
-                            <View className="w-16 h-16 rounded-3xl bg-surface-light-elevated dark:bg-surface-dark-elevated shadow-sm shadow-zinc-200/50 dark:shadow-none items-center justify-center mb-5">
-                                <Search size={30} color={isDark ? "#71717a" : "#A1A1AA"} />
-                            </View>
-                            <Text className="text-display-lg font-display-extrabold text-zinc-900 dark:text-white text-center mb-2 tracking-tight">"{debouncedQuery}"</Text>
-                            <Text className="text-body-md text-zinc-500 text-center font-sans tracking-wide px-8">İçin herhangi bir sonuç bulamadık. Farklı kelimeler denemeye ne dersin?</Text>
-                        </View>
-                    ) : (
-                        <>
-                            {/* Articles */}
-                            {articles.length > 0 && (activeTab === 'all' || activeTab === 'articles') && (
-                                <View className="mb-8">
-                                    {activeTab === 'all' && (
-                                        <View className="flex-row items-center gap-2 mb-4">
-                                            <Newspaper size={20} color="#0A66C2" />
-                                            <Text className="text-display-lg text-zinc-900 dark:text-white font-display-extrabold tracking-tight">Haberler <Text className="text-zinc-400 text-body-lg ml-2 font-sans-medium">({articles.length})</Text></Text>
-                                        </View>
-                                    )}
-                                    {articles.map((article, i) => (
-                                        <Animated.View key={article.id} entering={getEntryAnimation(i)}>
-                                            <TouchableOpacity
-                                                onPress={() => safePush(router, {
-                                                    pathname: '/article/[id]',
-                                                    params: { id: article.id.toString(), country: article.country },
-                                                } as any)}
-                                                className="bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-5 mb-4 border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none active:scale-95 transition-transform"
-                                                activeOpacity={0.7}
-                                            >
-                                                <Text className="text-zinc-900 dark:text-white text-body-lg font-sans-bold mb-2 leading-[22px]" numberOfLines={2}>
-                                                    {article.translatedTitle}
-                                                </Text>
-                                                <Text className="text-zinc-500 dark:text-zinc-400 text-body-sm font-sans leading-[18px] mb-4" numberOfLines={2}>
-                                                    {article.summary}
-                                                </Text>
-                                                <Text className="text-body-xs text-zinc-400 font-sans-medium tracking-wide">
-                                                    {new Date(article.publishedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                                </Text>
-                                            </TouchableOpacity>
-                                        </Animated.View>
-                                    ))}
-                                </View>
-                            )}
-
-                            {/* Sources */}
-                            {sources.length > 0 && (activeTab === 'all' || activeTab === 'sources') && (
-                                <View className="mb-8">
-                                    {activeTab === 'all' && (
-                                        <View className="flex-row items-center gap-2 mb-4">
-                                            <Users size={20} color="#818CF8" />
-                                            <Text className="text-display-lg text-zinc-900 dark:text-white font-display-extrabold tracking-tight">Kaynaklar <Text className="text-zinc-400 text-body-lg ml-2 font-sans-medium">({sources.length})</Text></Text>
-                                        </View>
-                                    )}
-                                    {sources.map((source, i) => (
-                                        <Animated.View key={source.id} entering={getEntryAnimation(i)}>
-                                            <View className="bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-5 mb-4 border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none flex-row items-center gap-4">
-                                                <View className="w-12 h-12 rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle items-center justify-center">
-                                                    <Users size={20} color="#A1A1AA" />
-                                                </View>
-                                                <View className="flex-1">
-                                                    <Text className="text-zinc-900 dark:text-white text-body-lg font-sans-bold tracking-tight">
-                                                        {source.sourceName}
-                                                    </Text>
-                                                    <Text className="text-body-xs text-zinc-400 font-sans-medium tracking-wider mt-1">
-                                                        {source.countryCode?.toUpperCase()} KANALI
-                                                    </Text>
-                                                </View>
-                                            </View>
-                                        </Animated.View>
-                                    ))}
-                                </View>
-                            )}
-
-                            {/* Topics */}
-                            {topics.length > 0 && (activeTab === 'all' || activeTab === 'topics') && (
-                                <View className="mb-8">
-                                    {activeTab === 'all' && (
-                                        <View className="flex-row items-center gap-2 mb-4">
-                                            <Hash size={20} color="#FBBF24" />
-                                            <Text className="text-display-lg text-zinc-900 dark:text-white font-display-extrabold tracking-tight">Konular <Text className="text-zinc-400 text-body-lg ml-2 font-sans-medium">({topics.length})</Text></Text>
-                                        </View>
-                                    )}
-                                    <View className="flex-row flex-wrap gap-3">
-                                        {topics.map((topic, i) => (
-                                            <Animated.View key={topic.id} entering={getEntryAnimation(i)}>
-                                                <TouchableOpacity
-                                                    onPress={() => {
-                                                        setSearchText(topic.name);
-                                                        setDebouncedQuery(topic.name);
-                                                        setActiveTab('articles');
-                                                    }}
-                                                    className="bg-surface-light-elevated dark:bg-surface-dark-elevated px-5 py-3 rounded-full border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none active:scale-95 transition-transform"
-                                                >
-                                                    <Text className="text-body-md text-zinc-800 dark:text-zinc-200 font-sans-bold">
-                                                        {topic.hashtag || topic.name}
-                                                    </Text>
-                                                    {topic.articleCount > 0 && (
-                                                        <Text className="text-[10px] text-zinc-400 mt-1 font-sans-medium tracking-wide">
-                                                            {topic.articleCount} YAKIN ZAMANLI HABER
-                                                        </Text>
-                                                    )}
-                                                </TouchableOpacity>
-                                            </Animated.View>
-                                        ))}
-                                    </View>
-                                </View>
-                            )}
-                        </>
-                    )}
-                </ScrollView>
             ) : (
-                /* Trending / empty state */
-                <ScrollView className="flex-1 px-5 pt-6" keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
-                    {trendingLoading ? (
-                        <View className="items-center py-12">
-                            <ActivityIndicator size="large" color="#0A66C2" />
-                        </View>
-                    ) : trending && trending.length > 0 ? (
-                        <View className="mb-10">
-                            <View className="flex-row items-center gap-3 mb-6">
-                                <View className="bg-primary-50 dark:bg-primary-900/20 p-2 rounded-xl">
-                                    <TrendingUp size={20} color="#0A66C2" />
+                <View className="flex-1 min-h-[2px]">
+                    {activeTab === 'articles' ? (
+                        /* @ts-ignore: FlashList types */
+                        <FlashList<Article>
+                            data={articles}
+                            renderItem={renderArticle}
+                            keyExtractor={(item) => item.id}
+                            estimatedItemSize={280}
+                            onEndReached={onEndReached}
+                            onEndReachedThreshold={0.5}
+                            refreshing={isRefreshing}
+                            onRefresh={onRefresh}
+                            contentContainerStyle={{ paddingVertical: 8 }}
+                            ListFooterComponent={
+                                feedQuery.isFetchingNextPage ? (
+                                    <View className="py-6 items-center">
+                                        <ActivityIndicator size="small" color="#0A66C2" />
+                                    </View>
+                                ) : null
+                            }
+                            ListEmptyComponent={
+                                <View className="items-center justify-center py-20 px-4">
+                                    <Text className="text-zinc-400 text-center font-medium">
+                                        Henüz haber bulunamadı.
+                                    </Text>
                                 </View>
-                                <Text className="text-display-xl text-zinc-900 dark:text-white font-display-extrabold tracking-tight">Popüler Aramalar</Text>
-                            </View>
-                            {trending.map((item, i) => (
-                                <Animated.View key={i} entering={getEntryAnimation(i)}>
-                                    <TouchableOpacity
-                                        onPress={() => handleSuggestionPress(item.term)}
-                                        className="flex-row items-center bg-surface-light-elevated dark:bg-surface-dark-elevated rounded-3xl p-4 mb-3 border border-border-light dark:border-border-dark shadow-sm shadow-zinc-200/50 dark:shadow-none active:scale-95 transition-transform"
-                                        activeOpacity={0.7}
-                                    >
-                                        <View className="w-12 h-12 rounded-2xl bg-primary-50 dark:bg-primary-900/20 items-center justify-center mr-4">
-                                            <Text className="text-primary-600 dark:text-primary-400 text-body-lg font-sans-black">
-                                                {i + 1}
-                                            </Text>
-                                        </View>
-                                        <View className="flex-1">
-                                            <Text className="text-zinc-900 dark:text-white text-body-lg font-sans-bold tracking-tight mb-0.5">
-                                                {item.term}
-                                            </Text>
-                                            {item.articleCount > 0 && (
-                                                <Text className="text-body-xs text-zinc-400 font-sans-medium tracking-wide">
-                                                    Son 24 saatte {item.articleCount} haber
-                                                </Text>
-                                            )}
-                                        </View>
-                                        <TrendingUp size={18} color="#A1A1AA" className="mr-2" />
-                                    </TouchableOpacity>
-                                </Animated.View>
-                            ))}
-                        </View>
+                            }
+                        />
                     ) : (
-                        <View className="items-center py-20 mt-10 rounded-4xl border-2 border-dashed border-border-light dark:border-border-dark bg-surface-light-subtle dark:bg-surface-dark-subtle">
-                            <View className="w-16 h-16 rounded-3xl bg-surface-light-elevated dark:bg-surface-dark-elevated shadow-sm shadow-zinc-200/50 dark:shadow-none items-center justify-center mb-5">
-                                <Search size={30} color={isDark ? "#71717a" : "#A1A1AA"} />
-                            </View>
-                            <Text className="text-display-lg font-display-extrabold text-zinc-900 dark:text-white text-center mb-2 tracking-tight">Keşfet</Text>
-                            <Text className="text-body-md text-zinc-500 text-center font-sans tracking-wide px-8">Aramak istediğiniz konuyu, kaynağı veya haberi yazmaya başlayın.</Text>
-                        </View>
+                        /* @ts-ignore: FlashList types */
+                        <FlashList<Tweet>
+                            data={tweets}
+                            renderItem={renderTweet}
+                            keyExtractor={(item) => item.id}
+                            estimatedItemSize={180}
+                            onEndReached={onEndReached}
+                            onEndReachedThreshold={0.5}
+                            refreshing={isRefreshing}
+                            onRefresh={onRefresh}
+                            contentContainerStyle={{ paddingVertical: 8 }}
+                            ListFooterComponent={
+                                tweetsQuery.isFetchingNextPage ? (
+                                    <View className="py-6 items-center">
+                                        <ActivityIndicator size="small" color="#0A66C2" />
+                                    </View>
+                                ) : null
+                            }
+                            ListEmptyComponent={
+                                <View className="items-center justify-center py-20 px-4">
+                                    <Text className="text-zinc-400 text-center font-medium">
+                                        Henüz tweet bulunamadı.
+                                    </Text>
+                                </View>
+                            }
+                        />
                     )}
-                </ScrollView>
+                </View>
             )}
         </SafeAreaView>
     );

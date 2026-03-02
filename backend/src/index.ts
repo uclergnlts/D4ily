@@ -34,6 +34,7 @@ import webhookRoute from './routes/webhooks';
 import ciiRoute from './routes/cii';
 import feedbackRoute from './routes/feedback';
 import feedRoute from './routes/feed';
+import tweetsRoute from './routes/tweets';
 
 // New admin routes
 import adminUsersRoute from './routes/admin-users';
@@ -205,6 +206,7 @@ app.route('/webhooks', webhookRoute);
 app.route('/cii', ciiRoute);
 app.route('/feedback', feedbackRoute);
 app.route('/feed', feedRoute);
+app.route('/tweets', tweetsRoute);
 
 // DEV-ONLY: Manual trigger endpoints (development only, never staging/production)
 if (env.NODE_ENV === 'development') {
