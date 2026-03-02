@@ -433,7 +433,7 @@ export async function findPerspectives(
             eq(tables.articles.isFiltered, false)
         ))
         .orderBy(desc(tables.articles.publishedAt))
-        .limit(50);
+        .limit(15);
 
     if (candidates.length === 0) {
         return {

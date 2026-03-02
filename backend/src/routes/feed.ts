@@ -27,6 +27,7 @@ import { cacheGet, cacheSet, cacheInvalidate } from '../config/redis.js';
 import { logger } from '../config/logger.js';
 import type { EmotionalAnalysisResponse } from '../types/index.js';
 import { findPerspectives, getBalancedFeed } from '../services/perspectivesService.js';
+import { aiTimeout } from '../middleware/timeout.js';
 import { getAlignmentLabel } from '../utils/alignment.js';
 import {
     getEmotionLabelTr,
@@ -529,7 +530,7 @@ app.post('/:country/:articleId/view', async (c) => {
 });
 
 // GET /feed/:country/:articleId/perspectives - Get different perspectives on the same story
-app.get('/:country/:articleId/perspectives', async (c) => {
+app.get('/:country/:articleId/perspectives', aiTimeout, async (c) => {
     try {
         const routeStart = Date.now();
         const countryParam = c.req.param('country');
@@ -561,14 +562,22 @@ app.get('/:country/:articleId/perspectives', async (c) => {
             return response;
         }
 
-        // Find perspectives
-        const perspectives = await findPerspectives(articleId, country);
+        // Find perspectives with a 20s internal timeout
+        const perspectivesPromise = findPerspectives(articleId, country, {
+            maxResults: 5,
+            timeWindowHours: 48,
+        });
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 20000));
+        const perspectives = await Promise.race([perspectivesPromise, timeoutPromise]);
 
         if (!perspectives) {
             return c.json({
-                success: false,
-                error: 'Article not found',
-            }, 404);
+                success: true,
+                data: {
+                    mainArticle: null,
+                    relatedPerspectives: [],
+                },
+            });
         }
 
         // Cache for 30 minutes (perspectives don't change often)
@@ -580,13 +589,17 @@ app.get('/:country/:articleId/perspectives', async (c) => {
         });
         response.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800');
         response.headers.set('Server-Timing', `perspectives;dur=${Date.now() - routeStart}`);
-        const duration = Date.now() - routeStart;
-        if (duration > PERSPECTIVES_ROUTE_BUDGET_MS) {
-            logger.warn({ duration, budgetMs: PERSPECTIVES_ROUTE_BUDGET_MS, path: c.req.path }, 'Perspectives route exceeded budget');
-        }
         return response;
     } catch (error) {
-        return handleError(c, error, 'Failed to fetch perspectives');
+        // On any error, return empty perspectives instead of 500
+        logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Perspectives failed, returning empty');
+        return c.json({
+            success: true,
+            data: {
+                mainArticle: null,
+                relatedPerspectives: [],
+            },
+        });
     }
 });
 
