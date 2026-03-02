@@ -41,14 +41,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Haberler',
+          title: 'Özetler',
           tabBarIcon: ({ color, focused }) => <Newspaper size={focused ? 26 : 24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />
       <Tabs.Screen
         name="explore"
         options={{
-          title: 'Keşfet',
+          title: 'Haberler',
           tabBarIcon: ({ color, focused }) => <Search size={focused ? 26 : 24} color={color} strokeWidth={focused ? 2.5 : 2} />,
         }}
       />

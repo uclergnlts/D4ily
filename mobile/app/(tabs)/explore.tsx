@@ -3,16 +3,15 @@ import { View, Text, TouchableOpacity, ActivityIndicator, LayoutChangeEvent } fr
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
-import { useRouter } from 'expo-router';
-import { Menu, Bell, Newspaper, MessageSquare } from 'lucide-react-native';
+import { Newspaper, MessageSquare } from 'lucide-react-native';
 
 import { useAppStore } from '../../src/store/useAppStore';
 import { useThemeStore } from '../../src/store/useThemeStore';
 import { useFeed } from '../../src/hooks/useFeed';
 import { useTweets } from '../../src/hooks/useTweets';
-import { ArticleCard } from '../../src/components/article/ArticleCard';
+import { NewsCard } from '../../src/components/article/NewsCard';
 import { TweetCard } from '../../src/components/tweet/TweetCard';
-import { safePush } from '../../src/utils/navigation';
+import { CountrySelector } from '../../src/components/navigation/CountrySelector';
 import type { Article, Tweet } from '../../src/types';
 
 type ExploreTab = 'articles' | 'tweets';
@@ -23,8 +22,7 @@ const TABS: { id: ExploreTab; label: string; icon: React.ElementType }[] = [
 ];
 
 export default function ExploreScreen() {
-    const router = useRouter();
-    const { selectedCountry, toggleSideMenu } = useAppStore();
+    const { selectedCountry } = useAppStore();
     const activeScheme = useThemeStore(state => state.activeScheme);
     const isDark = activeScheme === 'dark';
 
@@ -90,7 +88,7 @@ export default function ExploreScreen() {
     }, [activeTab, feedQuery, tweetsQuery]);
 
     const renderArticle = useCallback(({ item }: { item: Article }) => (
-        <ArticleCard article={item} />
+        <NewsCard article={item} />
     ), []);
 
     const renderTweet = useCallback(({ item }: { item: Tweet }) => (
@@ -101,24 +99,12 @@ export default function ExploreScreen() {
         <SafeAreaView className="flex-1 bg-surface-light dark:bg-surface-dark" edges={['top']}>
             {/* Header */}
             <View className="px-5 pt-4 pb-4 bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark">
-                <View className="flex-row items-center justify-between mb-2 mt-2">
-                    <TouchableOpacity
-                        onPress={toggleSideMenu}
-                        className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
-                    >
-                        <Menu size={22} color={isDark ? "#ffffff" : "#18181b"} />
-                    </TouchableOpacity>
-
+                <View className="flex-row items-center justify-between mt-2">
                     <Text className="text-display-lg font-display-extrabold text-zinc-900 dark:text-zinc-50 tracking-tight">
-                        Keşfet
+                        Haberler
                     </Text>
 
-                    <TouchableOpacity
-                        onPress={() => safePush(router, '/notifications' as any)}
-                        className="w-11 h-11 items-center justify-center rounded-full bg-surface-light-subtle dark:bg-surface-dark-subtle active:scale-95 transition-transform"
-                    >
-                        <Bell size={20} color={isDark ? "#ffffff" : "#18181b"} />
-                    </TouchableOpacity>
+                    <CountrySelector />
                 </View>
             </View>
 
@@ -170,7 +156,7 @@ export default function ExploreScreen() {
                             data={articles}
                             renderItem={renderArticle}
                             keyExtractor={(item) => item.id}
-                            estimatedItemSize={280}
+                            estimatedItemSize={120}
                             onEndReached={onEndReached}
                             onEndReachedThreshold={0.5}
                             refreshing={isRefreshing}
