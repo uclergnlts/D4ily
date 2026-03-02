@@ -86,34 +86,61 @@ export async function parseRSSFeed(url: string): Promise<RSSFeed> {
             });
         } else if (result.feed?.entry) {
             // Atom
-            feedTitle = result.feed.title || '';
-            feedDescription = result.feed.subtitle || '';
+            feedTitle = typeof result.feed.title === 'object' ? result.feed.title._ || result.feed.title : result.feed.title || '';
+            feedDescription = typeof result.feed.subtitle === 'object' ? result.feed.subtitle._ || '' : result.feed.subtitle || '';
 
             const rawEntries = Array.isArray(result.feed.entry) ? result.feed.entry : [result.feed.entry];
             items = rawEntries.filter(Boolean).map((entry: any) => {
+                // Extract text from xml2js objects ({_: "text", $: {type: ...}})
+                const getText = (v: any): string => {
+                    if (!v) return '';
+                    if (typeof v === 'string') return v;
+                    if (typeof v === 'object') return v._ || v._text || '';
+                    return String(v);
+                };
+
+                // Extract link href from Atom entry
+                let entryLink = '';
+                if (Array.isArray(entry.link)) {
+                    const altLink = entry.link.find((l: any) => l.$?.rel === 'alternate');
+                    entryLink = altLink?.$.href || entry.link[0]?.$.href || '';
+                } else if (entry.link?.$?.href) {
+                    entryLink = entry.link.$.href;
+                } else if (typeof entry.link === 'string') {
+                    entryLink = entry.link;
+                }
+
                 let imageUrl = '';
-                // Atom usually uses link with rel="enclosure"
+                // Atom: enclosure link or enclosure element
                 if (Array.isArray(entry.link)) {
                     const imgLink = entry.link.find((l: any) => l.$?.rel === 'enclosure' && l.$?.type?.startsWith('image'));
                     if (imgLink) imageUrl = imgLink.$.href;
                 } else if (entry.link?.$?.rel === 'enclosure' && entry.link?.$?.type?.startsWith('image')) {
                     imageUrl = entry.link.$.href;
                 }
+                // enclosure element (NTV-style)
+                if (!imageUrl && entry.enclosure?.$?.url) {
+                    imageUrl = entry.enclosure.$.url;
+                }
 
                 // Fallback: content HTML
-                if (!imageUrl && (entry.content?._text || entry.summary)) {
-                    const html = entry.content?._text || entry.summary;
+                const contentStr = getText(entry.content);
+                const summaryStr = getText(entry.summary);
+                if (!imageUrl && (contentStr || summaryStr)) {
+                    const html = contentStr || summaryStr;
                     const imgMatch = html.match(/<img[^>]+src="([^">]+)"/);
                     if (imgMatch) imageUrl = imgMatch[1];
                 }
 
+                const titleStr = getText(entry.title);
+
                 return {
-                    title: entry.title || '',
-                    link: entry.link?.$.href || entry.link || '',
-                    description: entry.summary || '',
-                    content: entry.content?._text || entry.summary || '',
+                    title: titleStr,
+                    link: sanitizeUrl(entryLink) || '',
+                    description: summaryStr,
+                    content: contentStr || summaryStr,
                     pubDate: entry.published || entry.updated || '',
-                    guid: entry.id || entry.link || '',
+                    guid: entry.id || entryLink || '',
                     imageUrl: imageUrl || undefined,
                 };
             });

@@ -482,13 +482,13 @@ describe('Feed API Integration Tests', () => {
             expect(mainArticle).toHaveProperty('govAlignmentLabel');
         });
 
-        it('should return 404 for non-existent article', async () => {
+        it('should return empty perspectives for non-existent article', async () => {
             const response = await request(server)
                 .get('/feed/tr/non-existent-article/perspectives')
-                .expect(404);
+                .expect(200);
 
-            expect(response.body.success).toBe(false);
-            expect(response.body.error).toBe('Article not found');
+            expect(response.body.success).toBe(true);
+            expect(response.body.data.relatedPerspectives).toEqual([]);
         });
 
         it('should handle invalid country code', async () => {

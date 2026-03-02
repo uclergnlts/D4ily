@@ -26,6 +26,23 @@ import { processArticleWithAI } from '../ai/aiService.js';
 import { isDuplicate } from '../../utils/similarity.js';
 import { eq, and, gte, sql } from 'drizzle-orm';
 
+/** Safely parse a date string; returns current time if invalid */
+function parseSafeDate(dateStr?: string): Date {
+    if (!dateStr) return new Date();
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) return d;
+
+    // Handle non-standard formats like "Mon, 03/02/2026 - 01:25"
+    const match = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s*-?\s*(\d{2}):(\d{2})/);
+    if (match) {
+        const [, month, day, year, hour, min] = match;
+        const d2 = new Date(`${year}-${month}-${day}T${hour}:${min}:00Z`);
+        if (!isNaN(d2.getTime())) return d2;
+    }
+
+    return new Date();
+}
+
 const COUNTRY_TABLES = {
     tr: { articles: tr_articles, sources: tr_article_sources },
     de: { articles: de_articles, sources: de_article_sources },
@@ -158,7 +175,7 @@ export async function scrapeSource(
                     loadedLanguageScore: 0, // Will be updated by AI
                     sensationalismScore: 0, // Will be updated by AI
                     categoryId: defaultCategoryId,
-                    publishedAt: item.pubDate ? new Date(item.pubDate) : new Date(),
+                    publishedAt: parseSafeDate(item.pubDate),
                     scrapedAt: new Date(),
                     viewCount: 0,
                     likeCount: 0,
@@ -235,7 +252,7 @@ export async function scrapeSource(
                 });
 
             } catch (error) {
-                logger.error({ error, item: item.title }, 'Failed to process article');
+                logger.error({ error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined, item: item.title }, 'Failed to process article');
             }
         }
 
