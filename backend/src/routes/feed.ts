@@ -441,10 +441,19 @@ app.get('/:country/:articleId', async (c) => {
         }
 
         const article = articles[0];
-        const sources = await db
+        const rawSources = await db
             .select()
             .from(tables.sources)
             .where(eq(tables.sources.articleId, articleId));
+
+        // Deduplicate sources by sourceUrl
+        const seen = new Set<string>();
+        const sources = rawSources.filter(s => {
+            const key = s.sourceUrl || s.sourceName;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
 
         let categoryInfo = null;
         if (article.categoryId) {
