@@ -3,29 +3,30 @@ import { View, Text, TouchableOpacity, Dimensions, FlatList } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import Animated, { FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
 const SLIDES = [
     {
         id: '1',
-        title: 'Gerçeklere Ulaş',
-        description: 'Yapay zeka analizleriyle haberlerin arka planını, duygusal tonunu ve manipülasyon riskini keşfet.',
-        icon: '🔍',
+        title: 'Günlük Özetler',
+        description: 'Yapay zeka ile hazırlanan günlük haber özetleri sayesinde gündemin nabzını tut. Her sabah ve akşam seni bilgilendirelim.',
+        icon: '📰',
         color: '#006FFF'
     },
     {
         id: '2',
-        title: 'Dengeli Bakış',
-        description: 'Sadece tek bir tarafı değil, tüm perspektifleri gör. Sağ, sol ve merkez kaynakları karşılaştır.',
-        icon: '⚖️',
+        title: '8 Ülke, Tek Uygulama',
+        description: 'Türkiye, ABD, İngiltere, Almanya, Fransa, İspanya, İtalya ve Rusya haberlerini ve tweetlerini tek ekrandan takip et.',
+        icon: '🌍',
         color: '#a855f7'
     },
     {
         id: '3',
-        title: 'Topluluğa Katıl',
-        description: 'Haberleri tartış, oyla ve güvenilir bilgi ekosisteminin bir parçası ol.',
-        icon: '🌍',
+        title: 'Farklı Bakış Açıları',
+        description: 'Her haberi farklı kaynakların gözünden gör. Dengeli ve bağımsız habercilik için tasarlandı.',
+        icon: '⚖️',
         color: '#10b981'
     }
 ];
@@ -44,18 +45,20 @@ export default function OnboardingScreen() {
         return () => clearTimeout(timer);
     }, []);
 
+    const completeOnboarding = async () => {
+        await AsyncStorage.setItem('hasSeenOnboarding', 'true');
+    };
+
     const handleNext = () => {
         if (currentIndex < SLIDES.length - 1) {
             flatListRef.current?.scrollToIndex({ index: currentIndex + 1 });
         } else {
-            // "Hemen Başla" -> Go to Auth
-            router.push('/auth');
+            completeOnboarding().then(() => router.replace('/(tabs)'));
         }
     };
 
     const handleGuest = () => {
-        // "Guest Mode" -> Skip to Feed
-        router.replace('/(tabs)');
+        completeOnboarding().then(() => router.replace('/(tabs)'));
     };
 
     const renderItem = ({ item }: { item: typeof SLIDES[0] }) => {
@@ -132,14 +135,15 @@ export default function OnboardingScreen() {
                     className="bg-[#006FFF] w-full py-4 rounded-2xl items-center justify-center shadow-lg shadow-blue-500/30 mb-4 active:scale-[0.98]"
                 >
                     <Text className="text-white font-bold text-lg">
-                        {currentIndex === SLIDES.length - 1 ? 'Hemen Başla' : 'Devam Et'}
+                        {currentIndex === SLIDES.length - 1 ? 'Başlayalım' : 'Devam Et'}
                     </Text>
                 </TouchableOpacity>
 
-                {/* Guest Link - Only show on last slide or always? Let's show always for convenience */}
-                <TouchableOpacity onPress={handleGuest} className="py-2 items-center">
-                    <Text className="text-zinc-400 font-medium text-sm">Giriş yapmadan devam et</Text>
-                </TouchableOpacity>
+                {currentIndex < SLIDES.length - 1 && (
+                    <TouchableOpacity onPress={handleGuest} className="py-2 items-center">
+                        <Text className="text-zinc-400 font-medium text-sm">Atla</Text>
+                    </TouchableOpacity>
+                )}
             </View>
         </SafeAreaView>
     );

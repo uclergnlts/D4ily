@@ -5,7 +5,7 @@ import { safeBack } from '../src/utils/navigation';
 import { ChevronLeft, Mail, Lock, User, Check, Eye, EyeOff } from 'lucide-react-native';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { authService } from '../src/api/services/authService';
-import { signInWithGoogle, signInWithApple, getIdToken, firebaseUserToAppUser } from '../src/utils/firebaseAuth';
+import { signInWithGoogle, signInWithApple, getIdToken, firebaseUserToAppUser, isFirebaseConfigured } from '../src/utils/firebaseAuth';
 import Animated, { FadeInDown, FadeOutUp, Layout } from 'react-native-reanimated';
 
 export default function AuthScreen() {
@@ -23,31 +23,29 @@ export default function AuthScreen() {
     const login = useAuthStore(state => state.login);
     const router = useRouter();
 
-    // Email validation
-    const validateEmail = (email: string): boolean => {
+    const validateEmail = (value: string): boolean => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
+        return emailRegex.test(value);
     };
 
-    // Password strength calculation
-    const getPasswordStrength = (password: string): { strength: number; label: string; color: string } => {
+    const getPasswordStrength = (pwd: string): { strength: number; label: string; color: string } => {
         let strength = 0;
-        if (password.length >= 8) strength += 1;
-        if (password.length >= 12) strength += 1;
-        if (/[A-Z]/.test(password)) strength += 1;
-        if (/[a-z]/.test(password)) strength += 1;
-        if (/[0-9]/.test(password)) strength += 1;
-        if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+        if (pwd.length >= 8) strength += 1;
+        if (pwd.length >= 12) strength += 1;
+        if (/[A-Z]/.test(pwd)) strength += 1;
+        if (/[a-z]/.test(pwd)) strength += 1;
+        if (/[0-9]/.test(pwd)) strength += 1;
+        if (/[^A-Za-z0-9]/.test(pwd)) strength += 1;
 
-        if (strength <= 2) return { strength, label: 'Zayıf', color: '#ef4444' };
+        if (strength <= 2) return { strength, label: 'Zayif', color: '#ef4444' };
         if (strength <= 4) return { strength, label: 'Orta', color: '#f59e0b' };
-        return { strength, label: 'Güçlü', color: '#22c55e' };
+        return { strength, label: 'Guclu', color: '#22c55e' };
     };
 
     const handleEmailChange = (text: string) => {
         setEmail(text);
         if (text && !validateEmail(text)) {
-            setEmailError('Geçerli bir e-posta adresi girin');
+            setEmailError('Gecerli bir e-posta adresi girin');
         } else {
             setEmailError('');
         }
@@ -55,8 +53,8 @@ export default function AuthScreen() {
 
     const handlePasswordChange = (text: string) => {
         setPassword(text);
-        if (!isLogin && text.length < 8) {
-            setPasswordError('Şifre en az 8 karakter olmalı');
+        if (!isLogin && text.length > 0 && text.length < 8) {
+            setPasswordError('Sifre en az 8 karakter olmali');
         } else {
             setPasswordError('');
         }
@@ -64,26 +62,26 @@ export default function AuthScreen() {
 
     const handleSubmit = async () => {
         if (!email || !password || (!isLogin && !name)) {
-            Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+            Alert.alert('Hata', 'Lutfen tum alanlari doldurun.');
             return;
         }
 
         if (!validateEmail(email)) {
-            Alert.alert('Hata', 'Geçerli bir e-posta adresi girin.');
+            Alert.alert('Hata', 'Gecerli bir e-posta adresi girin.');
             return;
         }
 
         if (!isLogin) {
             if (password.length < 8) {
-                Alert.alert('Hata', 'Şifre en az 8 karakter olmalıdır.');
+                Alert.alert('Hata', 'Sifre en az 8 karakter olmalidir.');
                 return;
             }
             if (password !== confirmPassword) {
-                Alert.alert('Hata', 'Şifreler eşleşmiyor.');
+                Alert.alert('Hata', 'Sifreler eslesmiyor.');
                 return;
             }
             if (!termsAccepted) {
-                Alert.alert('Hata', 'Devam etmek için kullanım koşullarını kabul etmelisiniz.');
+                Alert.alert('Hata', 'Devam etmek icin kullanim kosullarini kabul etmelisiniz.');
                 return;
             }
         }
@@ -96,11 +94,18 @@ export default function AuthScreen() {
                 safeBack(router);
             } else {
                 const data = await authService.register(email, password, name);
-                await login(data.user, data.customToken);
+                // Backend register returns user.id, auth store expects uid
+                const appUser = {
+                    uid: data.user.id || data.user.uid,
+                    email: data.user.email,
+                    name: data.user.name,
+                    role: 'user' as const,
+                };
+                await login(appUser, data.customToken);
                 router.push({ pathname: '/auth/verify', params: { email } });
             }
         } catch (error: any) {
-            Alert.alert('Hata', error.message || 'Bir sorun oluştu.');
+            Alert.alert('Hata', error.message || 'Bir sorun olustu.');
         } finally {
             setLoading(false);
         }
@@ -112,7 +117,7 @@ export default function AuthScreen() {
             let firebaseUser;
             if (provider === 'google') {
                 firebaseUser = await signInWithGoogle();
-            } else if (provider === 'apple') {
+            } else {
                 firebaseUser = await signInWithApple();
             }
 
@@ -123,11 +128,14 @@ export default function AuthScreen() {
                 safeBack(router);
             }
         } catch (error: any) {
-            Alert.alert('Hata', error.message || 'Social login başarısız');
+            Alert.alert('Bilgi', error.message || 'Social login basarisiz');
         } finally {
             setLoading(false);
         }
     };
+
+    // Show social login only on web with Firebase configured
+    const showSocialLogin = isFirebaseConfigured && Platform.OS === 'web';
 
     return (
         <View className="flex-1 bg-white dark:bg-black">
@@ -135,7 +143,7 @@ export default function AuthScreen() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 className="flex-1"
             >
-                {/* Header Actions */}
+                {/* Header */}
                 <View className="px-6 pt-12 pb-4 flex-row items-center justify-between z-10">
                     <TouchableOpacity
                         onPress={() => safeBack(router)}
@@ -149,78 +157,79 @@ export default function AuthScreen() {
                     className="flex-1 px-8"
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{ paddingBottom: 40 }}
+                    keyboardShouldPersistTaps="handled"
                 >
                     <Animated.View
                         entering={FadeInDown.duration(600).springify()}
                         className="mb-8 mt-4"
                     >
-                        <Text
-                            className="text-[40px] text-zinc-900 dark:text-white mb-3 font-black leading-[44px] tracking-tighter"
-                        >
-                            {isLogin ? 'Tekrar\nHoş Geldin' : 'Aramıza\nKatıl'}
+                        <Text className="text-[40px] text-zinc-900 dark:text-white mb-3 font-black leading-[44px] tracking-tighter">
+                            {isLogin ? 'Tekrar\nHos Geldin' : 'Aramiza\nKatil'}
                         </Text>
-                        <Text
-                            className="text-zinc-500 dark:text-zinc-400 text-[17px] leading-6 font-medium"
-                        >
+                        <Text className="text-zinc-500 dark:text-zinc-400 text-[17px] leading-6 font-medium">
                             {isLogin
-                                ? 'Kaldığın yerden devam etmek için giriş yap.'
-                                : 'Dünyayı yakalamak için hemen hesabını oluştur.'}
+                                ? 'Kaldigin yerden devam etmek icin giris yap.'
+                                : 'Dunyayi yakalamak icin hemen hesabini olustur.'}
                         </Text>
                     </Animated.View>
 
-                    {/* Social Login */}
-                    <Animated.View
-                        entering={FadeInDown.delay(100).duration(600).springify()}
-                        className="flex-row gap-4 mb-8"
-                    >
-                        <TouchableOpacity
-                            onPress={() => handleSocialLogin('google')}
-                            className="flex-1 flex-row items-center justify-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl shadow-sm active:scale-[0.98] transition-all"
-                        >
-                            <Image
-                                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' }}
-                                style={{ width: 22, height: 22, marginRight: 10 }}
-                            />
-                            <Text className="text-zinc-700 dark:text-white font-bold">Google</Text>
-                        </TouchableOpacity>
+                    {/* Social Login - only on web with firebase */}
+                    {showSocialLogin && (
+                        <>
+                            <Animated.View
+                                entering={FadeInDown.delay(100).duration(600).springify()}
+                                className="flex-row gap-4 mb-8"
+                            >
+                                <TouchableOpacity
+                                    onPress={() => handleSocialLogin('google')}
+                                    disabled={loading}
+                                    className="flex-1 flex-row items-center justify-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-4 rounded-2xl shadow-sm active:scale-[0.98]"
+                                >
+                                    <Image
+                                        source={{ uri: 'https://cdn-icons-png.flaticon.com/512/300/300221.png' }}
+                                        style={{ width: 22, height: 22, marginRight: 10 }}
+                                    />
+                                    <Text className="text-zinc-700 dark:text-white font-bold">Google</Text>
+                                </TouchableOpacity>
 
-                        <TouchableOpacity
-                            onPress={() => handleSocialLogin('apple')}
-                            className="flex-1 flex-row items-center justify-center bg-black dark:bg-zinc-800 border border-black dark:border-zinc-700 p-4 rounded-2xl shadow-sm active:scale-[0.98] transition-all"
-                        >
-                            <Image
-                                source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/1667px-Apple_logo_black.svg.png' }}
-                                style={{ width: 22, height: 22, marginRight: 10, tintColor: 'white' }}
-                            />
-                            <Text className="text-white font-bold">Apple</Text>
-                        </TouchableOpacity>
-                    </Animated.View>
+                                <TouchableOpacity
+                                    onPress={() => handleSocialLogin('apple')}
+                                    disabled={loading}
+                                    className="flex-1 flex-row items-center justify-center bg-black dark:bg-zinc-800 border border-black dark:border-zinc-700 p-4 rounded-2xl shadow-sm active:scale-[0.98]"
+                                >
+                                    <Image
+                                        source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/f/fa/Apple_logo_black.svg/1667px-Apple_logo_black.svg.png' }}
+                                        style={{ width: 22, height: 22, marginRight: 10, tintColor: 'white' }}
+                                    />
+                                    <Text className="text-white font-bold">Apple</Text>
+                                </TouchableOpacity>
+                            </Animated.View>
 
-                    <Animated.View
-                        entering={FadeInDown.delay(200).duration(600).springify()}
-                        className="flex-row items-center gap-4 mb-8"
-                    >
-                        <View className="h-[1px] bg-zinc-100 dark:bg-zinc-800 flex-1" />
-                        <Text className="text-zinc-400 text-xs font-semibold uppercase tracking-widest">veya e-posta ile</Text>
-                        <View className="h-[1px] bg-zinc-100 dark:bg-zinc-800 flex-1" />
-                    </Animated.View>
+                            <Animated.View
+                                entering={FadeInDown.delay(200).duration(600).springify()}
+                                className="flex-row items-center gap-4 mb-8"
+                            >
+                                <View className="h-[1px] bg-zinc-100 dark:bg-zinc-800 flex-1" />
+                                <Text className="text-zinc-400 text-xs font-semibold uppercase tracking-widest">veya e-posta ile</Text>
+                                <View className="h-[1px] bg-zinc-100 dark:bg-zinc-800 flex-1" />
+                            </Animated.View>
+                        </>
+                    )}
 
                     {/* Form Fields */}
-                    <Animated.View
-                        layout={Layout.springify()}
-                        className="gap-5"
-                    >
+                    <Animated.View layout={Layout.springify()} className="gap-5">
                         {!isLogin && (
                             <Animated.View entering={FadeInDown} exiting={FadeOutUp}>
-                                <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">İsim Soyisim</Text>
-                                <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4 focus:border-blue-500 focus:bg-white dark:focus:bg-black transition-all">
-                                    <User size={20} color="#a1a1aa" className="mr-3" />
+                                <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">Isim Soyisim</Text>
+                                <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4">
+                                    <User size={20} color="#a1a1aa" style={{ marginRight: 12 }} />
                                     <TextInput
                                         className="flex-1 text-zinc-900 dark:text-white font-medium text-[15px]"
-                                        placeholder="Adın Soyadın"
+                                        placeholder="Adin Soyadin"
                                         placeholderTextColor="#a1a1aa"
                                         value={name}
                                         onChangeText={setName}
+                                        autoCapitalize="words"
                                     />
                                 </View>
                             </Animated.View>
@@ -228,8 +237,8 @@ export default function AuthScreen() {
 
                         <View>
                             <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">E-posta</Text>
-                            <View className={`flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border rounded-2xl px-4 py-4 transition-all ${emailError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-zinc-200 dark:border-zinc-800 focus:border-blue-500 focus:bg-white dark:focus:bg-black'}`}>
-                                <Mail size={20} color={emailError ? '#ef4444' : '#a1a1aa'} className="mr-3" />
+                            <View className={`flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border rounded-2xl px-4 py-4 ${emailError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                                <Mail size={20} color={emailError ? '#ef4444' : '#a1a1aa'} style={{ marginRight: 12 }} />
                                 <TextInput
                                     className="flex-1 text-zinc-900 dark:text-white font-medium text-[15px]"
                                     placeholder="ornek@email.com"
@@ -238,6 +247,7 @@ export default function AuthScreen() {
                                     onChangeText={handleEmailChange}
                                     autoCapitalize="none"
                                     keyboardType="email-address"
+                                    autoComplete="email"
                                 />
                             </View>
                             {emailError ? (
@@ -246,40 +256,36 @@ export default function AuthScreen() {
                         </View>
 
                         <View>
-                            <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">Şifre</Text>
-                            <View className={`flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border rounded-2xl px-4 py-4 transition-all ${passwordError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-zinc-200 dark:border-zinc-800 focus:border-blue-500 focus:bg-white dark:focus:bg-black'}`}>
-                                <Lock size={20} color={passwordError ? '#ef4444' : '#a1a1aa'} className="mr-3" />
+                            <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">Sifre</Text>
+                            <View className={`flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border rounded-2xl px-4 py-4 ${passwordError ? 'border-red-500 bg-red-50 dark:bg-red-900/10' : 'border-zinc-200 dark:border-zinc-800'}`}>
+                                <Lock size={20} color={passwordError ? '#ef4444' : '#a1a1aa'} style={{ marginRight: 12 }} />
                                 <TextInput
                                     className="flex-1 text-zinc-900 dark:text-white font-medium text-[15px]"
-                                    placeholder="••••••••"
+                                    placeholder="********"
                                     placeholderTextColor="#a1a1aa"
                                     value={password}
                                     onChangeText={handlePasswordChange}
                                     secureTextEntry={!showPassword}
+                                    autoComplete={isLogin ? 'password' : 'new-password'}
                                 />
-                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                                    {showPassword ? (
-                                        <EyeOff size={20} color="#a1a1aa" />
-                                    ) : (
-                                        <Eye size={20} color="#a1a1aa" />
-                                    )}
+                                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    {showPassword ? <EyeOff size={20} color="#a1a1aa" /> : <Eye size={20} color="#a1a1aa" />}
                                 </TouchableOpacity>
                             </View>
-                            {/* Password Strength Indicator */}
                             {!isLogin && password.length > 0 && (
                                 <View className="mt-2">
                                     <View className="flex-row items-center justify-between mb-1">
-                                        <Text className="text-xs text-zinc-500">Şifre Gücü:</Text>
+                                        <Text className="text-xs text-zinc-500">Sifre Gucu:</Text>
                                         <Text className="text-xs font-bold" style={{ color: getPasswordStrength(password).color }}>
                                             {getPasswordStrength(password).label}
                                         </Text>
                                     </View>
                                     <View className="h-1 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
                                         <View
-                                            className="h-full rounded-full transition-all duration-300"
+                                            className="h-full rounded-full"
                                             style={{
                                                 width: `${(getPasswordStrength(password).strength / 6) * 100}%`,
-                                                backgroundColor: getPasswordStrength(password).color
+                                                backgroundColor: getPasswordStrength(password).color,
                                             }}
                                         />
                                     </View>
@@ -293,18 +299,22 @@ export default function AuthScreen() {
                         {!isLogin && (
                             <Animated.View entering={FadeInDown} exiting={FadeOutUp} className="gap-5">
                                 <View>
-                                    <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">Şifre Tekrar</Text>
-                                    <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4 focus:border-blue-500 focus:bg-white dark:focus:bg-black transition-all">
-                                        <Lock size={20} color="#a1a1aa" className="mr-3" />
+                                    <Text className="text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase mb-2 ml-1 tracking-wider">Sifre Tekrar</Text>
+                                    <View className="flex-row items-center bg-zinc-50 dark:bg-zinc-900/50 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 py-4">
+                                        <Lock size={20} color="#a1a1aa" style={{ marginRight: 12 }} />
                                         <TextInput
                                             className="flex-1 text-zinc-900 dark:text-white font-medium text-[15px]"
-                                            placeholder="••••••••"
+                                            placeholder="********"
                                             placeholderTextColor="#a1a1aa"
                                             value={confirmPassword}
                                             onChangeText={setConfirmPassword}
                                             secureTextEntry={!showPassword}
+                                            autoComplete="new-password"
                                         />
                                     </View>
+                                    {confirmPassword.length > 0 && password !== confirmPassword && (
+                                        <Text className="text-red-500 text-xs mt-1 ml-1">Sifreler eslesmiyor</Text>
+                                    )}
                                 </View>
 
                                 <TouchableOpacity
@@ -316,7 +326,7 @@ export default function AuthScreen() {
                                         {termsAccepted && <Check size={14} color="white" strokeWidth={3} />}
                                     </View>
                                     <Text className="flex-1 text-[13px] text-zinc-500 font-medium leading-[20px]">
-                                        <Text className="text-blue-600 dark:text-blue-400 font-bold">Kullanım Koşulları</Text>'nı ve <Text className="text-blue-600 dark:text-blue-400 font-bold">Gizlilik Politikası</Text>'nı okudum, kabul ediyorum.
+                                        <Text className="text-blue-600 dark:text-blue-400 font-bold">Kullanim Kosullari</Text>'ni ve <Text className="text-blue-600 dark:text-blue-400 font-bold">Gizlilik Politikasi</Text>'ni okudum, kabul ediyorum.
                                     </Text>
                                 </TouchableOpacity>
                             </Animated.View>
@@ -327,23 +337,21 @@ export default function AuthScreen() {
                                 className="self-end py-2 px-1"
                                 onPress={() => router.push('/auth/forgot-password')}
                             >
-                                <Text className="text-blue-600 dark:text-blue-400 font-bold text-[14px]">Şifremi unuttum?</Text>
+                                <Text className="text-blue-600 dark:text-blue-400 font-bold text-[14px]">Sifremi unuttum?</Text>
                             </TouchableOpacity>
                         )}
 
                         <TouchableOpacity
-                            className={`p-4 rounded-2xl items-center mt-4 shadow-lg shadow-blue-500/20 active:scale-[0.98] transition-all h-[56px] justify-center ${(!isLogin && !termsAccepted) ? 'bg-zinc-200 dark:bg-zinc-800' : 'bg-[#006FFF]'}`}
+                            className={`p-4 rounded-2xl items-center mt-4 shadow-lg shadow-blue-500/20 active:scale-[0.98] h-[56px] justify-center ${(!isLogin && !termsAccepted) ? 'bg-zinc-200 dark:bg-zinc-800' : 'bg-[#006FFF]'}`}
                             onPress={handleSubmit}
                             disabled={loading || (!isLogin && !termsAccepted)}
                             activeOpacity={0.8}
                         >
                             {loading ? (
-                                <ActivityIndicator color={(!isLogin && !termsAccepted) ? "#a1a1aa" : "white"} />
+                                <ActivityIndicator color={(!isLogin && !termsAccepted) ? '#a1a1aa' : 'white'} />
                             ) : (
-                                <Text
-                                    className={`font-bold text-[17px] tracking-wide ${(!isLogin && !termsAccepted) ? 'text-zinc-400 dark:text-zinc-500' : 'text-white'}`}
-                                >
-                                    {isLogin ? 'Giriş Yap' : 'Hesap Oluştur'}
+                                <Text className={`font-bold text-[17px] tracking-wide ${(!isLogin && !termsAccepted) ? 'text-zinc-400 dark:text-zinc-500' : 'text-white'}`}>
+                                    {isLogin ? 'Giris Yap' : 'Hesap Olustur'}
                                 </Text>
                             )}
                         </TouchableOpacity>
@@ -352,11 +360,11 @@ export default function AuthScreen() {
                     {/* Toggle Mode */}
                     <View className="flex-row justify-center mt-10 mb-8 items-center gap-1">
                         <Text className="text-zinc-500 font-medium text-[15px]">
-                            {isLogin ? 'Hesabın yok mu?' : 'Zaten hesabın var mı?'}
+                            {isLogin ? 'Hesabin yok mu?' : 'Zaten hesabin var mi?'}
                         </Text>
                         <TouchableOpacity onPress={() => setIsLogin(!isLogin)} className="py-2">
                             <Text className="text-[#006FFF] font-bold text-[15px]">
-                                {isLogin ? 'Hemen Kayıt Ol' : 'Giriş Yap'}
+                                {isLogin ? 'Hemen Kayit Ol' : 'Giris Yap'}
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -365,4 +373,3 @@ export default function AuthScreen() {
         </View>
     );
 }
-

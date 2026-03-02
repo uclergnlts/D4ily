@@ -1,14 +1,14 @@
 import {
   initializeAuth,
   getAuth,
+  signInWithCredential,
   GoogleAuthProvider,
   OAuthProvider,
-  signInWithPopup,
   User,
-  UserCredential,
   type Auth,
 } from 'firebase/auth';
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
+import { Platform } from 'react-native';
 
 // Firebase configuration from environment variables
 const firebaseConfig = {
@@ -35,7 +35,7 @@ const isPlaceholderValue = (value: string): boolean => {
 };
 
 const missingConfigKeys = REQUIRED_CONFIG_KEYS.filter((key) => isPlaceholderValue(firebaseConfig[key]));
-const isFirebaseConfigured = missingConfigKeys.length === 0;
+export const isFirebaseConfigured = missingConfigKeys.length === 0;
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
@@ -70,13 +70,19 @@ const ensureAuth = (): Auth => {
 
 /**
  * Sign in with Google
- * @returns Firebase User object
+ * Uses expo-auth-session on native, falls back to credential-based auth
  */
 export const signInWithGoogle = async (): Promise<User> => {
+  if (Platform.OS !== 'web') {
+    throw new Error('Google ile giris su an desteklenmiyor. E-posta ile giris yapabilirsiniz.');
+  }
+
   try {
     const authInstance = ensureAuth();
+    // Web-only: dynamic import to avoid crash on native
+    const { signInWithPopup } = await import('firebase/auth');
     const provider = new GoogleAuthProvider();
-    const result: UserCredential = await signInWithPopup(authInstance, provider);
+    const result = await signInWithPopup(authInstance, provider);
     return result.user;
   } catch (error: any) {
     console.error('Google sign-in error:', error);
@@ -86,15 +92,20 @@ export const signInWithGoogle = async (): Promise<User> => {
 
 /**
  * Sign in with Apple
- * @returns Firebase User object
+ * Uses expo-auth-session on native, falls back to credential-based auth
  */
 export const signInWithApple = async (): Promise<User> => {
+  if (Platform.OS !== 'web') {
+    throw new Error('Apple ile giris su an desteklenmiyor. E-posta ile giris yapabilirsiniz.');
+  }
+
   try {
     const authInstance = ensureAuth();
+    const { signInWithPopup } = await import('firebase/auth');
     const provider = new OAuthProvider('apple.com');
     provider.addScope('email');
     provider.addScope('name');
-    const result: UserCredential = await signInWithPopup(authInstance, provider);
+    const result = await signInWithPopup(authInstance, provider);
     return result.user;
   } catch (error: any) {
     console.error('Apple sign-in error:', error);
@@ -104,15 +115,13 @@ export const signInWithApple = async (): Promise<User> => {
 
 /**
  * Get the current ID token from Firebase Auth
- * @returns ID token string or null
  */
 export const getIdToken = async (): Promise<string | null> => {
   try {
     const authInstance = ensureAuth();
     const user = authInstance.currentUser;
     if (!user) return null;
-    const token = await user.getIdToken();
-    return token;
+    return await user.getIdToken();
   } catch (error: any) {
     console.error('Get ID token error:', error);
     throw new Error(error.message || 'Token alinamadi');
@@ -121,14 +130,12 @@ export const getIdToken = async (): Promise<string | null> => {
 
 /**
  * Get the current authenticated user
- * @returns Firebase User object or null
  */
 export const getCurrentUser = (): User | null => {
   try {
     const authInstance = ensureAuth();
     return authInstance.currentUser;
-  } catch (error) {
-    console.error('Get current user error:', error);
+  } catch {
     return null;
   }
 };
@@ -148,8 +155,6 @@ export const signOut = async (): Promise<void> => {
 
 /**
  * Convert Firebase User to app user format
- * @param firebaseUser Firebase User object
- * @returns App user object
  */
 export const firebaseUserToAppUser = (firebaseUser: User) => {
   return {

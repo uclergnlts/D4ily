@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   DMSans_400Regular,
   DMSans_500Medium,
@@ -35,6 +36,10 @@ export default function RootLayout() {
   const checkAuth = useAuthStore(state => state.checkAuth);
   const user = useAuthStore(state => state.user);
   const token = useAuthStore(state => state.token);
+  const router = useRouter();
+  const segments = useSegments();
+
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
 
   const [fontsLoaded, fontError] = useFonts({
     DMSans_400Regular,
@@ -49,6 +54,23 @@ export default function RootLayout() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  // Check if user has seen onboarding
+  useEffect(() => {
+    AsyncStorage.getItem('hasSeenOnboarding').then((value) => {
+      setHasSeenOnboarding(value === 'true');
+    });
+  }, []);
+
+  // Redirect to onboarding on first launch
+  useEffect(() => {
+    if (hasSeenOnboarding === null) return; // still loading
+    if (!fontsLoaded && !fontError) return; // fonts not ready
+
+    if (!hasSeenOnboarding && segments[0] !== 'onboarding') {
+      router.replace('/onboarding');
+    }
+  }, [hasSeenOnboarding, fontsLoaded, fontError, segments]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
